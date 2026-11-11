@@ -1,12 +1,12 @@
 # CeeVee: Technical Plan
 
-Last updated 2026-11-10. Companion to [PLAN.md](PLAN.md), which holds the product scope and decisions. This file says how CeeVee is built: repository layout, components, data flow, the open source projects it includes, and the engineering order of work.
+Last updated 2026-11-11. Companion to [PLAN.md](PLAN.md), which holds the product scope and decisions. This file says how CeeVee is built: repository layout, components, data flow, the open source projects it includes, and the engineering order of work.
 
 ## 1. Ground rules
 
 - **Clean room.** Dossier (AGPL-3.0) is a product reference only. No code, prompts, CSS, images or schema text is copied from it.
 - **Licenses we accept** in anything that ships: MIT, Apache-2.0, BSD-2/3, ISC, Zlib, Unicode, MPL-2.0 (file-level, unmodified), public domain. **Rejected:** GPL, LGPL (static linking), AGPL, SSPL, and model licenses that restrict commercial use. `cargo-deny` and `license-checker` enforce this in CI.
-- **Local first.** Profile, documents, mail and history never leave the machine. The only network calls are job-source queries (search terms only), mail sync, model download, license activation and update checks.
+- **Local first.** Profile, documents, mail and history never leave the machine. The only network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
 - **Human in the loop.** Nothing is submitted, sent or saved to the profile without an explicit user action.
 - **Targets.** Windows 11 x64 and macOS 13+ on Apple silicon (arm64). No Intel Mac or Linux build in v1.
 
@@ -159,6 +159,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - License activation sends key and machine hash, receives an Ed25519-signed license file; `ed25519-dalek` verifies it offline against a public key compiled into the app.
 - Clock rollback check: refuse to move the trial backwards past the newest timestamp seen in the database.
 - After the trial without a license, the app is read-only: view and export only.
+- Activation from the purchase email: `tauri-plugin-deep-link` registers the `ceevee://` scheme; `ceevee://activate?key=…` opens Settings › License with the key filled in, and the person confirms. The key is never activated without that click.
 
 ## 13. Server side (highturtle repo, AWS)
 
@@ -170,8 +171,9 @@ Small and serverless:
 | Activation API | API Gateway + Lambda + DynamoDB | Activate, deactivate (free a seat), validate; 2 seats per license |
 | Trial token API | Same | Issues signed trial tokens per machine hash |
 | Signing key | AWS KMS or Secrets Manager | Holds the Ed25519 private key |
-| Downloads and models | S3 + CloudFront | Installers, update manifest, GGUF models, adapter updates |
-| Update manifest | S3 + CloudFront | Signed JSON read by the Tauri updater |
+| Downloads, updates and models | S3 (private, versioned) + CloudFront at `dl.turtlebox.studio` | Installers, update manifests, GGUF models, adapter bundles; layout in section 16 |
+| My license page | Lambda + DynamoDB, emailed sign-in link (SES) | Shows key, seats with "Free this seat", download links |
+| CI publishing role | IAM role trusted through GitHub OIDC | Lets the CeeVee release workflow write to the bucket; no long-lived AWS keys |
 
 FastSpring is the merchant of record (sales tax, receipts, refunds).
 
@@ -192,12 +194,127 @@ FastSpring is the merchant of record (sales tax, receipts, refunds).
 - **Mail:** a local IMAP test server (GreenMail in Docker) with fixture mailboxes, including real-shape alert emails.
 - **UI:** Vitest for components; Playwright against the SvelteKit dev build with a mocked command layer for end-to-end screens.
 
-## 16. Build, CI and release
+## 16. Build, release and delivery
 
-- GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64).
-- Per pull request: `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`, `pnpm lint`, `pnpm test`, `svelte-check`.
-- Release: `tauri-action` builds MSI/NSIS and DMG; Windows signed with Azure Trusted Signing; macOS signed with Developer ID and notarized; artifacts and the signed update manifest uploaded to S3.
-- Version scheme: semantic versions; licenses cover the purchased major version.
+### 16.1 Per pull request
+
+GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64). Each pull request runs `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`, `pnpm lint`, `pnpm test` and `svelte-check`, and builds unsigned bundles to catch packaging errors. No secrets are available to pull request jobs.
+
+### 16.2 What gets built
+
+| Platform | First install | Updater artifact | Signing |
+| --- | --- | --- | --- |
+| Windows 11 x64 | `CeeVee_x.y.z_x64-setup.exe` (NSIS, `installMode: currentUser`, WebView2 from the OS) | The same `-setup.exe` plus `.sig` | Azure Trusted Signing on the app binary and the installer, through `bundle.windows.signCommand` |
+| macOS 13+ arm64 | `CeeVee_x.y.z_aarch64.dmg` | `CeeVee.app.tar.gz` plus `.sig` | Developer ID Application certificate, hardened runtime, notarized with `notarytool` (App Store Connect API key) and stapled |
+
+- `bundle.createUpdaterArtifacts: true` makes Tauri write the `.sig` files, signed with the Tauri updater key (minisign Ed25519) from `TAURI_SIGNING_PRIVATE_KEY`.
+- MSI is not built in v1: per-machine MSI installs need an administrator for every update. Add it later only if IT-managed customers ask.
+- No Intel Mac or universal binary (see section 1).
+- Each release also gets `SHA256SUMS` over every file, published next to the installers.
+
+### 16.3 Versions and tags
+
+- Semantic versions, one number for the whole app, kept in the workspace `Cargo.toml` and copied into `tauri.conf.json` and `package.json` by a `just bump` script.
+- `vX.Y.Z-beta.N` tags build Beta releases; `vX.Y.Z` tags build Stable releases. Main builds publish to Internal as `X.Y.Z-dev.<run number>`.
+- A tag's major version selects the manifest folder (`updates/v1/`), so a 1.x install never auto-updates to 2.0 (licenses cover the purchased major version).
+- Release notes come from `CHANGELOG.md`, one section per version, written for users.
+
+### 16.4 Release pipeline
+
+`release.yml` runs on a pushed tag that points at a commit on `main`:
+
+1. **Build.** Matrix job per platform with `tauri-action`, signing secrets from the `release` GitHub environment. The macOS job imports the certificate into a temporary keychain and notarizes; the Windows job signs through Trusted Signing.
+2. **Verify.** On fresh runners: `signtool verify /pa /all` on Windows; `codesign --verify --deep --strict`, `spctl -a -t exec` and `stapler validate` on macOS. Then a smoke test: install silently, launch with `--smoke-test` (opens the database, loads a tiny test model, renders a PDF, exits 0), uninstall.
+3. **Upload.** Files go to `releases/<version>/` in S3 through the OIDC role. Release folders are immutable once written.
+4. **Publish.** A manifest job writes the channel manifest (16.5). For Stable this step waits for approval in the `release` environment (Howard as required reviewer). Promotion from Beta to Stable reuses the same signed files; nothing is rebuilt.
+5. **Announce.** A draft GitHub Release with notes and checksums for the record, and an invalidation of the changed manifest paths in CloudFront.
+
+A separate `rollout.yml`, started by hand, moves a Stable release from 10 to 50 to 100 percent, pauses it, or resumes it. Each run rewrites one manifest and invalidates it.
+
+### 16.5 Update manifests and the client
+
+Static JSON on CloudFront, no server code:
+
+```
+https://dl.turtlebox.studio/ceevee/updates/v1/{channel}.json?t={{target}}&a={{arch}}&v={{current_version}}
+```
+
+The query string is ignored by the cache (cache key is the path) but kept in CloudFront access logs, which gives version and platform adoption counts without any identifier.
+
+```json
+{
+  "version": "1.3.0",
+  "notes": "…",
+  "pub_date": "2027-06-02T17:00:00Z",
+  "platforms": {
+    "windows-x86_64": { "url": "https://dl.turtlebox.studio/ceevee/releases/1.3.0/CeeVee_1.3.0_x64-setup.exe", "signature": "…" },
+    "darwin-aarch64": { "url": "https://dl.turtlebox.studio/ceevee/releases/1.3.0/CeeVee.app.tar.gz", "signature": "…" }
+  },
+  "rollout": { "percent": 10, "paused": false },
+  "min_version": "1.0.0",
+  "next_major": { "version": "2.0.0", "url": "https://turtlebox.studio/ceevee/upgrade" }
+}
+```
+
+- `tauri-plugin-updater`, with the endpoint chosen at run time through `app.updater_builder().endpoints(…)` from the channel setting (Stable by default, Beta opt-in, Internal only in internal builds).
+- Checks at launch and every 6 hours. The extra fields are read from `Update::raw_json`: the client installs only if `bucket(install_id) < rollout.percent` and not `paused`, where `install_id` is a random UUID stored locally (never sent) and `bucket` is its SHA-256 mod 100. The Beta manifest always points to the newer of the latest Beta and the latest Stable, so Beta users rejoin Stable.
+- Download in the background, verify the minisign signature (the updater refuses unsigned or mismatched files), then show "Restart to update". Install is deferred while any `Job` of kind auto-fill, draft or mail sync is running. Windows uses `installMode: "passive"` (progress bar, no questions).
+- macOS: on first run, if the bundle path is under `/Volumes/` or app translocation is active, offer to move to `/Applications` and relaunch.
+- If the updater fails three times in a row, Settings shows the error and a "Download manually" link.
+- `next_major` drives a dismissible "CeeVee 2 is available" note; the 1.x line keeps receiving fixes in `updates/v1/` as long as it is supported.
+
+### 16.6 Signed content outside the app
+
+Adapters (section 9), job-alert parsers and model files update without an app release. Each kind has a manifest signed with a separate **content key** (Ed25519, verified with `ed25519-dalek` against a public key compiled into the app):
+
+```
+ceevee/adapters/manifest.json (+ .sig)   → bundles/<sha256>.tar.zst
+ceevee/models/manifest.json   (+ .sig)   → <model-id>/<sha256>.gguf
+```
+
+- Each manifest entry has `id`, `version`, `sha256`, `size`, `min_app_version`, `max_app_version`, and for models the hardware tier (RAM, GPU) it is meant for.
+- Adapters: checked daily, downloaded, hash-checked, unpacked into the app-data folder and hot-loaded. The adapters built into the app are the floor; if a downloaded bundle fails its hash or its schema check, the app uses the built-in ones and reports it.
+- Models: checked weekly. A new default for the person's tier appears as an offer with its size. Download uses HTTP range requests to resume, writes to `*.partial`, checks SHA-256, then swaps the model in the model config; the old file is deleted after the first successful load. Files are content-addressed, so CloudFront can cache them forever.
+- Content manifests are built and signed by a `content.yml` workflow in the CeeVee repo, so adapter fixes ship in minutes.
+
+### 16.7 Bucket and CDN layout
+
+```
+s3://turtlebox-dl/ceevee/
+├─ releases/<version>/      installers, updater bundles, .sig, SHA256SUMS   (immutable, cache 1 year)
+├─ updates/v<major>/        stable.json, beta.json, internal.json          (cache 60 s)
+├─ latest/                  windows.json, mac.json: current Stable download links for the website (cache 60 s)
+├─ adapters/                manifest.json, .sig, bundles/                   (manifest 60 s, bundles 1 year)
+└─ models/                  manifest.json, .sig, <model-id>/<sha256>.gguf   (manifest 1 h, files 1 year)
+```
+
+- Bucket private, CloudFront Origin Access Control, S3 versioning on (so any manifest can be put back), TLS only, AWS WAF rate rule on `models/` to blunt scripted bulk downloads.
+- The Internal channel lives under a CloudFront path that requires a signed cookie, so dev builds are not public.
+- The turtlebox.studio download button reads `latest/*.json`, so the website never needs a deploy for a new release.
+
+### 16.8 Keys and secrets
+
+| Key | Used for | Where it lives | If lost |
+| --- | --- | --- | --- |
+| Tauri updater key (minisign) | Signing app updates | `release` environment secret + two offline encrypted backups | Existing installs can never verify another update; users must reinstall by hand. Rotation: ship a build with the new public key, signed with the old key |
+| Content key (Ed25519) | Signing adapter and model manifests | `content` environment secret + offline backup | Rotate by shipping a release that trusts both old and new keys, then retire the old |
+| License key (Ed25519) | Signing license files and trial tokens | AWS KMS or Secrets Manager (section 13) | Same rotation pattern; never in CI |
+| Apple Developer ID cert and App Store Connect API key | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
+| Azure Trusted Signing | Windows signing | Azure account; CI signs in through OIDC federation where supported, otherwise a client secret in `release` | Reissue in Azure |
+
+Release and content jobs run only on tags from `main`, with environment protection rules, and the AWS role can write only under `ceevee/`.
+
+### 16.9 Costs (estimate)
+
+| Item | Cost |
+| --- | --- |
+| Apple Developer Program | $99 a year |
+| Azure Trusted Signing (Basic) | about $10 a month |
+| App download and updates | about 10 MB per install, a few MB per update: negligible |
+| Model download | about 2.5 GB per install (5 GB for the 8B option): roughly $0.20 per install at CloudFront's standard US rate, paid on every trial |
+| S3 storage | a few dollars a month |
+
+If model bandwidth becomes material, the options are a CloudFront flat-rate plan, or moving `models/` alone to a zero-egress store (Cloudflare R2) behind the same signed manifest; the app does not change because the manifest holds the URLs.
 
 ## 17. Open source projects included
 
@@ -208,7 +325,7 @@ All are permissively licensed. Versions are pinned in `Cargo.lock` and `pnpm-loc
 | Project | Repository | License | Used for |
 | --- | --- | --- | --- |
 | Tauri 2 | [tauri-apps/tauri](https://github.com/tauri-apps/tauri) | MIT / Apache-2.0 | App shell, IPC, installers |
-| Tauri plugins (updater, single-instance, autostart, dialog, fs, log, notification, store, os) | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) | MIT / Apache-2.0 | Updates, tray, file dialogs, notifications |
+| Tauri plugins (updater, deep-link, process, single-instance, autostart, dialog, fs, log, notification, store, os) | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) | MIT / Apache-2.0 | Updates, tray, file dialogs, notifications |
 | tauri-specta, specta | [specta-rs/tauri-specta](https://github.com/specta-rs/tauri-specta) | MIT | Typed TypeScript bindings for commands |
 | Tokio | [tokio-rs/tokio](https://github.com/tokio-rs/tokio) | MIT | Async runtime |
 | Serde, serde_json | [serde-rs/serde](https://github.com/serde-rs/serde) | MIT / Apache-2.0 | Serialization |
@@ -305,12 +422,12 @@ All are permissively licensed. Versions are pinned in `Cargo.lock` and `pnpm-loc
 
 Matches the roadmap in PLAN.md (about 27 weeks).
 
-1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar, themes and tray; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing on both platforms; cargo-deny policy.
+1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar, themes and tray; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing and notarization on both platforms, release pipeline publishing to the Internal channel (16.4), S3 bucket and CloudFront set up in highturtle; cargo-deny policy.
 2. **Local AI (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** Onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard, reminders, export, import, backups. Categories and companies; company-site sources (Greenhouse, Lever, Ashby, SmartRecruiters, Workday feed, JobPosting reader), USAJOBS and Adzuna; dedupe, scoring, scheduler; LinkedIn Connections import and the "who you know" panel.
 5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel.
-6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail app-password flow; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater; turtlebox.studio pages; beta with 20 to 50 testers.
+6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail app-password flow; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
 
 ## 19. Technical risks
 
@@ -321,4 +438,7 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 | Workday's per-employer accounts and multi-page flow | Treat as the user's step: CeeVee pauses for sign-in, then resumes filling |
 | Job alert email formats change | Parsers are data-driven and shipped through the adapter update channel; fixtures from real alerts in tests |
 | Typst template quality vs. HTML themes | Prototype two themes in week 1 to confirm the look before committing |
+| Signing enrollment delays (Apple, Azure identity validation) | Start both before week 1; ship unsigned Internal builds to Howard's own machines meanwhile |
+| New Windows signing identity has no SmartScreen reputation | Trusted Signing certificates gain reputation with download volume; tell beta testers to expect a warning for the first weeks |
+| macOS app run from the DMG cannot update | Move-to-Applications prompt on first run (16.5) |
 | Webview differences (WebView2 vs WKWebView) | UI tested on both in CI with screenshots; avoid cutting-edge CSS |
