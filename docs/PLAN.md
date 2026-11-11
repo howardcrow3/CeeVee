@@ -1,6 +1,6 @@
 # CeeVee: Product and Technical Plan
 
-Last updated 2026-11-10. This file mirrors the [live plan document](https://claude.ai/artifact/WjnrwY1qasFHHXThPjtVrb) and is updated as decisions are made. Engineering detail is in [TECHNICAL_PLAN.md](TECHNICAL_PLAN.md).
+Last updated 2026-11-11. This file mirrors the [live plan document](https://claude.ai/artifact/WjnrwY1qasFHHXThPjtVrb) and is updated as decisions are made. Engineering detail is in [TECHNICAL_PLAN.md](TECHNICAL_PLAN.md).
 
 ## Summary
 
@@ -197,7 +197,7 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 
 | Part | Choice | Why |
 | --- | --- | --- |
-| App shell | Tauri 2 (decided) | Native installers for Windows (MSI/NSIS) and macOS (DMG, arm64), around 10 MB before models, built-in updater and tray |
+| App shell | Tauri 2 (decided) | Native installers for Windows (per-user NSIS) and macOS (DMG, arm64), around 10 MB before models, built-in updater and tray |
 | UI | TypeScript with SvelteKit (static build) and Tailwind (decided) | Fastest way to reach Dossier-level polish |
 | Core | Rust, Tokio, crates split by area: `db`, `ai`, `docs`, `apply`, `mail`, `license` | Each area testable on its own |
 | Database | SQLite through `sqlx` with versioned migrations, WAL mode, FTS5 for search | One file in the app data folder, easy to back up |
@@ -248,24 +248,67 @@ Migrations ship inside the app and run at start-up, after an automatic backup of
 
 People download CeeVee free from turtlebox.studio, use every feature for 14 days, then make a one-time purchase of $19.99 there to keep going. There is no subscription, and each license covers 2 machines. After the trial the app stays read-only: the person can still view and export their data, so nobody loses their job search.
 
-1. **Download.** turtlebox.studio offers a signed Windows installer and a notarized macOS DMG for Apple silicon. No account needed.
+1. **Download.** turtlebox.studio offers a signed Windows installer and a notarized macOS DMG for Apple silicon. No account needed. The same public download serves trial users and buyers, because the license, not the download, is what unlocks the app.
 2. **Trial.** On first run the app records the start time in the database and the OS keychain and asks turtlebox.studio once for a signed trial token tied to a hashed machine ID. Offline starts still work; the token is fetched on the next connection. Clock rollback is detected by comparing against the latest timestamp seen.
-3. **Purchase.** Checkout on turtlebox.studio through FastSpring, which is the merchant of record and so collects and remits US sales tax. FastSpring's license fulfillment calls a license endpoint on the turtlebox.studio AWS backend (the highturtle repo), which creates the key and stores the order; FastSpring emails the key to the buyer.
+3. **Purchase.** Checkout on turtlebox.studio through FastSpring, which is the merchant of record and so collects and remits US sales tax. FastSpring's license fulfillment calls a license endpoint on the turtlebox.studio AWS backend (the highturtle repo), which creates the key and stores the order; FastSpring emails the key to the buyer, with an "Activate in CeeVee" button (a `ceevee://activate` link that opens the app with the key filled in), the key in plain text, and download links for both platforms.
 4. **Activation.** The app sends the key and machine ID once and gets back a license file signed with Ed25519. The public key is built into the app, so every later check is offline. Each license covers 2 machines, and people can free a seat from the website.
-5. **Updates.** Tauri's updater reads a signed manifest from turtlebox.studio. Updates are free for the purchased major version. On AWS this needs only a small API (license fulfillment webhook, trial tokens, activation and seat release, for example API Gateway with Lambda and DynamoDB) and S3 with CloudFront for installers, the update manifest and model files, all added to the highturtle repo.
+5. **Updates.** Covered in the next section. Updates are free for the purchased major version.
 
-Code signing is required on both platforms or the installers will be blocked: an Apple Developer ID with notarization ($99 a year) and a Windows certificate (Azure Trusted Signing is the cheapest route). Model files are downloaded from a CDN controlled by Turtlebox, not from third-party hubs at run time, so the app works the same for every buyer.
+On AWS this needs only a small API (license fulfillment webhook, trial tokens, activation and seat release, for example API Gateway with Lambda and DynamoDB) and S3 with CloudFront for installers, update manifests, model files and adapter updates, all added to the highturtle repo.
+
+Code signing is required on both platforms or the installers will be blocked: an Apple Developer ID with notarization ($99 a year) and a Windows certificate (Azure Trusted Signing, about $10 a month, is the cheapest route). Both need identity checks that can take days to weeks, so they should be started before the first build. Model files are downloaded from a CDN controlled by Turtlebox, not from third-party hubs at run time, so the app works the same for every buyer.
+
+## Delivery and updates
+
+How CeeVee gets onto a computer and stays current. Engineering detail is in TECHNICAL_PLAN.md, section 17.
+
+**Getting the app.**
+
+- turtlebox.studio/ceevee has one Download button that picks Windows or Mac from the visitor's browser, with the other platform linked below it. Links point at `dl.turtlebox.studio`, a CloudFront address in front of a private S3 bucket.
+- Windows gets a signed per-user installer (`CeeVee_x.y.z_x64-setup.exe`, about 10 MB). It installs without an administrator prompt, which also lets updates install without one. Windows 11 already has the WebView2 runtime the app needs.
+- Mac gets a notarized DMG for Apple silicon. If the app is started from the DMG or the Downloads folder, it offers to move itself to Applications, because macOS cannot update an app that runs from there.
+- The local model is not in the installer. It downloads on first run while the person sets up their profile (see First run).
+- After purchase, the FastSpring email carries the key, a one-click activation link and both download links. A small "My license" page on turtlebox.studio (sign in with an emailed link, no password) shows the key, both seats with a "Free this seat" button, and the downloads again, so a lost email is never a support ticket.
+
+**Staying current.**
+
+- The app checks for an update at launch and every 6 hours while it runs. Updates download in the background and are verified against a signature before anything is installed.
+- The person sees "Update ready: restart to finish", with the release notes. CeeVee never restarts on its own, and holds the install while an auto-fill, draft or mail sync is running. Postponed updates install at the next quit.
+- Every update is free within the purchased major version, and updates are not tied to the license: trial and expired-trial installs get fixes too, so read-only data stays readable. When a new major version ships, older versions see an "upgrade available" note instead of an automatic update.
+- Before any update that changes the database, the app makes a backup, so the person can go back to the earlier version if needed.
+
+**Release channels.**
+
+| Channel | Who | What they get |
+| --- | --- | --- |
+| Stable | Everyone (default) | Releases that have run on Beta first, rolled out in steps |
+| Beta | Opt-in in Settings, and the 20 to 50 launch testers | Release candidates a week or so ahead of Stable; also receives each Stable release |
+| Internal | Turtlebox only | Every build from main, for testing on real machines |
+
+**Staged rollout.** A Stable release first reaches 10 percent of installs, then 50, then 100 over about a week, with the step chosen by a random ID that each install keeps on the machine (nothing identifying is sent). If crash reports or support mail show a problem, the rollout is paused in one change to the manifest, and the fix ships as the next version. Updates only move forward; nobody is automatically downgraded.
+
+**Content that updates without a release.** Three kinds of files update on their own schedule, each listed in a manifest signed by Turtlebox and checked by the app before use:
+
+| Content | How often it changes | How it updates |
+| --- | --- | --- |
+| Auto-fill adapters and job-alert email parsers | Whenever a job site changes its form | Checked daily, applied immediately, falls back to the version built into the app if a file fails its check |
+| Model files | A few times a year, when a better small model is worth it | Offered, not forced (it is a multi-gigabyte download); downloads in the background and replaces the old model only after it is verified; the old file is then deleted |
+| Model settings (which model each hardware tier gets) | With model changes | Part of the model manifest |
+
+Prompts change with the code that reads their output, so they ship only in app releases.
+
+**What it costs to run.** The fixed costs are Apple's $99 a year and about $10 a month for Windows signing. Bandwidth is the variable cost, and the model download dominates it: about 2.5 GB per new install, which is roughly $0.20 per install at CloudFront's standard US rate, against about 10 MB for the app and a few MB per update. Because trial users download the model too, every trial costs about that much whether or not it converts. CloudFront's flat-rate plans or a zero-egress store such as Cloudflare R2 for model files alone would cut this; this is listed under Open below.
 
 ## Roadmap
 
 Version 1 takes about 27 weeks for one or two developers, in milestones that each end with something runnable on both platforms. Durations are estimates and assume work starts in late November 2026.
 
-1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, permanent tray and menu bar mode with launch at login, scheduler and notifications, SQLite with migrations, CI building signed Windows and macOS installers, background job runner.
+1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, permanent tray and menu bar mode with launch at login, scheduler and notifications, SQLite with migrations, CI building signed and notarized Windows and macOS installers and publishing them to the Internal channel, background job runner.
 2. **Local AI and agent harness (weeks 4 to 6).** llama.cpp linked in, the agent loop with tools, approvals and activity log, hardware check, model download with progress, grammar-constrained JSON, a benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** First-run onboarding with resume and LinkedIn import and merge review, profile editor, 4 themes, PDF and DOCX export, new application from a posting with match and gaps, tailored resume and cover letter, refine chat and versions.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard funnel and weekly chart, follow-up reminders, export, import and backups. Job categories, companies and job search across career sites and free boards, plus LinkedIn connections at each company.
 5. **Auto-fill (weeks 18 to 23).** Browser control, adapters for Greenhouse, Lever and Ashby (simplest) then Workday and iCIMS (largest coverage), then the generic form path; review checklist and submit detection.
-6. **Email and launch (weeks 24 to 27).** IMAP with Gmail and Outlook, reply labelling and linking, job alert email parsing, trial and licensing, updater, turtlebox.studio download and checkout pages, beta with 20 to 50 testers.
+6. **Email and launch (weeks 24 to 27).** IMAP with Gmail and Outlook, reply labelling and linking, job alert email parsing, trial and licensing, updater with Beta and Stable channels and staged rollout, signed adapter and model manifests, turtlebox.studio download, checkout and "My license" pages, beta with 20 to 50 testers.
 
 After v1: background application drafts for review, a follow-up agent, calendar sync and more ATS adapters (v2).
 
@@ -278,6 +321,10 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 | Job sites change forms and add bot checks | Adapters break; some sites forbid automation | Adapters versioned and updatable without a full release; human always submits; fall back to copy-paste helpers |
 | Small local models write weaker drafts | Lower quality than hosted models | Grammars for structure, short focused prompts per task, optional larger or hosted model |
 | 8 GB Windows laptops without a usable GPU | Slow drafts (a minute or more) | Show progress, run in background, recommend the smallest model |
+| Signing accounts take weeks to approve | No installable builds for testers | Start Apple Developer and Azure Trusted Signing enrollment before week 1 |
+| Losing the updater signing key | Installed copies can never be updated again | Key kept in two offline backups as well as in CI; rotation path documented in the technical plan |
+| A bad update reaches everyone | Broken app for paying users | Beta first, then 10/50/100 percent rollout that can be paused; database backup before migrations |
+| Model download bandwidth on trial installs | Hosting cost grows with trials, not sales | Watch cost per install; move model files to a flat-rate or zero-egress host if needed |
 | Trial and license bypass | Lost sales | Signed licenses and trial tokens are enough deterrent; avoid heavy DRM that hurts paying users |
 
 ### Decisions log
@@ -294,3 +341,6 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 ### Open
 
 - Relay for paid posting services, or bring-your-own key (recommended: bring-your-own key in v1).
+- Where model files are served from: CloudFront like everything else (simplest), CloudFront on a flat-rate plan, or Cloudflare R2 for model files only (recommended to price once trial volume is known; start on CloudFront).
+- Whether to also offer an MSI installer for IT-managed Windows PCs (recommended: not in v1; the per-user installer updates without an administrator).
+- Delivery and update design (section above) proposed 2026-11-11, awaiting Howard's review.
