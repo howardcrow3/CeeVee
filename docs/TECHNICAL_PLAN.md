@@ -6,8 +6,8 @@ Last updated 2026-11-11. Companion to [PLAN.md](PLAN.md), which holds the produc
 
 - **Clean room.** Dossier (AGPL-3.0) is a product reference only. No code, prompts, CSS, images or schema text is copied from it.
 - **Licenses we accept** in anything that ships: MIT, Apache-2.0, BSD-2/3, ISC, Zlib, Unicode, MPL-2.0 (file-level, unmodified), public domain. **Rejected:** GPL, LGPL (static linking), AGPL, SSPL, and model licenses that restrict commercial use. `cargo-deny` and `license-checker` enforce this in CI.
-- **Local first.** Profile, documents, mail and history never leave the machine. The only network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
-- **Human in the loop.** Nothing is submitted, sent or saved to the profile without an explicit user action.
+- **Local first.** The profile, database, documents, mail, connections and all AI processing stay on the machine. Documents go to the user's own Google Drive only if they sign in with Google and turn on Drive storage (section 8.2); nothing goes to Turtlebox. The other network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
+- **The person sets the autonomy.** By default nothing is submitted, sent or saved to the profile without an explicit user action. The person can raise this, globally or per category, up to full automatic (section 6.6). A short list of actions stays manual at every level because automating them breaks site terms.
 - **Targets.** Windows 11 x64 and macOS 13+ on Apple silicon (arm64). No Intel Mac or Linux build in v1.
 
 ## 2. Repository layout
@@ -29,6 +29,7 @@ CeeVee/
 │  ├─ ceevee-docs/            # resume and cover letter rendering (Typst), DOCX export, themes
 │  ├─ ceevee-search/          # categories, job sources, dedupe, scoring, scheduler
 │  ├─ ceevee-apply/           # browser automation, ATS adapters, generic form filler
+│  ├─ ceevee-google/          # optional Google sign-in; Gmail and Drive MCP servers (sidecar)
 │  ├─ ceevee-mail/            # IMAP/SMTP, OAuth, classification, linking, alert-email parsing
 │  ├─ ceevee-network/         # contacts, LinkedIn Connections import, company matching
 │  └─ ceevee-license/         # trial, activation, Ed25519 license verification
@@ -165,7 +166,7 @@ Tools are Rust functions with a typed input and output. `schemars` derives the J
 | `network.*` | `who_knows(company)`, `contact_history`, `draft_referral` | Read; draft |
 | `application.*` | `create`, `read`, `list`, `propose_status` | Draft; propose |
 | `docs.*` | `tailor_resume`, `write_cover_letter`, `edit`, `render_pdf` | Draft (every change is a new version with undo) |
-| `apply.*` | `open_posting`, `fill_form`, `upload_documents`, `answer_question` | Act: runs only after the user starts it, and always stops before Submit |
+| `apply.*` | `open_posting`, `fill_form`, `upload_documents`, `answer_question`, `submit` | Act: filling runs when the user starts it or the policy allows; `submit` runs only when the policy resolves to automatic (6.6) |
 | `mail.*` | `search`, `read_thread`, `label`, `draft_reply`, `send` | Read; draft; `send` is act |
 | `calendar.*` | `create_ics` | Draft |
 | `memory.*` | `remember`, `recall` | Draft |
@@ -175,10 +176,10 @@ Risk levels:
 - **Read:** runs freely.
 - **Draft:** runs freely; the result is visible and reversible (a new document version, a saved posting, a draft email).
 - **Propose:** creates a proposal card the user accepts, edits or dismisses (profile changes, status changes, category edits).
-- **Act:** needs an explicit user click each time (sending an email, starting auto-fill).
-- **Never available to any agent:** pressing a final Submit, sending LinkedIn messages, creating accounts on job sites, deleting data, changing license or settings.
+- **Act:** needs a user click unless the person's automation policy makes that action automatic (6.6).
+- **Never available to any agent, at any level:** LinkedIn messages, connection requests or Easy Apply; on-board one-click apply flows; solving CAPTCHAs; creating accounts on job sites; deleting data; changing license or policy settings.
 
-The same tool registry is exposed, read and draft tools only, through an optional local MCP server (`rmcp`), so a user can drive CeeVee from Claude Desktop or another MCP client if they choose. Off by default.
+`rmcp` works both ways. As a client, it loads connector tools (Google Gmail and Drive, section 8.2) into the registry with assigned risk levels. As a server, the same registry is exposed, read and draft tools only, so a user can drive CeeVee from Claude Desktop or another MCP client if they choose; off by default.
 
 ### 6.4 Memory
 
@@ -201,19 +202,32 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 - **Sensitive fields** (EEO, veteran, disability, salary, sponsorship) are filled only from answers the user saved for that purpose; agents cannot infer them.
 - **Kill switch.** One toggle pauses all background agents; each agent can be turned off on its own.
 
-### 6.6 Scheduling background agents
+### 6.6 Automation levels and the policy engine
+
+The person's chosen automation level (see "Automation levels" in PLAN.md) decides what the harness may do without asking. Policy lives in one place, `ceevee-agent::policy`, and every tool call passes through it.
+
+- **Policy model.** A `policy` table holds rows of (scope, action, mode, caps): scope is `global` or a category ID; action is one of `apply.submit`, `mail.send_followup`, `mail.reply`, `mail.confirm_interview`, `network.referral_email`, `profile.update`, `application.status`, `search.save`; mode is `off`, `ask` or `auto`. A level is a preset that writes these rows; per-action overrides edit single rows. Category rows override global rows.
+- **Resolution.** For each act-level call the engine resolves the mode for the call's category (from the posting or application), then evaluates the checks: score threshold, required fields, adapter support, fill confidence, fact guard result, sensitive-field sources, caps (counted in `policy_ledger`), duplicates and blocked companies. The result is `run`, `queue(reason)` or `deny(reason)`.
+- **Auto-submit.** When the result is `run` for `apply.submit`, the auto-fill engine clicks the adapter's declared final submit control, waits for the confirmation pattern, and screenshots the confirmation page into the application record. A missing confirmation marks the run "needs a look".
+- **Send delay.** Automatic emails sit in an outbox for 30 seconds with an Undo notification, then send.
+- **Consent record.** Enabling `auto` for `apply.submit` requires a stored consent row (version of the consent text, timestamp).
+- **Hard denials** that no policy can change: LinkedIn messaging, connection requests and Easy Apply; on-board one-click apply flows (Indeed Apply, ZipRecruiter 1-Click); CAPTCHA solving; account creation; deleting data; changing license or policy settings.
+- **Untrusted content.** An instruction inside a posting or email can never raise a mode. Policy is read only from the user's settings.
+- **Tests.** The policy engine is pure Rust with a table of scenario tests (level × category override × check results → expected decision), and the eval suite includes injected-instruction emails that must not trigger sends.
+
+### 6.7 Scheduling background agents
 
 - Triggers: time (daily per category, follow-up check), events (new mail synced, new posting saved, status changed, chat turn), and manual.
 - One model worker serves all agents with a priority queue: Assistant and anything the user is waiting on first, then Apply, Inbox, Profile, Search, Follow-up.
 - Background agents run whenever CeeVee is running, including tray-only mode (3.1), pause on battery below 20%, and respect quiet hours the user sets. They raise desktop notifications through the notification types in 3.1.
 - Missed runs (computer asleep) run once at next start, not once per missed day.
 
-### 6.7 Observability and evaluation
+### 6.8 Observability and evaluation
 
 - **Activity screen:** every agent run with its steps, tool calls, results, tokens and time, so the user can see what an agent did and why.
 - **Eval suite:** scripted scenarios per agent (a mailbox with 30 messages, a category with 50 postings, a chat that changes a fact) run against mock tools and the real default model. Tracked per release: valid tool-call rate, task success, steps used, fact-guard violations, proposals the user would reject (labelled fixtures).
 
-### 6.8 Open source used by the harness
+### 6.9 Open source used by the harness
 
 | Project | Repository | License | Used for |
 | --- | --- | --- | --- |
@@ -221,7 +235,7 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 | MiniJinja | [mitsuhiko/minijinja](https://github.com/mitsuhiko/minijinja) | Apache-2.0 | Rendering model chat templates and prompts |
 | llama.cpp grammars (GBNF) | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | MIT | Constrained tool calls and outputs |
 | sqlite-vec | [asg017/sqlite-vec](https://github.com/asg017/sqlite-vec) | MIT / Apache-2.0 | Vector search in the SQLite file |
-| rmcp (official Rust MCP SDK) | [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk) | MIT / Apache-2.0 | Optional local MCP server |
+| rmcp (official Rust MCP SDK) | [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk) | MIT / Apache-2.0 | MCP client for Google connectors; optional local MCP server |
 | tiktoken-rs or the model's own tokenizer via llama.cpp | [zurawiki/tiktoken-rs](https://github.com/zurawiki/tiktoken-rs) | MIT | Token budgeting for hosted models |
 
 **Considered and not used:** Rust agent frameworks such as Rig (MIT) are good for hosted APIs, but CeeVee's needs (embedded llama.cpp, per-step grammars, risk-levelled tools and an approvals queue) are specific enough that a thin harness of about 2,000 lines is simpler to own. Python frameworks (LangChain, LangGraph, CrewAI) would add a Python runtime to the installer and are ruled out.
@@ -240,6 +254,32 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 - Live preview in the UI renders the same Typst output to SVG pages.
 - DOCX export through `docx-rs` from the same data, for employers that ask for Word.
 - Document versions store the structured data, not the PDF; PDFs are re-rendered on demand and cached.
+
+### 8.1 Local document store and editing
+
+- **Always-on drafting.** Drafting tools (`docs.tailor_resume`, `docs.write_cover_letter`, `mail.draft_reply`) are draft-level and run automatically at every automation level, on the events "application created" and "employer email needs reply". The policy engine (6.6) governs only `submit` and `send`.
+- **Formats.** Resume data is JSON in a schema modeled on JSON Resume (plus CeeVee fields such as fact IDs per bullet), stored in `document_version`. Cover letters and email replies are Markdown (`pulldown-cmark`). Outputs: Typst PDF, DOCX (`docx-rs`), plain text.
+- **Document folder.** Every version is also written to a user-visible folder, default `Documents/CeeVee` (changeable), laid out as `Base resume/` and `Applications/<Company - Title (date)>/` with PDF and DOCX per document and a frozen `Sent/` copy. The database stays the source of truth; the folder is an export the user can sync with iCloud Drive, OneDrive or Dropbox.
+- **Chat editing.** Each document has its own chat thread (`chat_message` keyed by document). The `refine` task returns structured edits applied to the document's data; each turn is a `document_version`. Long threads are summarized as in 6.4.
+- **Built-in editor.** Svelte side-by-side editor with live Typst SVG preview: section-based for resumes (jobs, bullets, skills, reorder by drag), rich text (TipTap, MIT) for Markdown documents.
+- **Open in Word.** Writes the DOCX to the folder and opens it with the system default app (`tauri-plugin-opener`). A file watcher (`notify`) sees the save, `docx-rs` parses it back, the result is mapped onto the document's structure (the model helps for resumes where paragraphs moved), and the diff is shown as a proposal for a new version.
+
+### 8.2 Optional Google sign-in: Gmail and Drive through MCP
+
+- **Optional.** Offered at first run and in Settings with the explanation "Sign in with Google and CeeVee can read replies from recruiters in your Gmail and keep your applications up to date. You can also store your documents in Google Drive." Everything works without it.
+- **Sign-in.** Google OAuth 2 with PKCE and a loopback redirect. Base scopes `openid`, `email`, `profile`; others added by incremental consent when the person turns a feature on. The refresh token lives in the OS keychain.
+- **MCP client.** `ceevee-agent` gains an MCP client (`rmcp`). Google services are connectors: MCP servers whose tools join the tool registry with risk levels like any other tool. Two ways to run them, chosen after a spike in milestone 3:
+  - Google's hosted Workspace MCP servers, if their terms allow a third-party desktop client to use them under CeeVee's own OAuth client.
+  - Otherwise, small bundled Rust MCP servers (`ceevee-google`, built on `rmcp`, calling Gmail API and Drive API v3 over `reqwest`) launched as local sidecars over stdio.
+  Either way the scopes are requested by CeeVee's OAuth client, so Google's verification rules for those scopes apply to CeeVee.
+- **Gmail (reading recruiter replies).** `gmail.readonly` to read, `gmail.send` only if the person allows CeeVee to send. `gmail.readonly` is a restricted scope: public release needs Google's restricted-scope verification and a yearly CASA assessment; until approved, the project is capped at 100 test users, enough for the beta. Messages flow into the same candidate filter and labelling as IMAP mail (section 11). IMAP with an app password stays as the fallback for people who don't sign in.
+- **Drive storage (setting, off by default).** Needs `drive.file` (non-sensitive). Mirrors the document folder to `My Drive/CeeVee`:
+  - Google Doc: the DOCX built by `docx-rs` is uploaded with target type `application/vnd.google-apps.document`, so Drive converts it. Later versions update the same file ID.
+  - PDF: the Typst PDF uploaded as `application/pdf`, same file ID updated per version.
+  - Writes go through a durable queue (`drive_sync` rows) with retry and back-off, so offline edits sync later.
+  - Pulling edits back: compare each Google Doc's `modifiedTime` and `lastModifyingUser` with the last CeeVee write; if the person edited it, export as DOCX and treat it like the Open in Word round trip.
+- **Data model additions.** `google_account` (subject ID, email, scopes granted), `mcp_connector` (server, transport, status), `drive_file` (document version, kind `gdoc` or `pdf`, Drive file ID, folder ID, last synced `modifiedTime`), `drive_sync` (queue).
+- **Failure modes.** Revoked access or a full Drive pauses syncing with a banner; documents stay usable locally.
 
 ## 9. Job search
 
@@ -262,13 +302,30 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 - **Generic path.** For unknown forms: read labels, input types, options and the accessibility tree through CDP; `map-form-fields` maps each field to a profile fact with a confidence; fields below the threshold are left empty and highlighted.
 - **Uploads.** Tailored resume and cover letter PDFs uploaded through CDP file-chooser interception.
 - **Sensitive answers.** EEO, veteran, disability, salary and sponsorship questions are filled only from answers the user saved for that purpose, and are always shown in the review list.
-- **Stop before submit.** The engine never clicks a final submit control. It shows a checklist overlay and waits. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
+- **Submit.** By default the engine stops before the final submit control, shows a checklist overlay and waits. When the automation policy resolves `apply.submit` to automatic (6.6), it clicks the adapter's declared submit control and records a screenshot of the confirmation page. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
 - **Logging.** Every run writes `apply_run` and `apply_field` rows; with the user's consent, anonymized field-mapping failures can be sent to Turtlebox to improve adapters.
+
+### 10.1 Browser control setting: Chrome MCP (optional)
+
+Settings, Browser, "Browser control" offers two choices:
+
+- **Built in (default).** `chromiumoxide` as above: adapters for known systems, generic path for the rest.
+- **Chrome MCP.** CeeVee runs Google's Chrome DevTools MCP server (`chrome-devtools-mcp`, Apache-2.0) and connects to it with its MCP client (`rmcp`, section 8.2). The agent then works the page through MCP tools (snapshot, click, fill, upload, navigate) instead of fixed adapter steps. Best with a larger model; the setting says so and shows the selected model.
+
+How the option is built:
+
+- **Runtime.** Node.js is not bundled. Turning the setting on downloads a pinned, checksummed Node LTS and server version into CeeVee's data folder (like a model download), or uses an existing Node 20+ if found. Updated through the signed manifest channel (17.6).
+- **Browser.** The MCP server is started against the same dedicated Edge or Chrome profile CeeVee already uses (`--browser-url` to the CDP port CeeVee opened), so job-site logins carry over and the person's everyday profile is never touched.
+- **Same guardrails.** MCP browser tools are wrapped by the harness, not passed through raw: each gets a risk level, navigation is checked against the never-list (LinkedIn messaging and Easy Apply, Indeed Apply, ZipRecruiter 1-Click, account-creation and CAPTCHA pages are refused), and any click on a control matching submit patterns is classified `apply.submit` and goes through the policy engine (6.6). Sensitive answers still come only from the answers store.
+- **Adapters still win.** On a known applicant tracking system with a tested adapter, the built-in path runs even when Chrome MCP is selected, unless the person turns on "Use Chrome MCP everywhere". Chrome MCP is the default for unknown forms only when the setting is on.
+- **Logging.** Each MCP tool call is logged into `apply_run` and `apply_field` like the built-in path, so review checklists and the activity log look the same.
+
+**Development use.** The same server, driven by Claude during development, is how adapters are written and repaired: walk a form, emit the adapter file, run its fixture tests, and ship it through the adapter update channel.
 
 ## 11. Mail
 
-- **Accounts.** Gmail and Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
-- **Gmail scope note.** Full IMAP access to Gmail is a restricted scope requiring Google's yearly security assessment. Until that is budgeted, Gmail users connect with an app password over IMAP, which needs no verification. Microsoft OAuth needs only publisher verification.
+- **Accounts.** Gmail through the optional Google sign-in (8.2) once Google approves the restricted scope, otherwise IMAP with an app password; Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
+- **Gmail scope note.** Reading Gmail by any OAuth route (Gmail API, IMAP XOAUTH2, or MCP under CeeVee's client) is a restricted scope requiring Google's verification and yearly CASA assessment. App-password IMAP needs no verification and remains the fallback. Microsoft OAuth needs only publisher verification.
 - **Sync.** `async-imap` with IDLE where supported, otherwise polling every 10 minutes; first sync covers 90 days of headers. Bodies are fetched only for candidate messages. `mail-parser` decodes MIME.
 - **Candidate filter** (no model): sender or reply-to domain matches a company's domains, known ATS sender domains, replies in threads the user started from CeeVee, and known job-alert senders.
 - **Labelling.** `label-email` assigns kind, application, suggested status and interview time. Alert emails go to the job-alert parsers instead.
@@ -448,7 +505,7 @@ If model bandwidth becomes material, the options are a CloudFront flat-rate plan
 
 ## 18. Open source projects included
 
-All are permissively licensed. The agent harness's own dependencies are listed in section 6.8. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
+All are permissively licensed. The agent harness's own dependencies are listed in section 6.9. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
 
 ### Rust (core)
 
@@ -484,6 +541,9 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | --- | --- | --- | --- |
 | Typst | [typst/typst](https://github.com/typst/typst) | Apache-2.0 | Resume and cover letter PDF and SVG rendering |
 | docx-rs | [bokuweb/docx-rs](https://github.com/bokuweb/docx-rs) | MIT | DOCX export and Word import |
+| pulldown-cmark | [pulldown-cmark/pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) | MIT | Markdown for cover letters and email replies |
+| notify | [notify-rs/notify](https://github.com/notify-rs/notify) | CC0-1.0 | Watches DOCX files opened in Word for saves |
+| tauri-plugin-opener | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) | MIT / Apache-2.0 | Opens documents in Word, Pages or LibreOffice |
 | pdf-extract | [jrmuizel/pdf-extract](https://github.com/jrmuizel/pdf-extract) | MIT | PDF text extraction |
 | lopdf | [J-F-Liu/lopdf](https://github.com/J-F-Liu/lopdf) | MIT | PDF fallback parsing |
 | csv | [BurntSushi/rust-csv](https://github.com/BurntSushi/rust-csv) | MIT / Unlicense | LinkedIn export files |
@@ -496,6 +556,8 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | --- | --- | --- | --- |
 | chromiumoxide | [mattsse/chromiumoxide](https://github.com/mattsse/chromiumoxide) | MIT / Apache-2.0 | Driving Edge or Chrome over CDP |
 | Chrome for Testing | [GoogleChromeLabs/chrome-for-testing](https://github.com/GoogleChromeLabs/chrome-for-testing) | BSD-3 (Chromium) | Fallback browser download |
+| Chrome DevTools MCP | [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Apache-2.0 | Optional "Chrome MCP" browser control (downloaded on demand) and adapter development |
+| Node.js (LTS) | [nodejs/node](https://github.com/nodejs/node) | MIT | Runtime for Chrome DevTools MCP, downloaded only when that setting is on |
 
 ### Mail and calendar
 
@@ -504,7 +566,7 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | async-imap | [chatmail/async-imap](https://github.com/chatmail/async-imap) | MIT / Apache-2.0 | Reading mail |
 | mail-parser | [stalwartlabs/mail-parser](https://github.com/stalwartlabs/mail-parser) | MIT / Apache-2.0 | MIME parsing |
 | lettre | [lettre/lettre](https://github.com/lettre/lettre) | MIT | Sending mail |
-| oauth2 | [ramosbugs/oauth2-rs](https://github.com/ramosbugs/oauth2-rs) | MIT / Apache-2.0 | Gmail and Microsoft sign-in |
+| oauth2 | [ramosbugs/oauth2-rs](https://github.com/ramosbugs/oauth2-rs) | MIT / Apache-2.0 | Google and Microsoft sign-in |
 | ics | [hummingly/ics](https://github.com/hummingly/ics) | MIT / Apache-2.0 | Interview calendar files |
 
 ### Licensing
@@ -554,10 +616,10 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 
 1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar and themes; permanent tray and menu bar mode, launch at login, single instance, scheduler with sleep and wake handling, notifications; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing and notarization on both platforms, release pipeline publishing to the Internal channel (17.4), S3 bucket and CloudFront set up in highturtle; cargo-deny policy.
 2. **Local AI and agent harness (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; `ceevee-agent` loop, tool registry with risk levels, approvals queue, activity log and eval harness; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
-3. **Profile and documents (weeks 7 to 11).** Onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
+3. **Profile and documents (weeks 7 to 11).** document folder, built-in editor, Open in Word round trip with file watcher; optional Google sign-in, MCP client, Drive connector spike (hosted vs bundled) and sync queue; start Google restricted-scope verification; onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard, reminders, export, import, backups. Categories and companies; company-site sources (Greenhouse, Lever, Ashby, SmartRecruiters, Workday feed, JobPosting reader), USAJOBS and Adzuna; dedupe, scoring, scheduler; LinkedIn Connections import and the "who you know" panel.
-5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel.
-6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail app-password flow; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
+5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel. Chrome MCP browser-control setting with on-demand Node download and wrapped tools.
+6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail connector over Google sign-in and the app-password fallback; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
 
 ## 20. Technical risks
 
@@ -567,6 +629,7 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 | 4B model quality on tailoring | Narrow tasks, grammars, fact guard, optional 8B or hosted model; measure with the live AI suite each release |
 | Workday's per-employer accounts and multi-page flow | Treat as the user's step: CeeVee pauses for sign-in, then resumes filling |
 | Job alert email formats change | Parsers are data-driven and shipped through the adapter update channel; fixtures from real alerts in tests |
+| Auto-submit sends a weak or wrong application | Checks in 6.6 (threshold, adapter support, confidence, fact guard, caps) must all pass; daily digest; per-company limit; Activity log |
 | Small model picks wrong tools in the free Assistant loop | Short tool lists per agent, grammar-constrained calls, step limit, workflows for all background work, eval suite gates each release |
 | Typst template quality vs. HTML themes | Prototype two themes in week 1 to confirm the look before committing |
 | Signing enrollment delays (Apple, Azure identity validation) | Start both before week 1; ship unsigned Internal builds to Howard's own machines meanwhile |
