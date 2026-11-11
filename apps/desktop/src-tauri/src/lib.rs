@@ -5,20 +5,30 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
-#[derive(serde::Serialize)]
-struct AppInfo {
-    name: &'static str,
-    version: &'static str,
-    schema_version: i64,
+#[tauri::command]
+#[specta::specta]
+async fn app_info(db: tauri::State<'_, ceevee_db::Db>) -> Result<ceevee_core::AppInfo, String> {
+    Ok(ceevee_core::AppInfo {
+        name: "CeeVee".into(),
+        version: env!("CARGO_PKG_VERSION").into(),
+        schema_version: db.schema_version().await.map_err(|e| e.to_string())? as u32,
+    })
 }
 
-#[tauri::command]
-async fn app_info(db: tauri::State<'_, ceevee_db::Db>) -> Result<AppInfo, String> {
-    Ok(AppInfo {
-        name: "CeeVee",
-        version: env!("CARGO_PKG_VERSION"),
-        schema_version: db.schema_version().await.map_err(|e| e.to_string())?,
-    })
+/// Typed command/event surface shared with the UI. `export_bindings` writes the
+/// TypeScript side; a test keeps the committed file in sync.
+pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
+    tauri_specta::Builder::<tauri::Wry>::new()
+        .commands(tauri_specta::collect_commands![app_info])
+        .typ::<ceevee_core::Event>()
+}
+
+const BINDINGS_PATH: &str = "../ui/src/lib/bindings.ts";
+
+/// Write `ui/src/lib/bindings.ts`. Run with `cargo test -p ceevee-desktop export_bindings -- --ignored`.
+pub fn export_bindings() -> Result<(), Box<dyn std::error::Error>> {
+    specta_builder().export(specta_typescript::Typescript::default(), BINDINGS_PATH)?;
+    Ok(())
 }
 
 fn show_main_window(app: &AppHandle) {
@@ -30,6 +40,12 @@ fn show_main_window(app: &AppHandle) {
 }
 
 pub fn run() {
+    let builder = specta_builder();
+    #[cfg(debug_assertions)]
+    if let Err(e) = export_bindings() {
+        eprintln!("could not export TypeScript bindings: {e}");
+    }
+
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
@@ -63,7 +79,7 @@ pub fn run() {
                 let _ = window.hide();
             }
         })
-        .invoke_handler(tauri::generate_handler![app_info])
+        .invoke_handler(builder.invoke_handler())
         .build(tauri::generate_context!())
         .expect("error while building CeeVee");
 
@@ -75,4 +91,29 @@ pub fn run() {
             api.prevent_exit(); // keep running in the tray
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[ignore = "writes ui/src/lib/bindings.ts"]
+    fn export_bindings() {
+        super::export_bindings().unwrap();
+    }
+
+    #[test]
+    fn committed_bindings_are_current() {
+        let tmp = std::env::temp_dir().join("ceevee-bindings-check.ts");
+        super::specta_builder()
+            .export(specta_typescript::Typescript::default(), &tmp)
+            .unwrap();
+        let fresh = std::fs::read_to_string(&tmp).unwrap();
+        let committed = std::fs::read_to_string(super::BINDINGS_PATH).unwrap();
+        let norm = |s: &str| s.replace("\r\n", "\n");
+        assert_eq!(
+            norm(&fresh),
+            norm(&committed),
+            "bindings.ts is stale: run `cargo test -p ceevee-desktop export_bindings -- --ignored`"
+        );
+    }
 }
