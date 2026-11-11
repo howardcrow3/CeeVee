@@ -13,6 +13,7 @@ fn spec(name: &'static str, risk: Risk) -> ToolSpec {
             "properties": {"id": {"type": "integer", "minimum": 1}}
         }),
         action: (risk == Risk::Act).then_some("apply.submit"),
+        untrusted_output: false,
     }
 }
 

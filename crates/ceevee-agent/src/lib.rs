@@ -6,5 +6,6 @@
 
 pub mod notifications;
 pub mod policy;
+pub mod runner;
 pub mod scheduler;
 pub mod tools;

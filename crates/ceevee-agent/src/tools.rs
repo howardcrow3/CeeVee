@@ -36,6 +36,9 @@ pub struct ToolSpec {
     pub input_schema: Value,
     /// The policy action an `Act` tool maps to, such as `apply.submit`. `None` for other risks.
     pub action: Option<&'static str>,
+    /// The result contains text written by someone else (a posting, an email, a web page). Once a
+    /// run has seen such a result, its act-level calls are queued for the user.
+    pub untrusted_output: bool,
 }
 
 pub type ToolFuture = Pin<Box<dyn Future<Output = Result<Value>> + Send>>;

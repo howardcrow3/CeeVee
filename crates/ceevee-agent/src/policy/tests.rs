@@ -9,6 +9,7 @@ fn tool(name: &'static str, risk: Risk, action: Option<&'static str>) -> ToolSpe
         risk,
         input_schema: json!({}),
         action,
+        untrusted_output: false,
     }
 }
 

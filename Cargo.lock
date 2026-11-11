@@ -513,6 +513,7 @@ dependencies = [
  "ceevee-core",
  "ceevee-db",
  "chrono",
+ "serde",
  "serde_json",
  "tokio",
  "tracing",
