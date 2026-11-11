@@ -72,6 +72,11 @@ jobs:
 
       - name: cargo test
         run: cargo test --workspace --locked
+      # Builds llama.cpp (needs cmake and clang, both on the hosted runners).
+      - name: llama.cpp backend (clippy and tests)
+        run: |
+          cargo clippy -p ceevee-ai --features llama --all-targets --locked -- -D warnings
+          cargo test -p ceevee-ai --features llama --locked
 
       - name: Build unsigned app bundle
         working-directory: apps/desktop
