@@ -43,7 +43,7 @@ Navigation follows Dossier's left sidebar: Dashboard; You (Profile, Base resume,
 
 ## First run: seed the profile
 
-The first screen after install asks for a resume and a LinkedIn profile, and builds the profile from both before the person sees an empty form. The model download runs at the same time, so the person is filling in their details instead of watching a progress bar.
+The first screen after install asks the person to sign in with Google (see Google account and Drive), then for a resume and a LinkedIn profile, and builds the profile from both before the person sees an empty form. The model download runs at the same time, so the person is filling in their details instead of watching a progress bar.
 
 1. **Resume.** Drop a PDF, Word or Markdown file. CeeVee extracts the text and the local model maps it to profile sections (experience, education, skills, projects, certifications), keeping the original wording of each bullet.
 2. **LinkedIn.** Three ways in, offered in this order:
@@ -54,6 +54,43 @@ The first screen after install asks for a resume and a LinkedIn profile, and bui
 4. **Fill the gaps.** A short follow-up asks for what neither source holds but auto-fill needs: work authorization, notice period, salary range, willingness to relocate, and links. These go into the answers store.
 
 Every step can be skipped, and both imports stay available later from the Profile screen to refresh the profile.
+
+## Google account and Drive
+
+A Google account is required. The person signs in with Google on the first screen, before the resume import, and every resume, cover letter and email draft CeeVee writes is saved to their own Google Drive as both a Google Doc and a PDF.
+
+**Always drafted automatically.** At every automation level, including Manual, CeeVee writes drafts without being asked: a tailored resume and cover letter for each new application, and a reply for each employer email that needs one. The automation level only decides what gets *sent or submitted*, never whether a draft exists.
+
+**Editing by chat.** Each document opens beside a multi-turn chat. The person asks for changes ("shorter summary", "lead with the payments work", "make the tone warmer"), CeeVee edits the document, and each turn makes a new version with undo. The chat remembers the whole conversation for that document. New facts mentioned in the chat become profile proposals, as described above.
+
+**What goes to Drive.**
+
+```
+My Drive/
+└─ CeeVee/
+   ├─ Base resume/            Base resume (Google Doc) + Base resume.pdf, one pair per category variant
+   └─ Applications/
+      └─ Acme Corp - Senior PM (2026-11-14)/
+         ├─ Resume            (Google Doc)    + Resume.pdf
+         ├─ Cover letter      (Google Doc)    + Cover letter.pdf
+         └─ Email drafts      (Google Doc, one per thread)
+```
+
+- **CeeVee's own copy is the source of truth.** Every chat edit updates the local version first, then CeeVee refreshes the Google Doc and the PDF in Drive. The PDF that gets uploaded to employers is always the one CeeVee renders, so formatting is exact.
+- **Edits made in Google Docs come back.** If the person edits a Google Doc directly, CeeVee notices on its next sync and offers to pull the changes in as a new version (shown as a diff), or keep them only in Drive.
+- **Frozen when sent.** When an application is sent, its Drive folder gets a "Sent" copy of the exact PDF submitted, and the Google Doc is marked read-only in its title.
+- **Offline.** CeeVee works offline after the first sign-in; Drive updates wait in a queue and go out when the connection returns.
+
+**Tradeoffs to know**
+
+| Change | Effect |
+| --- | --- |
+| Local-only privacy story | Documents now leave the computer, but only to the person's own Drive, never to Turtlebox. The profile, database, mail, connections and AI processing stay on the computer. The marketing line becomes "your data stays on your computer and in your own Google account". |
+| Google sign-in required | People without a Google account must create one. Outlook-only users still sign in with Google for Drive, then connect Outlook for mail. |
+| Google verification | Sign-in plus Drive access limited to files CeeVee creates (`drive.file`) are non-sensitive scopes: Google's brand verification only, no paid security assessment. Reading Gmail is still a restricted scope that needs the yearly assessment (often several thousand dollars). |
+| Email choice | Gmail mail stays on IMAP with an app password in v1, even though the person signed in with Google, unless the Gmail security assessment is budgeted. Then Gmail can switch to the same Google sign-in. Outlook stays on Microsoft sign-in. |
+| Two formats | Google Docs and Typst PDFs are rendered separately, so the Google Doc is close to, not pixel-identical with, the PDF. The PDF is the one that is submitted. |
+| License | The license can be tied to the Google account instead of the machine, which makes moving to a new computer simpler. The 2-machine limit still applies. |
 
 ## Resumes and cover letters
 
@@ -197,7 +234,7 @@ The person decides how much CeeVee does on its own, from fully manual to full au
 
 | Level | What CeeVee does on its own | What waits for the person |
 | --- | --- | --- |
-| Manual | Searches, scores and drafts only when asked | Everything else |
+| Manual | Writes drafts (documents and email replies) automatically; searches and scores only when asked | Everything else |
 | Assisted (default) | Runs searches, saves and scores postings, labels mail, drafts documents and replies | Every application, every email sent, every profile change |
 | Review before submit | All of the above, plus it prepares applications for high-scoring matches and fills the forms | One click per application in the Approvals queue (or approve a batch); every email sent |
 | Autopilot | All of the above, plus it submits applications that pass every check below and sends routine emails (follow-ups, thank-you notes, interview time confirmations) | Anything that fails a check, replies that need judgment (offers, salary, rejections), profile changes to employers, titles and dates |
@@ -251,7 +288,7 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 
 ## Data model
 
-The SQLite file has 28 core tables in seven groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
+The SQLite file has 31 core tables in eight groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
 
 | Group | Table | Holds |
 | --- | --- | --- |
@@ -272,6 +309,7 @@ The SQLite file has 28 core tables in seven groups. Jobs can be queried by categ
 | Documents | `theme` | Built-in and custom resume themes |
 | Automation | `apply_run`, `apply_field` | Each auto-fill attempt: ATS detected, outcome, and every field with its value, source fact and confidence, for review and for improving adapters |
 | Mail | `mail_account`, `email_message` | Connected accounts (tokens live in the keychain); messages with direction, thread, linked application, label, summary, suggested status, interview time |
+| Google | `google_account`, `drive_file`, `drive_sync` | Signed-in Google account and scopes; the Drive copy (Google Doc and PDF) of each document version; the queue of pending Drive writes |
 | Agents | `policy`, `policy_ledger`, `consent` | Automation level and per-action modes, global and per category; counts for daily caps; recorded consent for automatic submission |
 | Agents | `agent_run`, `agent_step`, `agent_memory`, `proposal`, `chat_summary` | Each agent run and its tool calls; learned search preferences; the approvals queue; chat summaries. Embeddings live in a `sqlite-vec` table |
 | System | `job`, `setting`, `license_state` | Background tasks with progress; settings; trial start, license and last check |
@@ -339,7 +377,7 @@ Version 1 takes about 27 weeks for one or two developers, in milestones that eac
 
 1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, permanent tray and menu bar mode with launch at login, scheduler and notifications, SQLite with migrations, CI building signed and notarized Windows and macOS installers and publishing them to the Internal channel, background job runner.
 2. **Local AI and agent harness (weeks 4 to 6).** llama.cpp linked in, the agent loop with tools, approvals and activity log, hardware check, model download with progress, grammar-constrained JSON, a benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
-3. **Profile and documents (weeks 7 to 11).** First-run onboarding with resume and LinkedIn import and merge review, profile editor, 4 themes, PDF and DOCX export, new application from a posting with match and gaps, tailored resume and cover letter, refine chat and versions.
+3. **Profile and documents (weeks 7 to 11).** Google sign-in and Drive sync of Google Docs and PDFs, first-run onboarding with resume and LinkedIn import and merge review, profile editor, 4 themes, PDF and DOCX export, new application from a posting with match and gaps, tailored resume and cover letter, refine chat and versions.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard funnel and weekly chart, follow-up reminders, export, import and backups. Job categories, companies and job search across career sites and free boards, plus LinkedIn connections at each company.
 5. **Auto-fill (weeks 18 to 23).** Browser control, adapters for Greenhouse, Lever and Ashby (simplest) then Workday and iCIMS (largest coverage), then the generic form path; review checklist and submit detection.
 6. **Email and launch (weeks 24 to 27).** IMAP with Gmail and Outlook, reply labelling and linking, job alert email parsing, trial and licensing, updater with Beta and Stable channels and staged rollout, signed adapter and model manifests, turtlebox.studio download, checkout and "My license" pages, beta with 20 to 50 testers.
@@ -360,6 +398,7 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 | A bad update reaches everyone | Broken app for paying users | Beta first, then 10/50/100 percent rollout that can be paused; database backup before migrations |
 | Model download bandwidth on trial installs | Hosting cost grows with trials, not sales | Watch cost per install; move model files to a flat-rate or zero-egress host if needed |
 | Automatic applications break site terms or misrepresent the person | LinkedIn and on-board one-click flows are never automated; only employer ATS sites with tested adapters; recorded consent; checks and caps; the person stays responsible, stated in the consent screen and CeeVee's terms of use |
+| Google sign-in required and documents stored in Drive | Weakens the "everything stays local" message; adds a dependency on Google | Only non-sensitive scopes (`drive.file`), documents only, never the database; works offline after sign-in |
 | Trial and license bypass | Lost sales | Signed licenses and trial tokens are enough deterrent; avoid heavy DRM that hurts paying users |
 
 ### Decisions log
@@ -372,6 +411,9 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 | 2026-11-10 | Job sites and applicant tracking systems chosen by scale and coverage (see Job sources) |
 | 2026-11-10 | v1 includes category-driven job search across all three source kinds |
 | 2026-11-10 | First audience: English-speaking job seekers in the United States (US English UI, US Letter, MM/DD/YYYY, USD, US form answers such as work authorization and voluntary EEO, veteran and disability questions, always asked and never guessed) |
+| 2026-11-11 | Automation levels from Manual to Full automatic, set globally and per category; LinkedIn automation, on-board one-click apply, CAPTCHAs and account creation stay manual |
+| 2026-11-11 | Drafts (resumes, cover letters, email replies) are always written automatically; documents are refined by multi-turn chat |
+| 2026-11-11 | Google sign-in required; documents saved to the user's Google Drive as Google Docs and PDFs |
 
 ### Open
 
