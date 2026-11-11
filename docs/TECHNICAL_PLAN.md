@@ -24,6 +24,7 @@ CeeVee/
 │  ├─ ceevee-core/            # domain types, errors, job runner, event bus
 │  ├─ ceevee-db/              # SQLite schema, migrations, repositories, FTS
 │  ├─ ceevee-ai/              # llama.cpp runtime, model manager, tasks, grammars, prompts
+│  ├─ ceevee-agent/           # agent harness: loop, tool registry, policy, approvals, memory, scheduler
 │  ├─ ceevee-profile/         # resume and LinkedIn import, merge, fact extraction from chat
 │  ├─ ceevee-docs/            # resume and cover letter rendering (Typst), DOCX export, themes
 │  ├─ ceevee-search/          # categories, job sources, dedupe, scoring, scheduler
@@ -38,16 +39,41 @@ CeeVee/
 └─ docs/
 ```
 
-Crates depend downward only: `desktop → feature crates → ceevee-db, ceevee-ai → ceevee-core`. Feature crates never call each other directly; they publish and subscribe through the core event bus, so each can be tested alone.
+Crates depend downward only: `desktop → feature crates → ceevee-db, ceevee-ai → ceevee-core`. Feature crates never call each other directly; they publish and subscribe through the core event bus, so each can be tested alone. Each feature crate registers its tools with `ceevee-agent`, which is the only place agents reach them.
 
 ## 3. Runtime architecture
 
 - **One process.** The Tauri app hosts the Rust core and one webview. Long work runs on a Tokio runtime inside the core.
 - **UI ↔ core.** Typed Tauri commands for requests, Tauri events for progress and live updates. TypeScript bindings are generated from Rust types with `specta` and `tauri-specta`, so the UI and core cannot drift.
 - **Job runner.** Every long task (draft documents, import resume, run searches, auto-fill, mail sync) is a `Job` row with named steps. The UI subscribes by job ID and can reattach after a reload. Jobs are resumable where it matters (search, mail sync) and cancellable.
-- **Scheduler.** A single in-process scheduler runs category searches daily and mail sync every 10 minutes while the app or tray icon is running. On macOS the app can keep running from the menu bar; on Windows from the system tray. Optional launch at login.
-- **Model worker.** One llama.cpp context owned by a dedicated thread with a priority queue: interactive tasks (chat, drafting) jump ahead of background tasks (scoring, mail labels). The model is unloaded after 10 idle minutes to free memory.
+- **Scheduler.** A single in-process scheduler runs category searches, mail sync and background agents; see 3.1.
+- **Model worker.** One llama.cpp context owned by a dedicated thread with a priority queue: interactive tasks (chat, drafting) jump ahead of background tasks (scoring, mail labels). All model use goes through the agent harness (section 6). The model is unloaded after 10 idle minutes to free memory.
 - **Automation window.** A separate Chrome or Edge process with its own user-data folder, driven over CDP. It is visible to the user at all times while filling.
+
+### 3.1 System tray and background mode
+
+CeeVee lives permanently in the Windows system tray and the macOS menu bar, so scheduled searches, mail sync and the background agents keep running when the main window is closed.
+
+- **Closing the window does not quit.** The main window hides to the tray. Quit is only in the tray menu (and the app menu on macOS). On macOS, with the window closed the Dock icon is hidden (accessory activation policy) and only the menu bar icon remains; it returns when the window opens.
+- **Memory while in the tray.** After 10 minutes hidden, the webview window is destroyed and recreated on open, so tray mode holds only the Rust core (target under 80 MB with the model unloaded). The model loads only while an agent is working.
+- **Launch at login** is on by default and can be turned off in Settings and from the first-run screen; it starts CeeVee straight into the tray. Windows uses the Run registry key, macOS a login item (`tauri-plugin-autostart`).
+- **One instance.** A second launch focuses the existing one (`tauri-plugin-single-instance`).
+- **Tray menu:** Open CeeVee; New jobs today (count, opens the list); Approvals waiting (count); Run searches now; Pause background work (1 hour, until tomorrow, until resumed); Quiet hours; Quit. The icon shows a dot when there is something new.
+- **Scheduler.** Category searches run once a day per category at a time the user picks (default 7:00 local), mail syncs every 10 minutes, follow-up checks run daily. Runs missed while the computer slept or was off run once at the next wake or start, not once per missed day. Wake and sleep events come from the OS (power notifications on Windows, NSWorkspace on macOS). Background work pauses below 20% battery and in quiet hours.
+- **Desktop notifications** (`tauri-plugin-notification`; Windows toast with an AppUserModelID set by the installer, macOS User Notifications with permission asked at first run). Clicking one opens the right screen through a deep link.
+
+| Notification | When | Default |
+| --- | --- | --- |
+| New matches | After a category's daily search, if any new posting scores above the category's threshold (default 70); one notification per run, naming the top match and the count | On |
+| Watched company posted | A watchlisted company has a new matching posting | On |
+| Employer replied | Inbox agent labels a reply as interview, assessment, offer or a direct question | On |
+| Interview reminder | 1 day and 1 hour before an interview found in mail | On |
+| Follow-up due | An application has been quiet for the chosen number of days | On, as a daily digest |
+| Ready for review | Apply agent finished filling a form, or a draft waits in Approvals | On |
+| Rejection received | Inbox agent labels a rejection | Off (shown in the app only) |
+
+Each type can be turned off, and notifications are batched so the user gets at most one per type per run, never a burst.
+
 
 ## 4. Data layer
 
@@ -96,7 +122,111 @@ Model choice is a config file, so a better small model can be swapped in with an
 
 **Optional providers.** Ollama, LM Studio, any OpenAI-compatible endpoint, and Anthropic, behind one `LlmProvider` trait. Keys in the keychain.
 
-## 6. Profile import and learning
+## 6. Agent harness
+
+CeeVee's AI work is done by a small set of agents running on one in-process harness, the `ceevee-agent` crate. The harness gives every agent the same loop, tools, memory, approvals, limits and logging, so adding an agent is mostly configuration.
+
+**Design rule for small local models: workflows first, free agents second.** A 4B model is reliable at one well-defined step and unreliable at long open-ended plans. So background agents are written as fixed workflows (code decides the order of steps; the model makes a decision or writes text inside each step), and only the interactive Assistant runs a free tool-calling loop, with a short tool list and a step limit. Both run on the same harness.
+
+### 6.1 Agents
+
+| Agent | Kind | Trigger | What it does | Tools it may use | Release |
+| --- | --- | --- | --- | --- | --- |
+| Assistant | Free loop, interactive | User opens chat (global or on an application) | Answers questions about the search, edits documents, creates categories, finds jobs, prepares applications on request | All read and draft tools; act tools only through approvals | v1 |
+| Search agent | Workflow | Daily per active category, or Refresh | Builds queries, runs sources, dedupes, scores, files results, writes a short daily digest | `search.*`, `company.*`, `network.who_knows` | v1 |
+| Inbox agent | Workflow | New mail after sync | Filters candidates, labels, links to applications, proposes status changes, drafts replies, turns job alerts into postings | `mail.*` (read, label, draft), `application.propose_status`, `search.ingest_alert` | v1 |
+| Profile agent | Workflow | After each user chat turn; after imports | Detects new facts, proposes profile changes, merges imports | `profile.read`, `profile.propose_change` | v1 |
+| Apply agent | Workflow | User clicks Prepare or Apply | Tailors resume and cover letter, answers form questions, runs auto-fill up to the review step | `docs.*`, `apply.*`, `profile.read` | v1 (on demand); v1.x (prepares top matches in the background for review) |
+| Follow-up agent | Workflow | Daily | Finds applications gone quiet, suggests follow-ups and referral asks, drafts the messages | `application.read`, `network.*`, `mail.draft` | v1.x |
+
+### 6.2 The loop
+
+Every agent run is an `AgentRun` with a goal, an agent profile (system prompt, tool allow-list, limits) and a context. One step is:
+
+1. **Build the prompt** from the agent's system prompt, the run's working state (a compact JSON summary, not the full history), the latest observation, and the tool list. Chat templates are rendered with `minijinja` from the model's own template, so tool calls use the format the model was trained on (Qwen3 uses `<tool_call>` JSON blocks).
+2. **Generate under a grammar.** The GBNF grammar for the step allows exactly one of: a call to one of the allowed tools with arguments matching that tool's JSON schema, or a final answer. A local 4B model therefore cannot produce a malformed or unknown tool call.
+3. **Check the call** against the policy (6.5): allowed for this agent, within budget, risk level. Act-level calls become a proposal instead of running.
+4. **Run the tool** in Rust with a timeout. Results are trimmed to a token budget and summarized when long (for example, 40 postings become IDs, titles, companies and scores).
+5. **Record** the step (prompt hash, tool, arguments, result summary, tokens, time) in `agent_step`, and stream it to the UI.
+6. **Repeat** until a final answer, the step limit (12 for the Assistant), the token budget, or a cancel.
+
+Hosted models (optional) use their native tool-calling APIs through the same `LlmProvider` trait; the harness does not change.
+
+### 6.3 Tools
+
+Tools are Rust functions with a typed input and output. `schemars` derives the JSON schema, which feeds the grammar, the prompt's tool list and validation. Each tool declares a **risk level**.
+
+| Tool group | Examples | Risk |
+| --- | --- | --- |
+| `profile.*` | `read`, `search_facts`, `propose_change` | Read; propose |
+| `category.*` | `list`, `create_draft`, `propose_update` | Read; propose |
+| `search.*` | `run_category`, `get_posting`, `score`, `save`, `dismiss`, `ingest_alert` | Read; draft (save and dismiss are reversible) |
+| `company.*` | `get`, `postings`, `watch`, `block` | Read; draft |
+| `network.*` | `who_knows(company)`, `contact_history`, `draft_referral` | Read; draft |
+| `application.*` | `create`, `read`, `list`, `propose_status` | Draft; propose |
+| `docs.*` | `tailor_resume`, `write_cover_letter`, `edit`, `render_pdf` | Draft (every change is a new version with undo) |
+| `apply.*` | `open_posting`, `fill_form`, `upload_documents`, `answer_question` | Act: runs only after the user starts it, and always stops before Submit |
+| `mail.*` | `search`, `read_thread`, `label`, `draft_reply`, `send` | Read; draft; `send` is act |
+| `calendar.*` | `create_ics` | Draft |
+| `memory.*` | `remember`, `recall` | Draft |
+
+Risk levels:
+
+- **Read:** runs freely.
+- **Draft:** runs freely; the result is visible and reversible (a new document version, a saved posting, a draft email).
+- **Propose:** creates a proposal card the user accepts, edits or dismisses (profile changes, status changes, category edits).
+- **Act:** needs an explicit user click each time (sending an email, starting auto-fill).
+- **Never available to any agent:** pressing a final Submit, sending LinkedIn messages, creating accounts on job sites, deleting data, changing license or settings.
+
+The same tool registry is exposed, read and draft tools only, through an optional local MCP server (`rmcp`), so a user can drive CeeVee from Claude Desktop or another MCP client if they choose. Off by default.
+
+### 6.4 Memory
+
+| Layer | What it holds | Where |
+| --- | --- | --- |
+| Profile | Facts about the user: the single source of truth, changed only through approved proposals | Profile tables |
+| Working state | The current run's compact state: goal, done steps, IDs in play | `agent_run.state` (JSON) |
+| Conversation | Chat history per thread, with rolling summaries once it passes about 6,000 tokens | `chat_message`, `chat_summary` |
+| Preferences | Things the agents learn about how the user searches ("skips on-call roles", "prefers hybrid in Seattle"), each with its source and a confidence; shown and editable in Settings | `agent_memory` |
+| Semantic index | Embeddings of postings, companies, emails, notes and profile entries for recall and dedupe | `sqlite-vec` virtual table in the same SQLite file |
+
+Preferences only steer ranking and suggestions; turning one into a category rule is a proposal.
+
+### 6.5 Approvals and guardrails
+
+- **Approvals screen.** Every proposal and pending act-level step from any agent lands in one queue (also shown inline where it happened), with the agent, the reason and a preview. Batch accept is allowed for low-risk kinds (saving postings, labels).
+- **Untrusted content.** Posting text, emails and web pages are wrapped as data in the prompt and marked untrusted. Instructions inside them are never followed. A step whose input came from untrusted content cannot escalate to an act-level tool in the same run without a user click, which act tools need anyway.
+- **Fact guard** on every drafting tool (see section 5).
+- **Limits per run:** step limit, token budget, wall-clock limit, and per-tool rate limits (for example, at most 3 source requests per category per day). Runs that hit a limit stop with a summary of what they finished.
+- **Sensitive fields** (EEO, veteran, disability, salary, sponsorship) are filled only from answers the user saved for that purpose; agents cannot infer them.
+- **Kill switch.** One toggle pauses all background agents; each agent can be turned off on its own.
+
+### 6.6 Scheduling background agents
+
+- Triggers: time (daily per category, follow-up check), events (new mail synced, new posting saved, status changed, chat turn), and manual.
+- One model worker serves all agents with a priority queue: Assistant and anything the user is waiting on first, then Apply, Inbox, Profile, Search, Follow-up.
+- Background agents run whenever CeeVee is running, including tray-only mode (3.1), pause on battery below 20%, and respect quiet hours the user sets. They raise desktop notifications through the notification types in 3.1.
+- Missed runs (computer asleep) run once at next start, not once per missed day.
+
+### 6.7 Observability and evaluation
+
+- **Activity screen:** every agent run with its steps, tool calls, results, tokens and time, so the user can see what an agent did and why.
+- **Eval suite:** scripted scenarios per agent (a mailbox with 30 messages, a category with 50 postings, a chat that changes a fact) run against mock tools and the real default model. Tracked per release: valid tool-call rate, task success, steps used, fact-guard violations, proposals the user would reject (labelled fixtures).
+
+### 6.8 Open source used by the harness
+
+| Project | Repository | License | Used for |
+| --- | --- | --- | --- |
+| schemars | [GREsau/schemars](https://github.com/GREsau/schemars) | MIT | JSON schemas from Rust tool types |
+| MiniJinja | [mitsuhiko/minijinja](https://github.com/mitsuhiko/minijinja) | Apache-2.0 | Rendering model chat templates and prompts |
+| llama.cpp grammars (GBNF) | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | MIT | Constrained tool calls and outputs |
+| sqlite-vec | [asg017/sqlite-vec](https://github.com/asg017/sqlite-vec) | MIT / Apache-2.0 | Vector search in the SQLite file |
+| rmcp (official Rust MCP SDK) | [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk) | MIT / Apache-2.0 | Optional local MCP server |
+| tiktoken-rs or the model's own tokenizer via llama.cpp | [zurawiki/tiktoken-rs](https://github.com/zurawiki/tiktoken-rs) | MIT | Token budgeting for hosted models |
+
+**Considered and not used:** Rust agent frameworks such as Rig (MIT) are good for hosted APIs, but CeeVee's needs (embedded llama.cpp, per-step grammars, risk-levelled tools and an approvals queue) are specific enough that a thin harness of about 2,000 lines is simpler to own. Python frameworks (LangChain, LangGraph, CrewAI) would add a Python runtime to the installer and are ruled out.
+
+## 7. Profile import and learning
 
 - **Resume:** `pdf-extract` / `lopdf` for PDF text, `docx-rs` for Word, plain read for Markdown. Text goes to `import-resume`.
 - **LinkedIn profile PDF:** same PDF path with a LinkedIn-specific section splitter before the model.
@@ -104,14 +234,14 @@ Model choice is a config file, so a better small model can be swapped in with an
 - **Merge:** entries matched on normalized company name (embedding similarity plus aliases), title and overlapping dates; conflicts go to a review screen.
 - **Learning from chat:** `detect-facts` runs after each user chat turn; proposals render as cards; accepted ones write to the profile with a `source_chat_id`.
 
-## 7. Documents
+## 8. Documents
 
 - Resumes and cover letters are rendered with **Typst** embedded as a library: one Typst template per theme in `themes/`, fed JSON from the profile or application copy. Output is a vector PDF with selectable text, which ATS parsers read reliably. US Letter by default, A4 optional.
 - Live preview in the UI renders the same Typst output to SVG pages.
 - DOCX export through `docx-rs` from the same data, for employers that ask for Word.
 - Document versions store the structured data, not the PDF; PDFs are re-rendered on demand and cached.
 
-## 8. Job search
+## 9. Job search
 
 - **Category → query builder.** Each active category produces a query per source: titles plus synonyms, location and radius or remote, level words, include and exclude keywords.
 - **Source trait.** `JobSource { search(query) -> Vec<RawPosting> }` with implementations:
@@ -124,7 +254,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - **Score.** Hard filters from required category fields first (cheap, no model), then `score-posting` on what remains, plus a bonus when the user knows someone at the company.
 - **Politeness.** Per-host rate limits, `robots.txt` honored for HTML pages, back-off on errors, 30-minute response cache.
 
-## 9. Auto-fill engine
+## 10. Auto-fill engine
 
 - **Browser.** `chromiumoxide` drives Microsoft Edge (present on every Windows 11 PC) or Google Chrome; if neither is found, Chrome for Testing is downloaded. A dedicated user-data folder keeps the user's logins to job sites between runs.
 - **ATS detection.** URL patterns and page markers identify Workday, Greenhouse, Lever, iCIMS, Ashby and the v1.x systems.
@@ -135,7 +265,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - **Stop before submit.** The engine never clicks a final submit control. It shows a checklist overlay and waits. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
 - **Logging.** Every run writes `apply_run` and `apply_field` rows; with the user's consent, anonymized field-mapping failures can be sent to Turtlebox to improve adapters.
 
-## 10. Mail
+## 11. Mail
 
 - **Accounts.** Gmail and Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
 - **Gmail scope note.** Full IMAP access to Gmail is a restricted scope requiring Google's yearly security assessment. Until that is budgeted, Gmail users connect with an app password over IMAP, which needs no verification. Microsoft OAuth needs only publisher verification.
@@ -145,7 +275,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - **Sending.** `lettre` over SMTP with the same credentials; every send is a user click.
 - **Calendar.** Interview times from email produce `.ics` files with the `ics` crate; calendar sync is v2.
 
-## 11. Network (connections)
+## 12. Network (connections)
 
 - `Connections.csv` from the LinkedIn export becomes `contact` and current `contact_role` rows.
 - Former-colleague matching compares contacts' companies with the user's own experience entries and dates.
@@ -153,7 +283,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - A "Save this profile" action in the automation browser captures one LinkedIn profile page the user opened, parsed into `contact_role` history. Never automatic or in bulk.
 - Company matching reuses the search crate's company resolver.
 
-## 12. Licensing client
+## 13. Licensing client
 
 - Trial start stored in the database and the keychain; the later of the two wins. A signed trial token is fetched from turtlebox.studio once, bound to a hashed machine ID (`machine-uid` hashed with SHA-256 and an app salt).
 - License activation sends key and machine hash, receives an Ed25519-signed license file; `ed25519-dalek` verifies it offline against a public key compiled into the app.
@@ -161,7 +291,7 @@ Model choice is a config file, so a better small model can be swapped in with an
 - After the trial without a license, the app is read-only: view and export only.
 - Activation from the purchase email: `tauri-plugin-deep-link` registers the `ceevee://` scheme; `ceevee://activate?key=…` opens Settings › License with the key filled in, and the person confirms. The key is never activated without that click.
 
-## 13. Server side (highturtle repo, AWS)
+## 14. Server side (highturtle repo, AWS)
 
 Small and serverless:
 
@@ -171,13 +301,13 @@ Small and serverless:
 | Activation API | API Gateway + Lambda + DynamoDB | Activate, deactivate (free a seat), validate; 2 seats per license |
 | Trial token API | Same | Issues signed trial tokens per machine hash |
 | Signing key | AWS KMS or Secrets Manager | Holds the Ed25519 private key |
-| Downloads, updates and models | S3 (private, versioned) + CloudFront at `dl.turtlebox.studio` | Installers, update manifests, GGUF models, adapter bundles; layout in section 16 |
+| Downloads, updates and models | S3 (private, versioned) + CloudFront at `dl.turtlebox.studio` | Installers, update manifests, GGUF models, adapter bundles; layout in section 17 |
 | My license page | Lambda + DynamoDB, emailed sign-in link (SES) | Shows key, seats with "Free this seat", download links |
 | CI publishing role | IAM role trusted through GitHub OIDC | Lets the CeeVee release workflow write to the bucket; no long-lived AWS keys |
 
 FastSpring is the merchant of record (sales tax, receipts, refunds).
 
-## 14. Security and privacy
+## 15. Security and privacy
 
 - Tauri capabilities restrict the webview to the commands it needs; strict Content Security Policy; no remote content in the main webview.
 - Outbound HTTP allow-list per feature (job sources, mail servers, turtlebox.studio, model CDN).
@@ -185,7 +315,7 @@ FastSpring is the merchant of record (sales tax, receipts, refunds).
 - Crash reports and anonymous usage stats are opt-in.
 - Data deletion: "Delete everything" removes the database, documents, keychain entries and the automation browser profile.
 
-## 15. Testing
+## 16. Testing
 
 - **Rust:** unit tests per crate, `insta` snapshot tests for prompt rendering and parsers, SQLite tests against a temp database.
 - **AI:** a mock provider for unit tests; an opt-in live suite that runs every task against the real default model on a fixed set of resumes and postings and checks schema validity and fact-guard results.
@@ -194,13 +324,13 @@ FastSpring is the merchant of record (sales tax, receipts, refunds).
 - **Mail:** a local IMAP test server (GreenMail in Docker) with fixture mailboxes, including real-shape alert emails.
 - **UI:** Vitest for components; Playwright against the SvelteKit dev build with a mocked command layer for end-to-end screens.
 
-## 16. Build, release and delivery
+## 17. Build, release and delivery
 
-### 16.1 Per pull request
+### 17.1 Per pull request
 
 GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64). Each pull request runs `cargo fmt`, `cargo clippy -D warnings`, `cargo test`, `cargo deny check`, `pnpm lint`, `pnpm test` and `svelte-check`, and builds unsigned bundles to catch packaging errors. No secrets are available to pull request jobs.
 
-### 16.2 What gets built
+### 17.2 What gets built
 
 | Platform | First install | Updater artifact | Signing |
 | --- | --- | --- | --- |
@@ -212,26 +342,26 @@ GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64). Each pull 
 - No Intel Mac or universal binary (see section 1).
 - Each release also gets `SHA256SUMS` over every file, published next to the installers.
 
-### 16.3 Versions and tags
+### 17.3 Versions and tags
 
 - Semantic versions, one number for the whole app, kept in the workspace `Cargo.toml` and copied into `tauri.conf.json` and `package.json` by a `just bump` script.
 - `vX.Y.Z-beta.N` tags build Beta releases; `vX.Y.Z` tags build Stable releases. Main builds publish to Internal as `X.Y.Z-dev.<run number>`.
 - A tag's major version selects the manifest folder (`updates/v1/`), so a 1.x install never auto-updates to 2.0 (licenses cover the purchased major version).
 - Release notes come from `CHANGELOG.md`, one section per version, written for users.
 
-### 16.4 Release pipeline
+### 17.4 Release pipeline
 
 `release.yml` runs on a pushed tag that points at a commit on `main`:
 
 1. **Build.** Matrix job per platform with `tauri-action`, signing secrets from the `release` GitHub environment. The macOS job imports the certificate into a temporary keychain and notarizes; the Windows job signs through Trusted Signing.
 2. **Verify.** On fresh runners: `signtool verify /pa /all` on Windows; `codesign --verify --deep --strict`, `spctl -a -t exec` and `stapler validate` on macOS. Then a smoke test: install silently, launch with `--smoke-test` (opens the database, loads a tiny test model, renders a PDF, exits 0), uninstall.
 3. **Upload.** Files go to `releases/<version>/` in S3 through the OIDC role. Release folders are immutable once written.
-4. **Publish.** A manifest job writes the channel manifest (16.5). For Stable this step waits for approval in the `release` environment (Howard as required reviewer). Promotion from Beta to Stable reuses the same signed files; nothing is rebuilt.
+4. **Publish.** A manifest job writes the channel manifest (17.5). For Stable this step waits for approval in the `release` environment (Howard as required reviewer). Promotion from Beta to Stable reuses the same signed files; nothing is rebuilt.
 5. **Announce.** A draft GitHub Release with notes and checksums for the record, and an invalidation of the changed manifest paths in CloudFront.
 
 A separate `rollout.yml`, started by hand, moves a Stable release from 10 to 50 to 100 percent, pauses it, or resumes it. Each run rewrites one manifest and invalidates it.
 
-### 16.5 Update manifests and the client
+### 17.5 Update manifests and the client
 
 Static JSON on CloudFront, no server code:
 
@@ -263,9 +393,9 @@ The query string is ignored by the cache (cache key is the path) but kept in Clo
 - If the updater fails three times in a row, Settings shows the error and a "Download manually" link.
 - `next_major` drives a dismissible "CeeVee 2 is available" note; the 1.x line keeps receiving fixes in `updates/v1/` as long as it is supported.
 
-### 16.6 Signed content outside the app
+### 17.6 Signed content outside the app
 
-Adapters (section 9), job-alert parsers and model files update without an app release. Each kind has a manifest signed with a separate **content key** (Ed25519, verified with `ed25519-dalek` against a public key compiled into the app):
+Adapters (section 10), job-alert parsers and model files update without an app release. Each kind has a manifest signed with a separate **content key** (Ed25519, verified with `ed25519-dalek` against a public key compiled into the app):
 
 ```
 ceevee/adapters/manifest.json (+ .sig)   → bundles/<sha256>.tar.zst
@@ -277,7 +407,7 @@ ceevee/models/manifest.json   (+ .sig)   → <model-id>/<sha256>.gguf
 - Models: checked weekly. A new default for the person's tier appears as an offer with its size. Download uses HTTP range requests to resume, writes to `*.partial`, checks SHA-256, then swaps the model in the model config; the old file is deleted after the first successful load. Files are content-addressed, so CloudFront can cache them forever.
 - Content manifests are built and signed by a `content.yml` workflow in the CeeVee repo, so adapter fixes ship in minutes.
 
-### 16.7 Bucket and CDN layout
+### 17.7 Bucket and CDN layout
 
 ```
 s3://turtlebox-dl/ceevee/
@@ -292,19 +422,19 @@ s3://turtlebox-dl/ceevee/
 - The Internal channel lives under a CloudFront path that requires a signed cookie, so dev builds are not public.
 - The turtlebox.studio download button reads `latest/*.json`, so the website never needs a deploy for a new release.
 
-### 16.8 Keys and secrets
+### 17.8 Keys and secrets
 
 | Key | Used for | Where it lives | If lost |
 | --- | --- | --- | --- |
 | Tauri updater key (minisign) | Signing app updates | `release` environment secret + two offline encrypted backups | Existing installs can never verify another update; users must reinstall by hand. Rotation: ship a build with the new public key, signed with the old key |
 | Content key (Ed25519) | Signing adapter and model manifests | `content` environment secret + offline backup | Rotate by shipping a release that trusts both old and new keys, then retire the old |
-| License key (Ed25519) | Signing license files and trial tokens | AWS KMS or Secrets Manager (section 13) | Same rotation pattern; never in CI |
+| License key (Ed25519) | Signing license files and trial tokens | AWS KMS or Secrets Manager (section 14) | Same rotation pattern; never in CI |
 | Apple Developer ID cert and App Store Connect API key | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
 | Azure Trusted Signing | Windows signing | Azure account; CI signs in through OIDC federation where supported, otherwise a client secret in `release` | Reissue in Azure |
 
 Release and content jobs run only on tags from `main`, with environment protection rules, and the AWS role can write only under `ceevee/`.
 
-### 16.9 Costs (estimate)
+### 17.9 Costs (estimate)
 
 | Item | Cost |
 | --- | --- |
@@ -316,9 +446,9 @@ Release and content jobs run only on tags from `main`, with environment protecti
 
 If model bandwidth becomes material, the options are a CloudFront flat-rate plan, or moving `models/` alone to a zero-egress store (Cloudflare R2) behind the same signed manifest; the app does not change because the manifest holds the URLs.
 
-## 17. Open source projects included
+## 18. Open source projects included
 
-All are permissively licensed. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
+All are permissively licensed. The agent harness's own dependencies are listed in section 6.8. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
 
 ### Rust (core)
 
@@ -418,18 +548,18 @@ All are permissively licensed. Versions are pinned in `Cargo.lock` and `pnpm-loc
 | Llama and Gemma model weights | Licenses add redistribution terms; Qwen (Apache-2.0) avoids them |
 | Puppeteer, Selenium, Playwright at runtime | Node or Java runtimes; chromiumoxide keeps automation in Rust |
 
-## 18. Engineering order of work
+## 19. Engineering order of work
 
 Matches the roadmap in PLAN.md (about 27 weeks).
 
-1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar, themes and tray; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing and notarization on both platforms, release pipeline publishing to the Internal channel (16.4), S3 bucket and CloudFront set up in highturtle; cargo-deny policy.
-2. **Local AI (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
+1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar and themes; permanent tray and menu bar mode, launch at login, single instance, scheduler with sleep and wake handling, notifications; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing and notarization on both platforms, release pipeline publishing to the Internal channel (17.4), S3 bucket and CloudFront set up in highturtle; cargo-deny policy.
+2. **Local AI and agent harness (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; `ceevee-agent` loop, tool registry with risk levels, approvals queue, activity log and eval harness; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** Onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard, reminders, export, import, backups. Categories and companies; company-site sources (Greenhouse, Lever, Ashby, SmartRecruiters, Workday feed, JobPosting reader), USAJOBS and Adzuna; dedupe, scoring, scheduler; LinkedIn Connections import and the "who you know" panel.
 5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel.
 6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail app-password flow; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
 
-## 19. Technical risks
+## 20. Technical risks
 
 | Risk | Mitigation |
 | --- | --- |
@@ -437,8 +567,10 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 | 4B model quality on tailoring | Narrow tasks, grammars, fact guard, optional 8B or hosted model; measure with the live AI suite each release |
 | Workday's per-employer accounts and multi-page flow | Treat as the user's step: CeeVee pauses for sign-in, then resumes filling |
 | Job alert email formats change | Parsers are data-driven and shipped through the adapter update channel; fixtures from real alerts in tests |
+| Small model picks wrong tools in the free Assistant loop | Short tool lists per agent, grammar-constrained calls, step limit, workflows for all background work, eval suite gates each release |
 | Typst template quality vs. HTML themes | Prototype two themes in week 1 to confirm the look before committing |
 | Signing enrollment delays (Apple, Azure identity validation) | Start both before week 1; ship unsigned Internal builds to Howard's own machines meanwhile |
 | New Windows signing identity has no SmartScreen reputation | Trusted Signing certificates gain reputation with download volume; tell beta testers to expect a warning for the first weeks |
-| macOS app run from the DMG cannot update | Move-to-Applications prompt on first run (16.5) |
+| macOS app run from the DMG cannot update | Move-to-Applications prompt on first run (17.5) |
+| Background app killed or throttled by the OS (Windows battery saver, macOS App Nap) | Disable App Nap for scheduled work, catch-up runs on wake, and a "last run" time shown in the tray menu |
 | Webview differences (WebView2 vs WKWebView) | UI tested on both in CI with screenshots; avoid cutting-edge CSS |

@@ -28,10 +28,11 @@ Version 1 matches Dossier's core loop (profile, tailored documents, tracking, in
 | New application | Paste a posting; AI extracts requirements, shows match and gaps, drafts tailored resume and cover letter | Same, also from a URL or a browser capture; never invents experience, gaps shown as gaps | v1 |
 | Refine | Chat to edit, regenerate parts, version history, undo, notes | Same | v1 |
 | Find jobs | Search JSearch, Adzuna, FreeHire; save, dismiss, score | Category-driven search of company career sites, job boards and job posting services (see Job sources), plus paste or capture any posting | v1 |
-| Job agent | Up to 3 saved searches run daily, scored, optional drafts for review | Same idea, runs while the app is open or in the tray | v2 |
+| AI agents | A job agent: up to 3 saved searches run daily, scored, optional drafts for review | An agent harness with an Assistant chat and background Search, Inbox, Profile and Apply agents; every send, submit or profile change waits for the person's approval (see TECHNICAL_PLAN.md, section 6) | v1; background application drafts v1.x |
 | Apply | Builds an email with PDFs; never applies | **Auto-fill**: opens the application page, fills every field from the profile and facts, uploads the tailored PDFs, writes answers to free-text questions, then pauses for review before Submit | v1 |
 | Inbox | Gmail replies linked to applications, AI summary, drafted answers | **IMAP for any provider** (Gmail and Outlook by OAuth); classifies each reply (rejection, interview, assessment, offer, recruiter), links it, suggests a status change, drafts a reply | v1 |
 | Calendar | Google Calendar sync, interviews on the dashboard | Interviews from emails shown on the dashboard, .ics export; Google and Outlook calendar sync later | v1, sync v2 |
+| Background and alerts | Runs on a server, so always on | **Permanent tray and menu bar app**: launches at login, keeps running when the window is closed, runs daily category searches and mail sync, and sends desktop notifications for new matches, employer replies, interviews and follow-ups (see TECHNICAL_PLAN.md, section 3.1) | v1 |
 | Track | Board (Draft to Offer), table, dashboard funnel, weekly chart, "worth a look next" | Same, with follow-up reminders when an application goes quiet for N days | v1 |
 | Your data | Export, import, nightly backups, delete everything | Same, all local; backups to a folder the person picks | v1 |
 | Usage | Tokens per AI task | Local model status, speed and disk use | v1 |
@@ -130,7 +131,7 @@ How results are handled:
 - **Deduplicated** by company, title and location, and by the link without tracking parameters. When the same job appears on a board and on the company's own site, CeeVee keeps the company link for applying.
 - **Linked to a company.** New companies are created as they appear, and their careers system is detected so later searches can poll it directly.
 - **Filed and scored per category.** A posting matching two categories appears in both, with a score for each.
-- **Scheduled** once a day per category while the app or its tray icon is running, plus a Refresh button. Each source has a polite rate limit and back-off.
+- **Scheduled** once a day per category from the always-running tray app, plus a Refresh button; new matches above the category's threshold raise a desktop notification. Each source has a polite rate limit and back-off.
 - **Expired postings** are marked closed when they drop out of the source.
 
 **Posting service costs.** Posting services charge per search. At $19.99 one-time, Turtlebox keeps about $18.50 per sale after payment fees, while a relay holding shared API keys would cost about $10 per user per year at a few cents a day. **Recommendation:** v1 relies on the free sources (company career sites, free boards and alert emails), which cover most postings, and paid posting services are optional with the person's own API key. A relay can come later as a paid add-on.
@@ -217,7 +218,7 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 
 ## Data model
 
-The SQLite file has 20 core tables in six groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
+The SQLite file has 25 core tables in seven groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
 
 | Group | Table | Holds |
 | --- | --- | --- |
@@ -238,6 +239,7 @@ The SQLite file has 20 core tables in six groups. Jobs can be queried by categor
 | Documents | `theme` | Built-in and custom resume themes |
 | Automation | `apply_run`, `apply_field` | Each auto-fill attempt: ATS detected, outcome, and every field with its value, source fact and confidence, for review and for improving adapters |
 | Mail | `mail_account`, `email_message` | Connected accounts (tokens live in the keychain); messages with direction, thread, linked application, label, summary, suggested status, interview time |
+| Agents | `agent_run`, `agent_step`, `agent_memory`, `proposal`, `chat_summary` | Each agent run and its tool calls; learned search preferences; the approvals queue; chat summaries. Embeddings live in a `sqlite-vec` table |
 | System | `job`, `setting`, `license_state` | Background tasks with progress; settings; trial start, license and last check |
 
 Migrations ship inside the app and run at start-up, after an automatic backup of the file.
@@ -258,7 +260,7 @@ Code signing is required on both platforms or the installers will be blocked: an
 
 ## Delivery and updates
 
-How CeeVee gets onto a computer and stays current. Engineering detail is in TECHNICAL_PLAN.md, section 16.
+How CeeVee gets onto a computer and stays current. Engineering detail is in TECHNICAL_PLAN.md, section 17.
 
 **Getting the app.**
 
@@ -301,14 +303,14 @@ Prompts change with the code that reads their output, so they ship only in app r
 
 Version 1 takes about 27 weeks for one or two developers, in milestones that each end with something runnable on both platforms. Durations are estimates and assume work starts in late November 2026.
 
-1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, SQLite with migrations, CI building signed and notarized Windows and macOS installers and publishing them to the Internal channel, background job runner.
-2. **Local AI (weeks 4 to 6).** llama.cpp linked in, hardware check, model download with progress, grammar-constrained JSON, a benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
+1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, permanent tray and menu bar mode with launch at login, scheduler and notifications, SQLite with migrations, CI building signed and notarized Windows and macOS installers and publishing them to the Internal channel, background job runner.
+2. **Local AI and agent harness (weeks 4 to 6).** llama.cpp linked in, the agent loop with tools, approvals and activity log, hardware check, model download with progress, grammar-constrained JSON, a benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** First-run onboarding with resume and LinkedIn import and merge review, profile editor, 4 themes, PDF and DOCX export, new application from a posting with match and gaps, tailored resume and cover letter, refine chat and versions.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard funnel and weekly chart, follow-up reminders, export, import and backups. Job categories, companies and job search across career sites and free boards, plus LinkedIn connections at each company.
 5. **Auto-fill (weeks 18 to 23).** Browser control, adapters for Greenhouse, Lever and Ashby (simplest) then Workday and iCIMS (largest coverage), then the generic form path; review checklist and submit detection.
 6. **Email and launch (weeks 24 to 27).** IMAP with Gmail and Outlook, reply labelling and linking, job alert email parsing, trial and licensing, updater with Beta and Stable channels and staged rollout, signed adapter and model manifests, turtlebox.studio download, checkout and "My license" pages, beta with 20 to 50 testers.
 
-After v1: the background job agent that drafts applications for review, calendar sync and more ATS adapters (v2).
+After v1: background application drafts for review, a follow-up agent, calendar sync and more ATS adapters (v2).
 
 ## Risks and open questions
 
