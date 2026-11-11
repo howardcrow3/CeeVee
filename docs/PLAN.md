@@ -1,6 +1,6 @@
 # CeeVee: Product and Technical Plan
 
-Last updated 2026-11-10. This file mirrors the [live plan document](https://claude.ai/artifact/WjnrwY1qasFHHXThPjtVrb) and is updated as decisions are made.
+Last updated 2026-11-10. This file mirrors the [live plan document](https://claude.ai/artifact/WjnrwY1qasFHHXThPjtVrb) and is updated as decisions are made. Engineering detail is in [TECHNICAL_PLAN.md](TECHNICAL_PLAN.md).
 
 ## Summary
 
@@ -205,7 +205,7 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 | Default models | A 4B instruct model at Q4 (about 2.5 GB) for 8 to 16 GB machines; an 8B model offered at 16 GB and up; a small embedding model for matching | Chosen by a first-run hardware check; downloaded with progress and checksum |
 | Optional AI | Ollama, LM Studio, or an OpenAI-compatible or Anthropic key | For people who want a larger model |
 | Structured output | GBNF grammars from JSON schemas | Small local models return valid JSON every time |
-| Documents | HTML templates rendered to PDF by the webview's print engine; DOCX through `docx-rs` | No server-side Chromium needed |
+| Documents | Typst templates rendered to PDF and SVG preview; DOCX through `docx-rs` | Vector PDFs that ATS parsers read reliably, no Chromium needed |
 | Resume import | `pdf-extract` / `lopdf` for PDF, `docx-rs` for Word, then the model maps text to the profile | Same flow as Dossier's import |
 | Browser automation | `chromiumoxide` over the Chrome DevTools Protocol, driving Edge (on every Windows 11 PC) or Chrome; Chrome for Testing downloaded if neither exists | Visible window with its own profile, so logins to job sites persist |
 | Email | `async-imap` for reading, `lettre` for sending; OAuth 2 with PKCE and a loopback redirect for Gmail and Microsoft | Works with any provider, not only Gmail |
@@ -261,9 +261,9 @@ Version 1 takes about 27 weeks for one or two developers, in milestones that eac
 1. **Foundation (weeks 1 to 3).** Tauri app with sidebar and light and dark themes, SQLite with migrations, CI building signed Windows and macOS installers, background job runner.
 2. **Local AI (weeks 4 to 6).** llama.cpp linked in, hardware check, model download with progress, grammar-constrained JSON, a benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** First-run onboarding with resume and LinkedIn import and merge review, profile editor, 4 themes, PDF and DOCX export, new application from a posting with match and gaps, tailored resume and cover letter, refine chat and versions.
-4. **Tracking (weeks 12 to 14).** Board, table, dashboard funnel and weekly chart, follow-up reminders, export, import and backups. Then job categories, companies and job search across career sites, posting services and alert emails (about 3 more weeks; later milestones shift by 3 weeks).
-5. **Auto-fill (weeks 15 to 20).** Browser control, adapters for Greenhouse, Lever and Ashby (simplest) then Workday and iCIMS (largest coverage), then the generic form path; review checklist and submit detection.
-6. **Email and launch (weeks 21 to 24).** IMAP with Gmail and Outlook OAuth, reply labelling and linking, trial and licensing, updater, turtlebox.studio download and checkout pages, beta with 20 to 50 testers.
+4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard funnel and weekly chart, follow-up reminders, export, import and backups. Job categories, companies and job search across career sites and free boards, plus LinkedIn connections at each company.
+5. **Auto-fill (weeks 18 to 23).** Browser control, adapters for Greenhouse, Lever and Ashby (simplest) then Workday and iCIMS (largest coverage), then the generic form path; review checklist and submit detection.
+6. **Email and launch (weeks 24 to 27).** IMAP with Gmail and Outlook, reply labelling and linking, job alert email parsing, trial and licensing, updater, turtlebox.studio download and checkout pages, beta with 20 to 50 testers.
 
 After v1: the background job agent that drafts applications for review, calendar sync and more ATS adapters (v2).
 
