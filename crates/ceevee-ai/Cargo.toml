@@ -26,6 +26,10 @@ llama = ["dep:llama-cpp-2"]
 # Vulkan GPU support for Windows. Metal is enabled automatically on Apple silicon.
 llama-vulkan = ["llama", "llama-cpp-2/vulkan"]
 
+[[bin]]
+name = "ceevee-eval"
+path = "src/bin/ceevee-eval.rs"
+
 [dev-dependencies]
 tempfile = "3"
 

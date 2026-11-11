@@ -5,6 +5,7 @@
 pub mod backend;
 pub mod catalog;
 pub mod download;
+pub mod eval;
 pub mod grammar;
 pub mod hardware;
 #[cfg(feature = "llama")]
