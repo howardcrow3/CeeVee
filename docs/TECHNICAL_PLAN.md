@@ -6,7 +6,7 @@ Last updated 2026-11-11. Companion to [PLAN.md](PLAN.md), which holds the produc
 
 - **Clean room.** Dossier (AGPL-3.0) is a product reference only. No code, prompts, CSS, images or schema text is copied from it.
 - **Licenses we accept** in anything that ships: MIT, Apache-2.0, BSD-2/3, ISC, Zlib, Unicode, MPL-2.0 (file-level, unmodified), public domain. **Rejected:** GPL, LGPL (static linking), AGPL, SSPL, and model licenses that restrict commercial use. `cargo-deny` and `license-checker` enforce this in CI.
-- **Local first, documents in the user's own Drive.** The profile, database, mail, connections and all AI processing stay on the machine. Documents (resumes, cover letters, email drafts) are also saved to the user's own Google Drive as Google Docs and PDFs (section 8.1); nothing goes to Turtlebox. The other network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
+- **Local first.** The profile, database, documents, mail, connections and all AI processing stay on the machine. Documents go to the user's own Google Drive only if they sign in with Google and turn on Drive storage (section 8.2); nothing goes to Turtlebox. The other network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
 - **The person sets the autonomy.** By default nothing is submitted, sent or saved to the profile without an explicit user action. The person can raise this, globally or per category, up to full automatic (section 6.6). A short list of actions stays manual at every level because automating them breaks site terms.
 - **Targets.** Windows 11 x64 and macOS 13+ on Apple silicon (arm64). No Intel Mac or Linux build in v1.
 
@@ -29,7 +29,7 @@ CeeVee/
 │  ├─ ceevee-docs/            # resume and cover letter rendering (Typst), DOCX export, themes
 │  ├─ ceevee-search/          # categories, job sources, dedupe, scoring, scheduler
 │  ├─ ceevee-apply/           # browser automation, ATS adapters, generic form filler
-│  ├─ ceevee-drive/           # Google sign-in, Drive sync of Google Docs and PDFs
+│  ├─ ceevee-google/          # optional Google sign-in; Gmail and Drive MCP servers (sidecar)
 │  ├─ ceevee-mail/            # IMAP/SMTP, OAuth, classification, linking, alert-email parsing
 │  ├─ ceevee-network/         # contacts, LinkedIn Connections import, company matching
 │  └─ ceevee-license/         # trial, activation, Ed25519 license verification
@@ -179,7 +179,7 @@ Risk levels:
 - **Act:** needs a user click unless the person's automation policy makes that action automatic (6.6).
 - **Never available to any agent, at any level:** LinkedIn messages, connection requests or Easy Apply; on-board one-click apply flows; solving CAPTCHAs; creating accounts on job sites; deleting data; changing license or policy settings.
 
-The same tool registry is exposed, read and draft tools only, through an optional local MCP server (`rmcp`), so a user can drive CeeVee from Claude Desktop or another MCP client if they choose. Off by default.
+`rmcp` works both ways. As a client, it loads connector tools (Google Gmail and Drive, section 8.2) into the registry with assigned risk levels. As a server, the same registry is exposed, read and draft tools only, so a user can drive CeeVee from Claude Desktop or another MCP client if they choose; off by default.
 
 ### 6.4 Memory
 
@@ -235,7 +235,7 @@ The person's chosen automation level (see "Automation levels" in PLAN.md) decide
 | MiniJinja | [mitsuhiko/minijinja](https://github.com/mitsuhiko/minijinja) | Apache-2.0 | Rendering model chat templates and prompts |
 | llama.cpp grammars (GBNF) | [ggml-org/llama.cpp](https://github.com/ggml-org/llama.cpp) | MIT | Constrained tool calls and outputs |
 | sqlite-vec | [asg017/sqlite-vec](https://github.com/asg017/sqlite-vec) | MIT / Apache-2.0 | Vector search in the SQLite file |
-| rmcp (official Rust MCP SDK) | [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk) | MIT / Apache-2.0 | Optional local MCP server |
+| rmcp (official Rust MCP SDK) | [modelcontextprotocol/rust-sdk](https://github.com/modelcontextprotocol/rust-sdk) | MIT / Apache-2.0 | MCP client for Google connectors; optional local MCP server |
 | tiktoken-rs or the model's own tokenizer via llama.cpp | [zurawiki/tiktoken-rs](https://github.com/zurawiki/tiktoken-rs) | MIT | Token budgeting for hosted models |
 
 **Considered and not used:** Rust agent frameworks such as Rig (MIT) are good for hosted APIs, but CeeVee's needs (embedded llama.cpp, per-step grammars, risk-levelled tools and an approvals queue) are specific enough that a thin harness of about 2,000 lines is simpler to own. Python frameworks (LangChain, LangGraph, CrewAI) would add a Python runtime to the installer and are ruled out.
@@ -255,20 +255,31 @@ The person's chosen automation level (see "Automation levels" in PLAN.md) decide
 - DOCX export through `docx-rs` from the same data, for employers that ask for Word.
 - Document versions store the structured data, not the PDF; PDFs are re-rendered on demand and cached.
 
-### 8.1 Google account and Drive sync
+### 8.1 Local document store and editing
 
-- **Sign-in.** Google OAuth 2 with PKCE and a loopback redirect, on the first screen. Scopes: `openid`, `email`, `profile` and `https://www.googleapis.com/auth/drive.file` (only files CeeVee creates or the person opens with it). All four are non-sensitive, so Google requires brand verification only. The refresh token lives in the OS keychain.
-- **Gmail.** Not requested at sign-in. `gmail.readonly` and `gmail.modify` are restricted scopes needing the yearly CASA assessment; until that is budgeted, Gmail mail stays on IMAP with an app password (section 11). The account model allows adding `gmail.modify` later as an incremental consent.
 - **Always-on drafting.** Drafting tools (`docs.tailor_resume`, `docs.write_cover_letter`, `mail.draft_reply`) are draft-level and run automatically at every automation level, on the events "application created" and "employer email needs reply". The policy engine (6.6) governs only `submit` and `send`.
+- **Formats.** Resume data is JSON in a schema modeled on JSON Resume (plus CeeVee fields such as fact IDs per bullet), stored in `document_version`. Cover letters and email replies are Markdown (`pulldown-cmark`). Outputs: Typst PDF, DOCX (`docx-rs`), plain text.
+- **Document folder.** Every version is also written to a user-visible folder, default `Documents/CeeVee` (changeable), laid out as `Base resume/` and `Applications/<Company - Title (date)>/` with PDF and DOCX per document and a frozen `Sent/` copy. The database stays the source of truth; the folder is an export the user can sync with iCloud Drive, OneDrive or Dropbox.
 - **Chat editing.** Each document has its own chat thread (`chat_message` keyed by document). The `refine` task returns structured edits applied to the document's data; each turn is a `document_version`. Long threads are summarized as in 6.4.
-- **Drive writer.** A `ceevee-drive` crate calls Drive API v3 over `reqwest`:
+- **Built-in editor.** Svelte side-by-side editor with live Typst SVG preview: section-based for resumes (jobs, bullets, skills, reorder by drag), rich text (TipTap, MIT) for Markdown documents.
+- **Open in Word.** Writes the DOCX to the folder and opens it with the system default app (`tauri-plugin-opener`). A file watcher (`notify`) sees the save, `docx-rs` parses it back, the result is mapped onto the document's structure (the model helps for resumes where paragraphs moved), and the diff is shown as a proposal for a new version.
+
+### 8.2 Optional Google sign-in: Gmail and Drive through MCP
+
+- **Optional.** Offered at first run and in Settings with the explanation "Sign in with Google and CeeVee can read replies from recruiters in your Gmail and keep your applications up to date. You can also store your documents in Google Drive." Everything works without it.
+- **Sign-in.** Google OAuth 2 with PKCE and a loopback redirect. Base scopes `openid`, `email`, `profile`; others added by incremental consent when the person turns a feature on. The refresh token lives in the OS keychain.
+- **MCP client.** `ceevee-agent` gains an MCP client (`rmcp`). Google services are connectors: MCP servers whose tools join the tool registry with risk levels like any other tool. Two ways to run them, chosen after a spike in milestone 3:
+  - Google's hosted Workspace MCP servers, if their terms allow a third-party desktop client to use them under CeeVee's own OAuth client.
+  - Otherwise, small bundled Rust MCP servers (`ceevee-google`, built on `rmcp`, calling Gmail API and Drive API v3 over `reqwest`) launched as local sidecars over stdio.
+  Either way the scopes are requested by CeeVee's OAuth client, so Google's verification rules for those scopes apply to CeeVee.
+- **Gmail (reading recruiter replies).** `gmail.readonly` to read, `gmail.send` only if the person allows CeeVee to send. `gmail.readonly` is a restricted scope: public release needs Google's restricted-scope verification and a yearly CASA assessment; until approved, the project is capped at 100 test users, enough for the beta. Messages flow into the same candidate filter and labelling as IMAP mail (section 11). IMAP with an app password stays as the fallback for people who don't sign in.
+- **Drive storage (setting, off by default).** Needs `drive.file` (non-sensitive). Mirrors the document folder to `My Drive/CeeVee`:
   - Google Doc: the DOCX built by `docx-rs` is uploaded with target type `application/vnd.google-apps.document`, so Drive converts it. Later versions update the same file ID.
   - PDF: the Typst PDF uploaded as `application/pdf`, same file ID updated per version.
-  - Folders created on first use under `CeeVee/`; IDs stored in `drive_file`.
   - Writes go through a durable queue (`drive_sync` rows) with retry and back-off, so offline edits sync later.
-- **Pulling edits back.** On sync, compare each Google Doc's `modifiedTime` and `lastModifyingUser` with the last CeeVee write. If the person edited it, export it as DOCX, parse it with `docx-rs`, diff against the current version, and show the diff as a proposal.
-- **Data model additions.** `google_account` (subject ID, email, scopes granted), `drive_file` (document version, kind `gdoc` or `pdf`, Drive file ID, folder ID, last synced `modifiedTime`), `drive_sync` (queue).
-- **Failure modes.** Revoked access or a full Drive pauses syncing with a banner; documents stay usable locally and in the app.
+  - Pulling edits back: compare each Google Doc's `modifiedTime` and `lastModifyingUser` with the last CeeVee write; if the person edited it, export as DOCX and treat it like the Open in Word round trip.
+- **Data model additions.** `google_account` (subject ID, email, scopes granted), `mcp_connector` (server, transport, status), `drive_file` (document version, kind `gdoc` or `pdf`, Drive file ID, folder ID, last synced `modifiedTime`), `drive_sync` (queue).
+- **Failure modes.** Revoked access or a full Drive pauses syncing with a banner; documents stay usable locally.
 
 ## 9. Job search
 
@@ -296,8 +307,8 @@ The person's chosen automation level (see "Automation levels" in PLAN.md) decide
 
 ## 11. Mail
 
-- **Accounts.** The Google sign-in (8.1) covers Drive only. Mail: Gmail over IMAP with an app password in v1, and Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
-- **Gmail scope note.** Full IMAP access to Gmail is a restricted scope requiring Google's yearly security assessment. Until that is budgeted, Gmail users connect with an app password over IMAP, which needs no verification. Microsoft OAuth needs only publisher verification.
+- **Accounts.** Gmail through the optional Google sign-in (8.2) once Google approves the restricted scope, otherwise IMAP with an app password; Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
+- **Gmail scope note.** Reading Gmail by any OAuth route (Gmail API, IMAP XOAUTH2, or MCP under CeeVee's client) is a restricted scope requiring Google's verification and yearly CASA assessment. App-password IMAP needs no verification and remains the fallback. Microsoft OAuth needs only publisher verification.
 - **Sync.** `async-imap` with IDLE where supported, otherwise polling every 10 minutes; first sync covers 90 days of headers. Bodies are fetched only for candidate messages. `mail-parser` decodes MIME.
 - **Candidate filter** (no model): sender or reply-to domain matches a company's domains, known ATS sender domains, replies in threads the user started from CeeVee, and known job-alert senders.
 - **Labelling.** `label-email` assigns kind, application, suggested status and interview time. Alert emails go to the job-alert parsers instead.
@@ -513,6 +524,9 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | --- | --- | --- | --- |
 | Typst | [typst/typst](https://github.com/typst/typst) | Apache-2.0 | Resume and cover letter PDF and SVG rendering |
 | docx-rs | [bokuweb/docx-rs](https://github.com/bokuweb/docx-rs) | MIT | DOCX export and Word import |
+| pulldown-cmark | [pulldown-cmark/pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) | MIT | Markdown for cover letters and email replies |
+| notify | [notify-rs/notify](https://github.com/notify-rs/notify) | CC0-1.0 / MIT / Apache-2.0 | Watches DOCX files opened in Word for saves |
+| tauri-plugin-opener | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) | MIT / Apache-2.0 | Opens documents in Word, Pages or LibreOffice |
 | pdf-extract | [jrmuizel/pdf-extract](https://github.com/jrmuizel/pdf-extract) | MIT | PDF text extraction |
 | lopdf | [J-F-Liu/lopdf](https://github.com/J-F-Liu/lopdf) | MIT | PDF fallback parsing |
 | csv | [BurntSushi/rust-csv](https://github.com/BurntSushi/rust-csv) | MIT / Unlicense | LinkedIn export files |
@@ -583,10 +597,10 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 
 1. **Foundation (weeks 1 to 3).** Workspace and crates skeleton; Tauri app with sidebar and themes; permanent tray and menu bar mode, launch at login, single instance, scheduler with sleep and wake handling, notifications; `ceevee-db` with first migrations; job runner and event bus; tauri-specta bindings; CI with signing and notarization on both platforms, release pipeline publishing to the Internal channel (17.4), S3 bucket and CloudFront set up in highturtle; cargo-deny policy.
 2. **Local AI and agent harness (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; `ceevee-agent` loop, tool registry with risk levels, approvals queue, activity log and eval harness; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
-3. **Profile and documents (weeks 7 to 11).** Google sign-in, `ceevee-drive` with Drive sync queue and edit pull-back; onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
+3. **Profile and documents (weeks 7 to 11).** document folder, built-in editor, Open in Word round trip with file watcher; optional Google sign-in, MCP client, Drive connector spike (hosted vs bundled) and sync queue; start Google restricted-scope verification; onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard, reminders, export, import, backups. Categories and companies; company-site sources (Greenhouse, Lever, Ashby, SmartRecruiters, Workday feed, JobPosting reader), USAJOBS and Adzuna; dedupe, scoring, scheduler; LinkedIn Connections import and the "who you know" panel.
 5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel.
-6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail app-password flow; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
+6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail connector over Google sign-in and the app-password fallback; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
 
 ## 20. Technical risks
 
