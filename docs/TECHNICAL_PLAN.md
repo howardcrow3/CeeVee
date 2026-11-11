@@ -305,6 +305,23 @@ The person's chosen automation level (see "Automation levels" in PLAN.md) decide
 - **Submit.** By default the engine stops before the final submit control, shows a checklist overlay and waits. When the automation policy resolves `apply.submit` to automatic (6.6), it clicks the adapter's declared submit control and records a screenshot of the confirmation page. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
 - **Logging.** Every run writes `apply_run` and `apply_field` rows; with the user's consent, anonymized field-mapping failures can be sent to Turtlebox to improve adapters.
 
+### 10.1 Browser control setting: Chrome MCP (optional)
+
+Settings, Browser, "Browser control" offers two choices:
+
+- **Built in (default).** `chromiumoxide` as above: adapters for known systems, generic path for the rest.
+- **Chrome MCP.** CeeVee runs Google's Chrome DevTools MCP server (`chrome-devtools-mcp`, Apache-2.0) and connects to it with its MCP client (`rmcp`, section 8.2). The agent then works the page through MCP tools (snapshot, click, fill, upload, navigate) instead of fixed adapter steps. Best with a larger model; the setting says so and shows the selected model.
+
+How the option is built:
+
+- **Runtime.** Node.js is not bundled. Turning the setting on downloads a pinned, checksummed Node LTS and server version into CeeVee's data folder (like a model download), or uses an existing Node 20+ if found. Updated through the signed manifest channel (17.6).
+- **Browser.** The MCP server is started against the same dedicated Edge or Chrome profile CeeVee already uses (`--browser-url` to the CDP port CeeVee opened), so job-site logins carry over and the person's everyday profile is never touched.
+- **Same guardrails.** MCP browser tools are wrapped by the harness, not passed through raw: each gets a risk level, navigation is checked against the never-list (LinkedIn messaging and Easy Apply, Indeed Apply, ZipRecruiter 1-Click, account-creation and CAPTCHA pages are refused), and any click on a control matching submit patterns is classified `apply.submit` and goes through the policy engine (6.6). Sensitive answers still come only from the answers store.
+- **Adapters still win.** On a known applicant tracking system with a tested adapter, the built-in path runs even when Chrome MCP is selected, unless the person turns on "Use Chrome MCP everywhere". Chrome MCP is the default for unknown forms only when the setting is on.
+- **Logging.** Each MCP tool call is logged into `apply_run` and `apply_field` like the built-in path, so review checklists and the activity log look the same.
+
+**Development use.** The same server, driven by Claude during development, is how adapters are written and repaired: walk a form, emit the adapter file, run its fixture tests, and ship it through the adapter update channel.
+
 ## 11. Mail
 
 - **Accounts.** Gmail through the optional Google sign-in (8.2) once Google approves the restricted scope, otherwise IMAP with an app password; Microsoft 365/Outlook through OAuth 2 (PKCE, loopback redirect on a random local port, `oauth2` crate); any other provider through IMAP with an app password.
@@ -539,6 +556,8 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | --- | --- | --- | --- |
 | chromiumoxide | [mattsse/chromiumoxide](https://github.com/mattsse/chromiumoxide) | MIT / Apache-2.0 | Driving Edge or Chrome over CDP |
 | Chrome for Testing | [GoogleChromeLabs/chrome-for-testing](https://github.com/GoogleChromeLabs/chrome-for-testing) | BSD-3 (Chromium) | Fallback browser download |
+| Chrome DevTools MCP | [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) | Apache-2.0 | Optional "Chrome MCP" browser control (downloaded on demand) and adapter development |
+| Node.js (LTS) | [nodejs/node](https://github.com/nodejs/node) | MIT | Runtime for Chrome DevTools MCP, downloaded only when that setting is on |
 
 ### Mail and calendar
 
@@ -599,7 +618,7 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 2. **Local AI and agent harness (weeks 4 to 6).** Model manager (hardware check, download, checksum, resume); llama.cpp worker with priority queue; grammar-constrained output; prompt and task framework; `ceevee-agent` loop, tool registry with risk levels, approvals queue, activity log and eval harness; first tasks (`extract-posting`, `import-resume`); benchmark on an 8 GB Windows laptop and an M1 MacBook Air.
 3. **Profile and documents (weeks 7 to 11).** document folder, built-in editor, Open in Word round trip with file watcher; optional Google sign-in, MCP client, Drive connector spike (hosted vs bundled) and sync queue; start Google restricted-scope verification; onboarding with resume, LinkedIn PDF and export import, merge review; profile editor and answers store; Typst themes (4), PDF and DOCX export; new application, match, tailoring, cover letter; refine chat, versions, fact guard, `detect-facts`.
 4. **Tracking and search (weeks 12 to 17).** Board, table, dashboard, reminders, export, import, backups. Categories and companies; company-site sources (Greenhouse, Lever, Ashby, SmartRecruiters, Workday feed, JobPosting reader), USAJOBS and Adzuna; dedupe, scoring, scheduler; LinkedIn Connections import and the "who you know" panel.
-5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel.
+5. **Auto-fill (weeks 18 to 23).** Browser launcher and CDP layer; adapters for Greenhouse, Lever and Ashby, then Workday and iCIMS; generic form path; review overlay; submit detection; adapter update channel. Chrome MCP browser-control setting with on-demand Node download and wrapped tools.
 6. **Mail and launch (weeks 24 to 27).** IMAP accounts, Microsoft OAuth, Gmail connector over Google sign-in and the app-password fallback; candidate filter, labelling, linking; job-alert parsers for Indeed, LinkedIn, ZipRecruiter, Glassdoor; licensing client and highturtle endpoints; updater client with channels and staged rollout, signed adapter and model manifests, `rollout.yml`; turtlebox.studio download, checkout and My license pages; beta with 20 to 50 testers.
 
 ## 20. Technical risks

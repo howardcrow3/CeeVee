@@ -278,11 +278,13 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 | Structured output | GBNF grammars from JSON schemas | Small local models return valid JSON every time |
 | Documents | Typst templates rendered to PDF and SVG preview; DOCX through `docx-rs` | Vector PDFs that ATS parsers read reliably, no Chromium needed |
 | Resume import | `pdf-extract` / `lopdf` for PDF, `docx-rs` for Word, then the model maps text to the profile | Same flow as Dossier's import |
-| Browser automation | `chromiumoxide` over the Chrome DevTools Protocol, driving Edge (on every Windows 11 PC) or Chrome; Chrome for Testing downloaded if neither exists | Visible window with its own profile, so logins to job sites persist |
+| Browser automation | `chromiumoxide` over the Chrome DevTools Protocol, driving Edge (on every Windows 11 PC) or Chrome; Chrome for Testing downloaded if neither exists. Optional in Settings: Chrome MCP (Google's Chrome DevTools MCP server) | Visible window with its own profile, so logins to job sites persist. Chrome MCP lets the AI work any form step by step; best with a larger model |
 | Email | `async-imap` for reading, `lettre` for sending; OAuth 2 with PKCE and a loopback redirect for Gmail and Microsoft | Works with any provider, not only Gmail |
 | Licensing | Ed25519-signed license files checked offline, activation through turtlebox.studio | See the licensing section |
 
 **How auto-fill works.** The person clicks Apply on an application. CeeVee opens the posting in the automation window and identifies the applicant tracking system from the page. Known systems (Workday, Greenhouse, Lever, iCIMS, Ashby in v1) get a hand-written adapter that knows their fields and steps. Any other form goes through a generic path: CeeVee reads the form's labels and accessibility tree, the model maps each field to a profile fact, and anything it cannot answer with confidence is left empty and highlighted. Free-text questions are drafted from the profile. Files are uploaded from the tailored PDFs. CeeVee then stops, shows a checklist of what it filled and what needs a person, and waits. It never solves CAPTCHAs and never creates accounts on its own. It presses Submit only when the automation level allows it and every check passes; when the person or CeeVee submits, CeeVee notices the confirmation page and marks the application Sent.
+
+**Chrome MCP option.** In Settings, Browser control can be switched from Built in (the default) to Chrome MCP. CeeVee then downloads Google's Chrome DevTools MCP server and the Node.js runtime it needs, and the AI works the form step by step through it, in the same separate browser profile. The same automation levels, never-list and Submit rules apply. Known systems with a tested adapter still use the adapter unless the person chooses Chrome MCP everywhere. It works best with a larger model, and the setting says so.
 
 **How email tracking works.** After the person connects a mailbox, CeeVee syncs the last 90 days of mail headers, then checks every 10 minutes while open. A cheap filter (sender domain matches an application's company, known ATS senders, thread replies to mail CeeVee sent) picks candidate messages; only those reach the model, which labels them and pulls out interview times and questions. Each match is linked to an application and suggests a status change the person confirms with one click. Unmatched job mail lands in a "Needs a look" list, as in Dossier.
 
@@ -415,6 +417,7 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 | 2026-11-11 | Drafts (resumes, cover letters, email replies) are always written automatically; documents are refined by multi-turn chat |
 | 2026-11-11 | Drafts (resumes, cover letters, email replies) are always written automatically and edited by multi-turn chat |
 | 2026-11-11 | Documents stay local by default (Documents/CeeVee, PDF and DOCX), edited by chat, built-in editor or Word. Google sign-in is optional; it lets CeeVee read recruiter replies in Gmail and enables a setting to store documents in Google Drive through MCP |
+| 2026-11-11 | Chrome MCP (Google's Chrome DevTools MCP) is a Settings option for browser control; built-in control stays the default |
 
 ### Open
 
