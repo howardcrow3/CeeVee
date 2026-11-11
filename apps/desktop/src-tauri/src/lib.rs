@@ -23,9 +23,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<ceevee_core::Event>()
 }
 
-const BINDINGS_PATH: &str = "../ui/src/lib/bindings.ts";
+pub const BINDINGS_PATH: &str = "../ui/src/lib/bindings.ts";
 
-/// Write `ui/src/lib/bindings.ts`. Run with `cargo test -p ceevee-desktop export_bindings -- --ignored`.
+/// Write `ui/src/lib/bindings.ts`. Run from `apps/desktop/src-tauri`:
+/// `cargo run -- --export-bindings`.
 pub fn export_bindings() -> Result<(), Box<dyn std::error::Error>> {
     specta_builder().export(specta_typescript::Typescript::default(), BINDINGS_PATH)?;
     Ok(())
@@ -93,27 +94,13 @@ pub fn run() {
     });
 }
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    #[ignore = "writes ui/src/lib/bindings.ts"]
-    fn export_bindings() {
-        super::export_bindings().unwrap();
-    }
-
-    #[test]
-    fn committed_bindings_are_current() {
-        let tmp = std::env::temp_dir().join("ceevee-bindings-check.ts");
-        super::specta_builder()
-            .export(specta_typescript::Typescript::default(), &tmp)
-            .unwrap();
-        let fresh = std::fs::read_to_string(&tmp).unwrap();
-        let committed = std::fs::read_to_string(super::BINDINGS_PATH).unwrap();
-        let norm = |s: &str| s.replace("\r\n", "\n");
-        assert_eq!(
-            norm(&fresh),
-            norm(&committed),
-            "bindings.ts is stale: run `cargo test -p ceevee-desktop export_bindings -- --ignored`"
-        );
-    }
+/// True if the committed bindings file matches what the code would generate.
+/// This is a command-line mode rather than a unit test: on Windows a test
+/// executable that links Tauri lacks the application manifest and fails to
+/// start (STATUS_ENTRYPOINT_NOT_FOUND).
+pub fn bindings_are_current() -> Result<bool, Box<dyn std::error::Error>> {
+    let tmp = std::env::temp_dir().join("ceevee-bindings-check.ts");
+    specta_builder().export(specta_typescript::Typescript::default(), &tmp)?;
+    let norm = |s: String| s.replace("\r\n", "\n");
+    Ok(norm(std::fs::read_to_string(&tmp)?) == norm(std::fs::read_to_string(BINDINGS_PATH)?))
 }
