@@ -29,7 +29,9 @@ version = 2
 # next to a crafted -wal file. CeeVee only opens its own file in its own app-data folder, and
 # sqlx 0.8 and 0.9 both pin libsqlite3-sys < 0.39. Remove this ignore as soon
 # as sqlx moves to libsqlite3-sys >= 0.39.
-ignore = ["RUSTSEC-2026-0459"]
+# RUSTSEC-2024-0436: `paste` is unmaintained (a notice, not a vulnerability). It is a
+# compile-time proc macro pulled in by specta, with no safe upgrade available.
+ignore = ["RUSTSEC-2026-0459", "RUSTSEC-2024-0436"]
 
 [sources]
 unknown-registry = "deny"

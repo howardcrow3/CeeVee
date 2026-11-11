@@ -61,6 +61,9 @@ jobs:
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      - name: TypeScript bindings are current
+        run: cargo run --locked -p ceevee-desktop -- --check-bindings
+
       - name: cargo test
         run: cargo test --workspace --locked
 
