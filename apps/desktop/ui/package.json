@@ -9,7 +9,7 @@
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "tauri": "tauri",
+    "tauri": "cd .. && tauri",
     "license-check": "node license-check.mjs"
   },
   "dependencies": {
