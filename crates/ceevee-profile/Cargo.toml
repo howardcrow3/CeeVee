@@ -9,6 +9,13 @@ publish.workspace = true
 
 [dependencies]
 ceevee-core.workspace = true
+ceevee-db.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true
