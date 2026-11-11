@@ -1,0 +1,3 @@
+# Prompts and eval cases are compiled into the app; keep identical bytes on every platform.
+crates/ceevee-ai/prompts/* text eol=lf
+crates/ceevee-ai/evals/* text eol=lf
