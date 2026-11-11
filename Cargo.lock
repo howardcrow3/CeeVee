@@ -646,6 +646,10 @@ name = "ceevee-search"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "ceevee-db",
+ "serde",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]
