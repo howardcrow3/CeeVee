@@ -81,7 +81,8 @@ fn built_in_task_is_well_formed() {
     assert!(parse_output::<Posting>(&schema, GOOD).is_ok());
     assert!(render(spec.prompt, &[("posting", "text")])
         .unwrap()
-        .trim_end().ends_with("text"));
+        .trim_end()
+        .ends_with("text"));
 }
 
 #[tokio::test]
