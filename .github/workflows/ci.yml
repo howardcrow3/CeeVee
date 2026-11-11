@@ -55,6 +55,12 @@ jobs:
           pnpm license-check
           pnpm build
 
+      - name: Version consistency and script tests
+        shell: bash
+        run: |
+          node scripts/bump-version.mjs --check
+          node --test scripts/scripts.test.mjs
+
       - name: cargo fmt
         run: cargo fmt --all --check
 
