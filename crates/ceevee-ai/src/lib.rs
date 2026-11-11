@@ -5,6 +5,7 @@
 pub mod backend;
 pub mod catalog;
 pub mod download;
+pub mod grammar;
 pub mod hardware;
 pub mod worker;
 
