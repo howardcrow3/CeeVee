@@ -25,7 +25,11 @@ allow-wildcard-paths = true
 
 [advisories]
 version = 2
-ignore = []
+# RUSTSEC-2026-0459: bundled SQLite < 3.54 can leak uninitialised memory when opening a database
+# next to a crafted -wal file. CeeVee only opens its own file in its own app-data folder, and
+# sqlx 0.8 and 0.9 both pin libsqlite3-sys < 0.39. Remove this ignore as soon
+# as sqlx moves to libsqlite3-sys >= 0.39.
+ignore = ["RUSTSEC-2026-0459"]
 
 [sources]
 unknown-registry = "deny"
