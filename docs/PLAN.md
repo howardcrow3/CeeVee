@@ -290,7 +290,7 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 
 ## Data model
 
-The SQLite file has 31 core tables in eight groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
+The SQLite file has 37 core tables in eight groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
 
 | Group | Table | Holds |
 | --- | --- | --- |
