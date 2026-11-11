@@ -2,7 +2,7 @@
 
 Answer in the thread or edit this file. Newest at the bottom; delete a question once it is answered and reflected in the plans.
 
-1. **macOS CI job is cancelled within one second on every run** (`build-test (macos-arm64)` on `macos-14`, no log). Windows passes. Likely the repository or account cannot use hosted macOS runners yet (billing or plan limit). Can you check Settings > Actions and billing? Until then macOS compiles are unverified in CI.
+1. ~~macOS CI job cancelled instantly.~~ Answered by Howard: the error was "The configuration 'macos-14-arm64-us-default' is not supported", so the `macos-14` image is unavailable, not a billing limit. Switched to `macos-latest` (Apple silicon). Needs a CI run to confirm.
 2. **Table count.** The plan says 31 core tables; the schema in PR #4 has 37 (the plan's list adds up to 37). I will fix the plan text to 37 unless you want the schema trimmed.
 3. **App icon.** The icon is a generated placeholder (teal square, white disc). Do you have a logo or brand colors for CeeVee and turtlebox.studio?
 4. **SQLite advisory RUSTSEC-2026-0459.** `sqlx` (0.8 and 0.9) bundles SQLite older than 3.54, which has a local-file advisory. I added a documented ignore in `deny.toml`. CeeVee only opens its own database file, so I judge the risk low. OK to accept until sqlx updates?
