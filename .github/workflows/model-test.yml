@@ -1,0 +1,93 @@
+name: Real model test
+
+# Runs the llama.cpp backend against a small real model on Windows and Apple silicon: loading,
+# grammar-constrained output, streaming, unloading, then the task eval cases. The model is
+# downloaded once, checked against a pinned SHA-256 and cached.
+
+on:
+  pull_request:
+    paths:
+      - "crates/ceevee-ai/**"
+      - "crates/ceevee-agent/**"
+      - ".github/workflows/model-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "crates/ceevee-ai/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-test-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Qwen3 0.6B, Q8_0, from Qwen's official GGUF repository. Apache-2.0.
+  MODEL_URL: https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf
+  # Leave empty to print the hash of the download without failing; then pin it here.
+  MODEL_SHA256: ""
+
+jobs:
+  real-model:
+    name: real-model (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest }
+          - { name: macos-arm64, os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Find libclang (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: echo "LIBCLANG_PATH=C:\\Program Files\\LLVM\\bin" >> "$GITHUB_ENV"
+
+      - name: Restore model cache
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: model/model.gguf
+          key: model-${{ env.MODEL_URL }}-${{ env.MODEL_SHA256 }}
+
+      - name: Download model
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          mkdir -p model
+          curl --fail --location --retry 5 --retry-delay 10 -o model/model.gguf "$MODEL_URL"
+          ls -l model/model.gguf
+
+      - name: Check model hash
+        shell: bash
+        run: |
+          actual=$(python3 -c "import hashlib,sys; print(hashlib.sha256(open('model/model.gguf','rb').read()).hexdigest())")
+          echo "model sha256: $actual"
+          if [ -z "$MODEL_SHA256" ]; then
+            echo "::warning::MODEL_SHA256 is not pinned yet. Pin $actual in .github/workflows/model-test.yml"
+          elif [ "$actual" != "$MODEL_SHA256" ]; then
+            echo "::error::model hash mismatch (expected $MODEL_SHA256)"
+            exit 1
+          fi
+
+      - name: Real model test
+        shell: bash
+        run: |
+          CEEVEE_TEST_MODEL="$PWD/model/model.gguf" \
+            cargo test --release --locked -p ceevee-ai --features llama -- --ignored --nocapture
+
+      - name: Eval cases (report only)
+        if: hashFiles('crates/ceevee-ai/src/bin/ceevee-eval.rs') != ''
+        shell: bash
+        run: |
+          cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" | tee eval.txt
+          { echo '### Eval: ${{ matrix.name }}'; echo '```'; cat eval.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
