@@ -7,8 +7,11 @@ pub mod catalog;
 pub mod download;
 pub mod grammar;
 pub mod hardware;
+pub mod task;
+pub mod validate;
 pub mod worker;
 
 pub use backend::{GenerateRequest, LlmBackend};
 pub use catalog::{Catalog, ModelEntry, Role};
+pub use task::{TaskOutput, TaskSpec};
 pub use worker::{CancelHandle, Job, ModelWorker, Priority};
