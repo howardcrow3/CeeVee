@@ -40,10 +40,10 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: apps/desktop/ui/pnpm-lock.yaml
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
 
       - name: Install UI dependencies
-        working-directory: apps/desktop/ui
+        working-directory: apps/desktop
         run: pnpm install --frozen-lockfile
 
       - name: UI checks
@@ -65,7 +65,7 @@ jobs:
         run: cargo test --workspace --locked
 
       - name: Build unsigned app bundle
-        working-directory: apps/desktop/ui
+        working-directory: apps/desktop
         run: pnpm tauri build --ci --no-sign -- --locked
 
   licenses:

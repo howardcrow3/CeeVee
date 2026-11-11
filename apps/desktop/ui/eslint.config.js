@@ -7,5 +7,6 @@ export default ts.config(
   ...ts.configs.recommended,
   ...svelte.configs['flat/recommended'],
   { files: ['**/*.svelte'], languageOptions: { parserOptions: { parser: ts.parser } } },
+  { files: ['**/*.mjs'], languageOptions: { globals: { process: 'readonly', console: 'readonly' } } },
   { ignores: ['build/', '.svelte-kit/', 'node_modules/'] }
 );

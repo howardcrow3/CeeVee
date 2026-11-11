@@ -7,6 +7,12 @@ settings:
 importers:
 
   .:
+    devDependencies:
+      '@tauri-apps/cli':
+        specifier: ^2
+        version: 2.12.4
+
+  ui:
     dependencies:
       '@tauri-apps/api':
         specifier: ^2
@@ -24,9 +30,6 @@ importers:
       '@sveltejs/vite-plugin-svelte':
         specifier: ^5
         version: 5.1.1(svelte@5.57.3(@typescript-eslint/types@8.72.2))(vite@6.4.6)
-      '@tauri-apps/cli':
-        specifier: ^2
-        version: 2.12.4
       eslint:
         specifier: ^9
         version: 9.39.5

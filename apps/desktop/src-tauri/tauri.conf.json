@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "identifier": "studio.turtlebox.ceevee",
   "build": {
-    "beforeDevCommand": "pnpm --dir ui dev",
+    "beforeDevCommand": "pnpm --filter ceevee-ui dev",
     "devUrl": "http://localhost:5173",
-    "beforeBuildCommand": "pnpm --dir ui build",
+    "beforeBuildCommand": "pnpm --filter ceevee-ui build",
     "frontendDist": "../ui/build"
   },
   "app": {
