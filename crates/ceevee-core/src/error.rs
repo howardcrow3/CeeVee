@@ -7,6 +7,8 @@ pub enum Error {
     Invalid(String),
     #[error("database: {0}")]
     Database(String),
+    #[error("cancelled")]
+    Cancelled,
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("{0}")]
