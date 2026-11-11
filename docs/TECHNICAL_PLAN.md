@@ -525,7 +525,7 @@ All are permissively licensed. The agent harness's own dependencies are listed i
 | Typst | [typst/typst](https://github.com/typst/typst) | Apache-2.0 | Resume and cover letter PDF and SVG rendering |
 | docx-rs | [bokuweb/docx-rs](https://github.com/bokuweb/docx-rs) | MIT | DOCX export and Word import |
 | pulldown-cmark | [pulldown-cmark/pulldown-cmark](https://github.com/pulldown-cmark/pulldown-cmark) | MIT | Markdown for cover letters and email replies |
-| notify | [notify-rs/notify](https://github.com/notify-rs/notify) | CC0-1.0 / MIT / Apache-2.0 | Watches DOCX files opened in Word for saves |
+| notify | [notify-rs/notify](https://github.com/notify-rs/notify) | CC0-1.0 | Watches DOCX files opened in Word for saves |
 | tauri-plugin-opener | [tauri-apps/plugins-workspace](https://github.com/tauri-apps/plugins-workspace) | MIT / Apache-2.0 | Opens documents in Word, Pages or LibreOffice |
 | pdf-extract | [jrmuizel/pdf-extract](https://github.com/jrmuizel/pdf-extract) | MIT | PDF text extraction |
 | lopdf | [J-F-Liu/lopdf](https://github.com/J-F-Liu/lopdf) | MIT | PDF fallback parsing |
