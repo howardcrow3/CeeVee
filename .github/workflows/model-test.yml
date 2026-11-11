@@ -90,7 +90,7 @@ jobs:
         shell: bash
         run: |
           : > eval.txt
-          for task in extract_posting import_resume; do
+          for task in extract_posting import_resume score_match; do
             cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" "$task" | tee -a eval.txt
           done
           { echo '### Eval: ${{ matrix.name }}'; echo '```'; cat eval.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
