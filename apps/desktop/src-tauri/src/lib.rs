@@ -1,6 +1,8 @@
 //! CeeVee desktop shell: window, tray, single instance and the typed command
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
+mod scheduler;
+
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
@@ -53,6 +55,9 @@ pub fn run() {
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             let db = tauri::async_runtime::block_on(ceevee_db::Db::open(&dir.join("ceevee.db")))?;
+            let bus = ceevee_core::EventBus::new(256);
+            scheduler::spawn(db.clone(), bus.clone());
+            app.manage(bus);
             app.manage(db);
 
             let open = MenuItem::with_id(app, "open", "Open CeeVee", true, None::<&str>)?;

@@ -106,3 +106,28 @@ fn backup_file(path: &Path) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests;
+
+impl Db {
+    /// Read a value from the `setting` table.
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>> {
+        sqlx::query_scalar("SELECT value FROM setting WHERE key = ?")
+            .bind(key)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(db_err)
+    }
+
+    /// Insert or replace a value in the `setting` table.
+    pub async fn set_setting(&self, key: &str, value: &str) -> Result<()> {
+        sqlx::query(
+            "INSERT INTO setting(key, value) VALUES (?, ?) \
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        )
+        .bind(key)
+        .bind(value)
+        .execute(&self.pool)
+        .await
+        .map_err(db_err)?;
+        Ok(())
+    }
+}

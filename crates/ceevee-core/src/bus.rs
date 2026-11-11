@@ -10,6 +10,8 @@ pub enum Event {
         #[specta(type = u32)] // specta forbids i64; ids stay far below 2^32
         job_id: i64,
     },
+    /// A scheduled task is due; the owning feature crate should start it.
+    TaskDue { task: String },
     /// A setting changed.
     SettingChanged { key: String },
 }
