@@ -11,7 +11,7 @@ The key decisions:
 - **Rust core in a Tauri 2 shell.** One small native app per platform, with the UI drawn in the system webview (WebView2 on Windows, WKWebView on macOS).
 - **Local model built in.** llama.cpp is linked into the app, uses Metal on Macs and Vulkan on Windows, and a default model downloads on first run. No account, key or Ollama install needed. Hosted or Ollama models stay optional.
 - **One SQLite file** holds the profile, jobs, applications, documents, emails and history.
-- **Browser automation** fills applications in a separate Chrome or Edge window and stops before Submit, so the person always presses the final button.
+- **Browser automation** fills applications in a separate Chrome or Edge window. By default it stops before Submit; the person can raise the automation level, globally or per category, up to full automatic (see Automation levels).
 - **Email tracking** over IMAP (Gmail and Outlook by OAuth, others by app password) links replies to applications and moves their status.
 - **14-day full trial, then a license key** bought on turtlebox.studio, checked offline, with updates served from the same site.
 
@@ -29,7 +29,7 @@ Version 1 matches Dossier's core loop (profile, tailored documents, tracking, in
 | Refine | Chat to edit, regenerate parts, version history, undo, notes | Same | v1 |
 | Find jobs | Search JSearch, Adzuna, FreeHire; save, dismiss, score | Category-driven search of company career sites, job boards and job posting services (see Job sources), plus paste or capture any posting | v1 |
 | AI agents | A job agent: up to 3 saved searches run daily, scored, optional drafts for review | An agent harness with an Assistant chat and background Search, Inbox, Profile and Apply agents; every send, submit or profile change waits for the person's approval (see TECHNICAL_PLAN.md, section 6) | v1; background application drafts v1.x |
-| Apply | Builds an email with PDFs; never applies | **Auto-fill**: opens the application page, fills every field from the profile and facts, uploads the tailored PDFs, writes answers to free-text questions, then pauses for review before Submit | v1 |
+| Apply | Builds an email with PDFs; never applies | **Auto-fill**: opens the application page, fills every field from the profile and facts, uploads the tailored PDFs, writes answers to free-text questions, then pauses for review before Submit, or submits on its own when the automation level allows | v1 |
 | Inbox | Gmail replies linked to applications, AI summary, drafted answers | **IMAP for any provider** (Gmail and Outlook by OAuth); classifies each reply (rejection, interview, assessment, offer, recruiter), links it, suggests a status change, drafts a reply | v1 |
 | Calendar | Google Calendar sync, interviews on the dashboard | Interviews from emails shown on the dashboard, .ics export; Google and Outlook calendar sync later | v1, sync v2 |
 | Background and alerts | Runs on a server, so always on | **Permanent tray and menu bar app**: launches at login, keeps running when the window is closed, runs daily category searches and mail sync, and sends desktop notifications for new matches, employer replies, interviews and follow-ups (see TECHNICAL_PLAN.md, section 3.1) | v1 |
@@ -191,6 +191,39 @@ Limits to be clear about: second-degree connections (friends of friends) are not
 
 In the database this adds `contact` (name, profile link, email, source, notes), `contact_role` (contact, company, title, start and end dates, current or past) and `outreach` (contact, application, message, status, dates).
 
+## Automation levels
+
+The person decides how much CeeVee does on its own, from fully manual to full automatic. They set one level for everything in Settings, and each job category can override it (for example, full automatic for a broad "any remote data role" category and Review everything for a dream-company category). They can also fine-tune individual actions.
+
+| Level | What CeeVee does on its own | What waits for the person |
+| --- | --- | --- |
+| Manual | Searches, scores and drafts only when asked | Everything else |
+| Assisted (default) | Runs searches, saves and scores postings, labels mail, drafts documents and replies | Every application, every email sent, every profile change |
+| Review before submit | All of the above, plus it prepares applications for high-scoring matches and fills the forms | One click per application in the Approvals queue (or approve a batch); every email sent |
+| Autopilot | All of the above, plus it submits applications that pass every check below and sends routine emails (follow-ups, thank-you notes, interview time confirmations) | Anything that fails a check, replies that need judgment (offers, salary, rejections), profile changes to employers, titles and dates |
+| Full automatic | Everything Autopilot does, plus all email replies it can draft with confidence and low-risk profile updates | Only what fails a check below |
+
+**Per-action overrides.** Under the level, each action can be set to Off, Ask, or Automatic: submit applications, send follow-ups, reply to employers, confirm interview times, send referral requests by email, update the profile, change application status, save or dismiss postings.
+
+**Checks every automatic step must pass,** at any level:
+
+- The posting scores at or above the category's auto-apply threshold (default 80) and meets every required category field.
+- The site is a supported applicant tracking system with a tested adapter. Unknown forms always go to review.
+- Every form field was filled with high confidence, the fact guard found nothing invented, and no CAPTCHA or new-account step appeared.
+- Sensitive questions (EEO, veteran, disability, salary, sponsorship) were answered from answers the person saved for that purpose.
+- Daily and weekly caps are not exceeded (defaults: 10 applications a day, 1 per company per 30 days, 20 emails a day).
+- The company is not blocked, and the person has not already applied there for the same role.
+
+Anything that fails a check drops back to the Approvals queue with the reason. Every automatic action is logged in the Activity screen, shown in a daily digest notification, and, for emails, can be undone for 30 seconds before it actually sends.
+
+**Consent.** Turning on Autopilot or Full automatic shows a one-time screen explaining that CeeVee will submit applications and tick attestation boxes ("I certify this information is accurate") on the person's behalf, and that they remain responsible for what is sent. The acceptance is recorded with a timestamp.
+
+**What stays manual at every level.** These are not settings, because doing them automatically breaks the sites' terms or the law and would get the person's accounts banned:
+
+- **LinkedIn:** no automated messages, connection requests, or Easy Apply. LinkedIn's User Agreement forbids bots and automated activity, and it bans accounts for it. CeeVee drafts LinkedIn messages; the person sends them. Referral requests can go automatically only by email.
+- **Indeed Apply, ZipRecruiter 1-Click and similar on-board applications:** their terms forbid automated use. CeeVee follows the posting to the employer's own site and applies there, or leaves it for the person.
+- **CAPTCHAs and account creation:** never solved or created automatically. Workday sites that need a new account pause for the person once per employer; after that, Autopilot can apply there.
+
 ## Architecture
 
 CeeVee is one process: a Rust core that owns the database, model, browser and mail, and a web UI in the system webview that talks to it through Tauri commands and events. Long tasks (drafting, form filling, mail sync) run as background jobs in the core and stream progress to the UI, the way Dossier's job queue does.
@@ -212,13 +245,13 @@ CeeVee is one process: a Rust core that owns the database, model, browser and ma
 | Email | `async-imap` for reading, `lettre` for sending; OAuth 2 with PKCE and a loopback redirect for Gmail and Microsoft | Works with any provider, not only Gmail |
 | Licensing | Ed25519-signed license files checked offline, activation through turtlebox.studio | See the licensing section |
 
-**How auto-fill works.** The person clicks Apply on an application. CeeVee opens the posting in the automation window and identifies the applicant tracking system from the page. Known systems (Workday, Greenhouse, Lever, iCIMS, Ashby in v1) get a hand-written adapter that knows their fields and steps. Any other form goes through a generic path: CeeVee reads the form's labels and accessibility tree, the model maps each field to a profile fact, and anything it cannot answer with confidence is left empty and highlighted. Free-text questions are drafted from the profile. Files are uploaded from the tailored PDFs. CeeVee then stops, shows a checklist of what it filled and what needs a person, and waits. It never solves CAPTCHAs, never creates accounts on its own and never presses Submit; when the person submits, CeeVee notices the confirmation page and marks the application Sent.
+**How auto-fill works.** The person clicks Apply on an application. CeeVee opens the posting in the automation window and identifies the applicant tracking system from the page. Known systems (Workday, Greenhouse, Lever, iCIMS, Ashby in v1) get a hand-written adapter that knows their fields and steps. Any other form goes through a generic path: CeeVee reads the form's labels and accessibility tree, the model maps each field to a profile fact, and anything it cannot answer with confidence is left empty and highlighted. Free-text questions are drafted from the profile. Files are uploaded from the tailored PDFs. CeeVee then stops, shows a checklist of what it filled and what needs a person, and waits. It never solves CAPTCHAs and never creates accounts on its own. It presses Submit only when the automation level allows it and every check passes; when the person or CeeVee submits, CeeVee notices the confirmation page and marks the application Sent.
 
 **How email tracking works.** After the person connects a mailbox, CeeVee syncs the last 90 days of mail headers, then checks every 10 minutes while open. A cheap filter (sender domain matches an application's company, known ATS senders, thread replies to mail CeeVee sent) picks candidate messages; only those reach the model, which labels them and pulls out interview times and questions. Each match is linked to an application and suggests a status change the person confirms with one click. Unmatched job mail lands in a "Needs a look" list, as in Dossier.
 
 ## Data model
 
-The SQLite file has 25 core tables in seven groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
+The SQLite file has 28 core tables in seven groups. Jobs can be queried by category and by company, both indexed. Structured AI output (extracted requirements, match results, email labels) is stored as JSON columns next to the prompt version that produced it, so results can be re-run when prompts improve.
 
 | Group | Table | Holds |
 | --- | --- | --- |
@@ -239,6 +272,7 @@ The SQLite file has 25 core tables in seven groups. Jobs can be queried by categ
 | Documents | `theme` | Built-in and custom resume themes |
 | Automation | `apply_run`, `apply_field` | Each auto-fill attempt: ATS detected, outcome, and every field with its value, source fact and confidence, for review and for improving adapters |
 | Mail | `mail_account`, `email_message` | Connected accounts (tokens live in the keychain); messages with direction, thread, linked application, label, summary, suggested status, interview time |
+| Agents | `policy`, `policy_ledger`, `consent` | Automation level and per-action modes, global and per category; counts for daily caps; recorded consent for automatic submission |
 | Agents | `agent_run`, `agent_step`, `agent_memory`, `proposal`, `chat_summary` | Each agent run and its tool calls; learned search preferences; the approvals queue; chat summaries. Embeddings live in a `sqlite-vec` table |
 | System | `job`, `setting`, `license_state` | Background tasks with progress; settings; trial start, license and last check |
 
@@ -318,13 +352,14 @@ After v1: background application drafts for review, a follow-up agent, calendar 
 | --- | --- | --- |
 | Dossier is AGPL-3.0 | Copying any of its code, prompts, CSS or images would force CeeVee to be open source | Clean-room build: use it only as a product reference; record this rule in the repo |
 | Gmail's full-mail scope is "restricted" | A paid app that reads Gmail needs Google verification and a yearly third-party security assessment (often several thousand dollars) | Launch with IMAP app passwords and Microsoft OAuth; budget the Google assessment or use the narrower metadata plus labels approach for v1 |
-| Job sites change forms and add bot checks | Adapters break; some sites forbid automation | Adapters versioned and updatable without a full release; human always submits; fall back to copy-paste helpers |
+| Job sites change forms and add bot checks | Adapters break; some sites forbid automation | Adapters versioned and updatable without a full release; unknown forms always go to review; fall back to copy-paste helpers |
 | Small local models write weaker drafts | Lower quality than hosted models | Grammars for structure, short focused prompts per task, optional larger or hosted model |
 | 8 GB Windows laptops without a usable GPU | Slow drafts (a minute or more) | Show progress, run in background, recommend the smallest model |
 | Signing accounts take weeks to approve | No installable builds for testers | Start Apple Developer and Azure Trusted Signing enrollment before week 1 |
 | Losing the updater signing key | Installed copies can never be updated again | Key kept in two offline backups as well as in CI; rotation path documented in the technical plan |
 | A bad update reaches everyone | Broken app for paying users | Beta first, then 10/50/100 percent rollout that can be paused; database backup before migrations |
 | Model download bandwidth on trial installs | Hosting cost grows with trials, not sales | Watch cost per install; move model files to a flat-rate or zero-egress host if needed |
+| Automatic applications break site terms or misrepresent the person | LinkedIn and on-board one-click flows are never automated; only employer ATS sites with tested adapters; recorded consent; checks and caps; the person stays responsible, stated in the consent screen and CeeVee's terms of use |
 | Trial and license bypass | Lost sales | Signed licenses and trial tokens are enough deterrent; avoid heavy DRM that hurts paying users |
 
 ### Decisions log

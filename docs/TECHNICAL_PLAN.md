@@ -7,7 +7,7 @@ Last updated 2026-11-11. Companion to [PLAN.md](PLAN.md), which holds the produc
 - **Clean room.** Dossier (AGPL-3.0) is a product reference only. No code, prompts, CSS, images or schema text is copied from it.
 - **Licenses we accept** in anything that ships: MIT, Apache-2.0, BSD-2/3, ISC, Zlib, Unicode, MPL-2.0 (file-level, unmodified), public domain. **Rejected:** GPL, LGPL (static linking), AGPL, SSPL, and model licenses that restrict commercial use. `cargo-deny` and `license-checker` enforce this in CI.
 - **Local first.** Profile, documents, mail and history never leave the machine. The only network calls are job-source queries (search terms only), mail sync, model download, license activation, and update checks (app, adapters, models).
-- **Human in the loop.** Nothing is submitted, sent or saved to the profile without an explicit user action.
+- **The person sets the autonomy.** By default nothing is submitted, sent or saved to the profile without an explicit user action. The person can raise this, globally or per category, up to full automatic (section 6.6). A short list of actions stays manual at every level because automating them breaks site terms.
 - **Targets.** Windows 11 x64 and macOS 13+ on Apple silicon (arm64). No Intel Mac or Linux build in v1.
 
 ## 2. Repository layout
@@ -165,7 +165,7 @@ Tools are Rust functions with a typed input and output. `schemars` derives the J
 | `network.*` | `who_knows(company)`, `contact_history`, `draft_referral` | Read; draft |
 | `application.*` | `create`, `read`, `list`, `propose_status` | Draft; propose |
 | `docs.*` | `tailor_resume`, `write_cover_letter`, `edit`, `render_pdf` | Draft (every change is a new version with undo) |
-| `apply.*` | `open_posting`, `fill_form`, `upload_documents`, `answer_question` | Act: runs only after the user starts it, and always stops before Submit |
+| `apply.*` | `open_posting`, `fill_form`, `upload_documents`, `answer_question`, `submit` | Act: filling runs when the user starts it or the policy allows; `submit` runs only when the policy resolves to automatic (6.6) |
 | `mail.*` | `search`, `read_thread`, `label`, `draft_reply`, `send` | Read; draft; `send` is act |
 | `calendar.*` | `create_ics` | Draft |
 | `memory.*` | `remember`, `recall` | Draft |
@@ -175,8 +175,8 @@ Risk levels:
 - **Read:** runs freely.
 - **Draft:** runs freely; the result is visible and reversible (a new document version, a saved posting, a draft email).
 - **Propose:** creates a proposal card the user accepts, edits or dismisses (profile changes, status changes, category edits).
-- **Act:** needs an explicit user click each time (sending an email, starting auto-fill).
-- **Never available to any agent:** pressing a final Submit, sending LinkedIn messages, creating accounts on job sites, deleting data, changing license or settings.
+- **Act:** needs a user click unless the person's automation policy makes that action automatic (6.6).
+- **Never available to any agent, at any level:** LinkedIn messages, connection requests or Easy Apply; on-board one-click apply flows; solving CAPTCHAs; creating accounts on job sites; deleting data; changing license or policy settings.
 
 The same tool registry is exposed, read and draft tools only, through an optional local MCP server (`rmcp`), so a user can drive CeeVee from Claude Desktop or another MCP client if they choose. Off by default.
 
@@ -201,19 +201,32 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 - **Sensitive fields** (EEO, veteran, disability, salary, sponsorship) are filled only from answers the user saved for that purpose; agents cannot infer them.
 - **Kill switch.** One toggle pauses all background agents; each agent can be turned off on its own.
 
-### 6.6 Scheduling background agents
+### 6.6 Automation levels and the policy engine
+
+The person's chosen automation level (see "Automation levels" in PLAN.md) decides what the harness may do without asking. Policy lives in one place, `ceevee-agent::policy`, and every tool call passes through it.
+
+- **Policy model.** A `policy` table holds rows of (scope, action, mode, caps): scope is `global` or a category ID; action is one of `apply.submit`, `mail.send_followup`, `mail.reply`, `mail.confirm_interview`, `network.referral_email`, `profile.update`, `application.status`, `search.save`; mode is `off`, `ask` or `auto`. A level is a preset that writes these rows; per-action overrides edit single rows. Category rows override global rows.
+- **Resolution.** For each act-level call the engine resolves the mode for the call's category (from the posting or application), then evaluates the checks: score threshold, required fields, adapter support, fill confidence, fact guard result, sensitive-field sources, caps (counted in `policy_ledger`), duplicates and blocked companies. The result is `run`, `queue(reason)` or `deny(reason)`.
+- **Auto-submit.** When the result is `run` for `apply.submit`, the auto-fill engine clicks the adapter's declared final submit control, waits for the confirmation pattern, and screenshots the confirmation page into the application record. A missing confirmation marks the run "needs a look".
+- **Send delay.** Automatic emails sit in an outbox for 30 seconds with an Undo notification, then send.
+- **Consent record.** Enabling `auto` for `apply.submit` requires a stored consent row (version of the consent text, timestamp).
+- **Hard denials** that no policy can change: LinkedIn messaging, connection requests and Easy Apply; on-board one-click apply flows (Indeed Apply, ZipRecruiter 1-Click); CAPTCHA solving; account creation; deleting data; changing license or policy settings.
+- **Untrusted content.** An instruction inside a posting or email can never raise a mode. Policy is read only from the user's settings.
+- **Tests.** The policy engine is pure Rust with a table of scenario tests (level × category override × check results → expected decision), and the eval suite includes injected-instruction emails that must not trigger sends.
+
+### 6.7 Scheduling background agents
 
 - Triggers: time (daily per category, follow-up check), events (new mail synced, new posting saved, status changed, chat turn), and manual.
 - One model worker serves all agents with a priority queue: Assistant and anything the user is waiting on first, then Apply, Inbox, Profile, Search, Follow-up.
 - Background agents run whenever CeeVee is running, including tray-only mode (3.1), pause on battery below 20%, and respect quiet hours the user sets. They raise desktop notifications through the notification types in 3.1.
 - Missed runs (computer asleep) run once at next start, not once per missed day.
 
-### 6.7 Observability and evaluation
+### 6.8 Observability and evaluation
 
 - **Activity screen:** every agent run with its steps, tool calls, results, tokens and time, so the user can see what an agent did and why.
 - **Eval suite:** scripted scenarios per agent (a mailbox with 30 messages, a category with 50 postings, a chat that changes a fact) run against mock tools and the real default model. Tracked per release: valid tool-call rate, task success, steps used, fact-guard violations, proposals the user would reject (labelled fixtures).
 
-### 6.8 Open source used by the harness
+### 6.9 Open source used by the harness
 
 | Project | Repository | License | Used for |
 | --- | --- | --- | --- |
@@ -262,7 +275,7 @@ Preferences only steer ranking and suggestions; turning one into a category rule
 - **Generic path.** For unknown forms: read labels, input types, options and the accessibility tree through CDP; `map-form-fields` maps each field to a profile fact with a confidence; fields below the threshold are left empty and highlighted.
 - **Uploads.** Tailored resume and cover letter PDFs uploaded through CDP file-chooser interception.
 - **Sensitive answers.** EEO, veteran, disability, salary and sponsorship questions are filled only from answers the user saved for that purpose, and are always shown in the review list.
-- **Stop before submit.** The engine never clicks a final submit control. It shows a checklist overlay and waits. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
+- **Submit.** By default the engine stops before the final submit control, shows a checklist overlay and waits. When the automation policy resolves `apply.submit` to automatic (6.6), it clicks the adapter's declared submit control and records a screenshot of the confirmation page. Submission is detected by URL change and confirmation-text patterns, and the application moves to Sent with its documents frozen.
 - **Logging.** Every run writes `apply_run` and `apply_field` rows; with the user's consent, anonymized field-mapping failures can be sent to Turtlebox to improve adapters.
 
 ## 11. Mail
@@ -448,7 +461,7 @@ If model bandwidth becomes material, the options are a CloudFront flat-rate plan
 
 ## 18. Open source projects included
 
-All are permissively licensed. The agent harness's own dependencies are listed in section 6.8. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
+All are permissively licensed. The agent harness's own dependencies are listed in section 6.9. Versions are pinned in `Cargo.lock` and `pnpm-lock.yaml`.
 
 ### Rust (core)
 
@@ -567,6 +580,7 @@ Matches the roadmap in PLAN.md (about 27 weeks).
 | 4B model quality on tailoring | Narrow tasks, grammars, fact guard, optional 8B or hosted model; measure with the live AI suite each release |
 | Workday's per-employer accounts and multi-page flow | Treat as the user's step: CeeVee pauses for sign-in, then resumes filling |
 | Job alert email formats change | Parsers are data-driven and shipped through the adapter update channel; fixtures from real alerts in tests |
+| Auto-submit sends a weak or wrong application | Checks in 6.6 (threshold, adapter support, confidence, fact guard, caps) must all pass; daily digest; per-company limit; Activity log |
 | Small model picks wrong tools in the free Assistant loop | Short tool lists per agent, grammar-constrained calls, step limit, workflows for all background work, eval suite gates each release |
 | Typst template quality vs. HTML themes | Prototype two themes in week 1 to confirm the look before committing |
 | Signing enrollment delays (Apple, Azure identity validation) | Start both before week 1; ship unsigned Internal builds to Howard's own machines meanwhile |
