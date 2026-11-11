@@ -25,7 +25,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .typ::<ceevee_core::Event>()
 }
 
-pub const BINDINGS_PATH: &str = "../ui/src/lib/bindings.ts";
+pub const BINDINGS_PATH: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../ui/src/lib/bindings.ts");
 
 /// Write `ui/src/lib/bindings.ts`. Run from `apps/desktop/src-tauri`:
 /// `cargo run -- --export-bindings`.
