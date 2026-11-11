@@ -488,6 +488,10 @@ name = "ceevee-agent"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "ceevee-db",
+ "chrono",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -531,6 +535,7 @@ dependencies = [
 name = "ceevee-desktop"
 version = "0.1.0"
 dependencies = [
+ "ceevee-agent",
  "ceevee-core",
  "ceevee-db",
  "chrono",

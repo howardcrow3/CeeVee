@@ -25,6 +25,7 @@ publish = false
 
 [workspace.dependencies]
 ceevee-core = { path = "crates/ceevee-core" }
+ceevee-agent = { path = "crates/ceevee-agent" }
 ceevee-db = { path = "crates/ceevee-db" }
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "serde"] }

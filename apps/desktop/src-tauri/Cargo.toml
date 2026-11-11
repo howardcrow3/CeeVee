@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 ceevee-core.workspace = true
+ceevee-agent.workspace = true
 ceevee-db.workspace = true
 chrono.workspace = true
 serde.workspace = true
