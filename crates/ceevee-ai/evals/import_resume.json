@@ -1,0 +1,12 @@
+[
+  {
+    "name": "two jobs and a degree",
+    "vars": {"resume": "Maria Lopez\nmaria.lopez@example.com | 614-555-0142 | Columbus, OH\n\nSummary\nOperations analyst with six years of experience in logistics reporting.\n\nExperience\nSenior Analyst, Northfield Logistics, 2021-03 to present\n- Built weekly delivery dashboards in Tableau\n- Cut report preparation time from two days to four hours\n\nAnalyst, Harbor Freight Co., 2018-06 to 2021-02\n- Maintained SQL reports for 40 depots\n\nEducation\nB.S. Industrial Engineering, Ohio State University, 2018\n\nSkills: SQL, Tableau, Excel, Python"},
+    "expected": {"name": "Maria Lopez", "email": "maria.lopez@example.com", "phone": "614-555-0142", "location": "Columbus, OH", "summary": "Operations analyst with six years of experience in logistics reporting.", "skills": ["SQL", "Tableau", "Excel", "Python"]}
+  },
+  {
+    "name": "sparse resume, nothing invented",
+    "vars": {"resume": "Dev Patel\nBarista, Daily Grind Cafe, 2022 to present\nStudent at Seattle Central College, expected 2026"},
+    "expected": {"name": "Dev Patel", "email": null, "phone": null, "location": null, "summary": null, "skills": []}
+  }
+]

@@ -89,5 +89,8 @@ jobs:
         if: hashFiles('crates/ceevee-ai/src/bin/ceevee-eval.rs') != ''
         shell: bash
         run: |
-          cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" | tee eval.txt
+          : > eval.txt
+          for task in extract_posting import_resume; do
+            cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" "$task" | tee -a eval.txt
+          done
           { echo '### Eval: ${{ matrix.name }}'; echo '```'; cat eval.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

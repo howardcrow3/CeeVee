@@ -140,5 +140,16 @@ pub const EXTRACT_POSTING: TaskSpec = TaskSpec {
     temperature: 0.0,
 };
 
+/// Copy the facts of a resume's text into a structured record. Long resumes are read in one
+/// piece, so the caller must keep the text within the model's window.
+pub const IMPORT_RESUME: TaskSpec = TaskSpec {
+    id: "import_resume",
+    version: 1,
+    prompt: include_str!("../prompts/import_resume.md"),
+    schema: include_str!("../prompts/import_resume.schema.json"),
+    max_tokens: 1800,
+    temperature: 0.0,
+};
+
 #[cfg(test)]
 mod tests;
