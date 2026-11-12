@@ -1,0 +1,11 @@
+{
+  "note": "Models the eval report compares. Add the 4B and 8B builds here once their files are hosted with a pinned SHA-256 (docs/QUESTIONS.md items 10 and 11).",
+  "models": [
+    {
+      "id": "qwen3-0.6b-q8",
+      "label": "Qwen3 0.6B Q8_0 (CI test model)",
+      "url": "https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf",
+      "sha256": "9465e63a22add5354d9bb4b99e90117043c7124007664907259bd16d043bb031"
+    }
+  ]
+}
