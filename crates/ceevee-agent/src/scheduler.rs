@@ -53,11 +53,15 @@ async fn load_gate(db: &Db) -> Gate {
         .as_deref()
         .and_then(parse_time)
         .zip(end.as_deref().and_then(parse_time));
-    // Battery level is not read yet; see docs/QUESTIONS.md.
+    // The platform call can block briefly, so keep it off the async threads.
+    let battery_percent = tokio::task::spawn_blocking(crate::power::battery_percent)
+        .await
+        .ok()
+        .flatten();
     Gate {
         paused_until,
         quiet_hours,
-        battery_percent: None,
+        battery_percent,
     }
 }
 

@@ -7,6 +7,7 @@
 pub mod approvals;
 pub mod notifications;
 pub mod policy;
+pub mod power;
 pub mod runner;
 pub mod scheduler;
 pub mod tools;
