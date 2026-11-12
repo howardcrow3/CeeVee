@@ -649,6 +649,7 @@ dependencies = [
  "ceevee-core",
  "ceevee-db",
  "serde",
+ "serde_json",
  "sqlx",
  "tokio",
 ]
