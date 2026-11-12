@@ -7,6 +7,8 @@ pub mod catalog;
 pub mod download;
 pub mod grammar;
 pub mod hardware;
+#[cfg(feature = "llama")]
+pub mod llama;
 pub mod task;
 pub mod validate;
 pub mod worker;
