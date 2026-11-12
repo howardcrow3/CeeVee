@@ -45,7 +45,7 @@ jobs:
     needs: models
     runs-on: macos-latest
     continue-on-error: true
-    timeout-minutes: 60
+    timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.models.outputs.matrix) }}
@@ -56,6 +56,7 @@ jobs:
 
       - name: Restore model cache
         id: cache
+        if: matrix.cache
         uses: actions/cache@v4
         with:
           path: model/model.gguf
@@ -77,25 +78,29 @@ jobs:
       - name: Score each task
         continue-on-error: true
         # macOS has no `timeout` command, so each task runs in the background and is killed after
-        # its own wall-clock cap. A single import_resume case can take longer than the whole budget
-        # on a hosted CPU runner (docs/QUESTIONS.md item 15), and the budget only applies between cases.
-        timeout-minutes: 45
+        # its own wall-clock cap. The per-task budget only applies between cases, and a single
+        # case can take longer than any budget (docs/QUESTIONS.md item 15), so the cap is what
+        # keeps one slow task from starving the rest. A killed task shows as "not run".
+        timeout-minutes: 270
         env:
           CEEVEE_EVAL_MODEL: ${{ matrix.id }}
-          CEEVEE_EVAL_BUDGET_SECS: "600"
+          CEEVEE_EVAL_BUDGET_SECS: ${{ matrix.budget_secs }}
         run: |
           mkdir -p results
-          run_capped() { # task, seconds
+          cap=$(( ${{ matrix.budget_secs }} + 900 ))
+          run_capped() { # task
             CEEVEE_EVAL_JSON="results/${{ matrix.id }}-$1.json" \
               ./target/release/ceevee-eval "$PWD/model/model.gguf" "$1" &
             pid=$!
-            ( sleep "$2"; echo "::warning::$1 hit its $2 second cap"; kill "$pid" 2>/dev/null ) &
+            ( sleep "$cap"; echo "::warning::$1 hit its $cap second cap"; kill "$pid" 2>/dev/null ) &
             watcher=$!
             wait "$pid" || true
             kill "$watcher" 2>/dev/null || true
           }
-          run_capped extract_posting 1200
-          run_capped import_resume 900
+          # import_resume last: its grammar is the slow one.
+          for task in extract_posting score_match write_cover_letter tailor_resume import_resume; do
+            run_capped "$task"
+          done
 
       - uses: actions/upload-artifact@v4
         if: always()
