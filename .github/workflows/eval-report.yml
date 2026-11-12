@@ -76,6 +76,8 @@ jobs:
 
       - name: Score each task
         continue-on-error: true
+        # macOS has no `timeout` command, so the step limit and the per-task budget cap the run.
+        timeout-minutes: 45
         env:
           CEEVEE_EVAL_MODEL: ${{ matrix.id }}
           # Per task, so a slow task cannot starve the next one.
@@ -84,7 +86,7 @@ jobs:
           mkdir -p results
           for task in extract_posting import_resume; do
             CEEVEE_EVAL_JSON="results/${{ matrix.id }}-$task.json" \
-              timeout 1200 ./target/release/ceevee-eval "$PWD/model/model.gguf" "$task" || true
+              ./target/release/ceevee-eval "$PWD/model/model.gguf" "$task" || true
           done
 
       - uses: actions/upload-artifact@v4
