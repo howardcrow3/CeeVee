@@ -24,6 +24,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  # Hosted macOS runners have no real GPU, so Metal is very slow there. Run on the CPU in CI.
+  CEEVEE_GPU_LAYERS: "0"
   # Qwen3 0.6B, Q8_0, from Qwen's official GGUF repository. Apache-2.0.
   MODEL_URL: https://huggingface.co/Qwen/Qwen3-0.6B-GGUF/resolve/main/Qwen3-0.6B-Q8_0.gguf
   # Hash of the file above. Leave empty to print a new download's hash without failing, then pin it.
@@ -87,6 +89,7 @@ jobs:
 
       - name: Eval cases (report only)
         if: hashFiles('crates/ceevee-ai/src/bin/ceevee-eval.rs') != ''
+        timeout-minutes: 20
         shell: bash
         run: |
           : > eval.txt
