@@ -1,0 +1,17 @@
+[
+  {
+    "name": "remote analyst with pay range",
+    "vars": {"posting": "Acme Analytics is hiring a Data Analyst. This is a fully remote role open across the US. Pay: $85,000 to $105,000 per year. You will write SQL, build Tableau dashboards and present findings to product teams. Requirements: 2+ years of SQL, Tableau, strong written communication."},
+    "expected": {"title": "Data Analyst", "company": "Acme Analytics", "location": null, "remote": "remote", "salary_min": 85000, "salary_max": 105000, "skills": ["SQL", "Tableau", "written communication"]}
+  },
+  {
+    "name": "onsite nurse no pay",
+    "vars": {"posting": "Registered Nurse, Night Shift. St. Mary's Hospital, Columbus, OH. Full-time, onsite. Active Ohio RN license and BLS certification required. Experience in a medical-surgical unit preferred."},
+    "expected": {"title": "Registered Nurse, Night Shift", "company": "St. Mary's Hospital", "location": "Columbus, OH", "remote": "onsite", "salary_min": null, "salary_max": null, "skills": ["Ohio RN license", "BLS certification", "medical-surgical experience"]}
+  },
+  {
+    "name": "hybrid engineer hourly not convertible",
+    "vars": {"posting": "Senior Backend Engineer at Brightpath (Seattle, WA). Hybrid: three days a week in our Seattle office. $70 per hour contract. You will build Go services on AWS and own on-call for them."},
+    "expected": {"title": "Senior Backend Engineer", "company": "Brightpath", "location": "Seattle, WA", "remote": "hybrid", "salary_min": null, "salary_max": null, "skills": ["Go", "AWS", "on-call"]}
+  }
+]
