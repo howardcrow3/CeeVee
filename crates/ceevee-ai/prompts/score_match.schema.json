@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "required": ["score", "reasons", "gaps"],
+  "properties": {
+    "score": {"type": "integer", "minimum": 0, "maximum": 100},
+    "reasons": {"type": "array", "maxItems": 4, "items": {"type": "string", "maxLength": 240}},
+    "gaps": {"type": "array", "maxItems": 4, "items": {"type": "string", "maxLength": 240}}
+  }
+}

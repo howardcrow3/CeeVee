@@ -1,0 +1,42 @@
+{
+  "type": "object",
+  "required": ["name", "email", "phone", "location", "summary", "work", "education", "skills"],
+  "properties": {
+    "name": {"type": ["string", "null"], "maxLength": 120},
+    "email": {"type": ["string", "null"], "maxLength": 200},
+    "phone": {"type": ["string", "null"], "maxLength": 60},
+    "location": {"type": ["string", "null"], "maxLength": 120},
+    "summary": {"type": ["string", "null"], "maxLength": 1200},
+    "work": {
+      "type": "array",
+      "maxItems": 20,
+      "items": {
+        "type": "object",
+        "required": ["company", "title", "start", "end", "current", "highlights"],
+        "properties": {
+          "company": {"type": "string", "maxLength": 160},
+          "title": {"type": "string", "maxLength": 160},
+          "start": {"type": ["string", "null"], "maxLength": 7},
+          "end": {"type": ["string", "null"], "maxLength": 7},
+          "current": {"type": "boolean"},
+          "highlights": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 300}}
+        }
+      }
+    },
+    "education": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "required": ["school", "degree", "field", "end"],
+        "properties": {
+          "school": {"type": "string", "maxLength": 160},
+          "degree": {"type": ["string", "null"], "maxLength": 120},
+          "field": {"type": ["string", "null"], "maxLength": 120},
+          "end": {"type": ["string", "null"], "maxLength": 7}
+        }
+      }
+    },
+    "skills": {"type": "array", "maxItems": 40, "items": {"type": "string", "maxLength": 60}}
+  }
+}
