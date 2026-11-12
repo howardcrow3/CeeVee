@@ -19,11 +19,153 @@ use crate::worker::{ModelWorker, Priority};
 pub struct Case {
     pub name: String,
     pub vars: std::collections::BTreeMap<String, String>,
+    /// Exact answers to compare, field by field. Empty for free-text tasks that use `checks`.
+    #[serde(default)]
     pub expected: Value,
+    /// Rules the answer must satisfy, for tasks whose output is prose (cover letters) or a
+    /// rearranged copy of the input (tailored resumes). Each passing rule scores 1.
+    #[serde(default)]
+    pub checks: Vec<Check>,
     /// Numeric fields that count as right when within this distance of the expected value (for
     /// example a match score of 88 against an expected 85 with a tolerance of 10).
     #[serde(default)]
     pub tolerance: std::collections::BTreeMap<String, f64>,
+}
+
+/// One rule about a task's answer. `field` is a top-level field of the answer.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum Check {
+    /// The text field contains `text` (ignoring case).
+    Contains { field: String, text: String },
+    /// The text field does not contain `text` (ignoring case).
+    NotContains { field: String, text: String },
+    /// The text field has between `min` and `max` words.
+    Words {
+        field: String,
+        min: usize,
+        max: usize,
+    },
+    /// Every number in the text field also appears in the case variable(s) `var` (several joined
+    /// with "+"), so the model did not invent or round a figure.
+    NumbersFrom { field: String, var: String },
+    /// Every string in the list field appears (ignoring case) in the case variable `var`, so
+    /// nothing was added.
+    ItemsFrom { field: String, var: String },
+    /// The list field has exactly `n` items.
+    Count { field: String, n: usize },
+    /// The list field's first item contains `text` (ignoring case).
+    FirstContains { field: String, text: String },
+    /// Every `company` in the `work` list appears in the case variable `var`.
+    CompaniesFrom { var: String },
+}
+
+impl Check {
+    fn describe(&self) -> String {
+        match self {
+            Check::Contains { field, text } => format!("{field} contains \"{text}\""),
+            Check::NotContains { field, text } => format!("{field} avoids \"{text}\""),
+            Check::Words { field, min, max } => format!("{field} has {min}-{max} words"),
+            Check::NumbersFrom { field, var } => format!("{field} numbers come from {var}"),
+            Check::ItemsFrom { field, var } => format!("{field} items come from {var}"),
+            Check::Count { field, n } => format!("{field} has {n} items"),
+            Check::FirstContains { field, text } => format!("{field} starts with \"{text}\""),
+            Check::CompaniesFrom { var } => format!("employers come from {var}"),
+        }
+    }
+
+    fn passes(&self, vars: &std::collections::BTreeMap<String, String>, out: &Value) -> bool {
+        let text = |f: &str| {
+            out.get(f)
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_lowercase()
+        };
+        // `var` may name several variables joined with "+", such as "profile+posting".
+        let var = |v: &str| {
+            v.split('+')
+                .filter_map(|n| vars.get(n.trim()))
+                .map(|s| s.to_lowercase())
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let list = |f: &str| {
+            out.get(f)
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default()
+        };
+        match self {
+            Check::Contains { field, text: t } => text(field).contains(&t.to_lowercase()),
+            Check::NotContains { field, text: t } => !text(field).contains(&t.to_lowercase()),
+            Check::Words { field, min, max } => {
+                let n = text(field).split_whitespace().count();
+                (*min..=*max).contains(&n)
+            }
+            Check::NumbersFrom { field, var: v } => {
+                let source = var(v);
+                numbers(&text(field))
+                    .iter()
+                    .all(|n| numbers(&source).contains(n))
+            }
+            Check::ItemsFrom { field, var: v } => {
+                let source = var(v);
+                list(field).iter().all(|i| {
+                    i.as_str()
+                        .is_some_and(|s| source.contains(&s.to_lowercase()))
+                })
+            }
+            Check::Count { field, n } => list(field).len() == *n,
+            Check::FirstContains { field, text: t } => list(field)
+                .first()
+                .and_then(Value::as_str)
+                .is_some_and(|s| s.to_lowercase().contains(&t.to_lowercase())),
+            Check::CompaniesFrom { var: v } => {
+                let source = var(v);
+                list("work").iter().all(|j| {
+                    j.get("company")
+                        .and_then(Value::as_str)
+                        .is_some_and(|c| source.contains(&c.to_lowercase()))
+                })
+            }
+        }
+    }
+}
+
+/// The digit runs in a text, with thousands separators removed ("85,000" and "85000" match).
+fn numbers(text: &str) -> BTreeSet<String> {
+    let cleaned = text.replace(',', "");
+    let mut found = BTreeSet::new();
+    let mut run = String::new();
+    for c in cleaned.chars().chain(std::iter::once(' ')) {
+        if c.is_ascii_digit() {
+            run.push(c);
+        } else if !run.is_empty() {
+            found.insert(std::mem::take(&mut run));
+        }
+    }
+    found
+}
+
+/// Score a case's checks: the share that pass, and each check's result by description.
+pub fn score_checks(
+    checks: &[Check],
+    vars: &std::collections::BTreeMap<String, String>,
+    out: &Value,
+) -> (f64, Map<String, Value>) {
+    let mut fields = Map::new();
+    let mut passed = 0.0;
+    for c in checks {
+        let ok = c.passes(vars, out);
+        passed += f64::from(ok);
+        fields.insert(c.describe(), Value::from(f64::from(ok)));
+    }
+    let mean = if checks.is_empty() {
+        1.0
+    } else {
+        passed / checks.len() as f64
+    };
+    (mean, fields)
 }
 
 pub fn parse_cases(json: &str) -> Result<Vec<Case>> {
@@ -96,6 +238,22 @@ pub fn score_case_with(
         total / exp.len() as f64
     };
     (mean, fields)
+}
+
+/// Score a case with its exact answers, its checks, or both (their mean).
+fn score_any(case: &Case, out: &Value) -> (f64, Map<String, Value>) {
+    let has_expected = case.expected.as_object().is_some_and(|o| !o.is_empty());
+    let (exact, mut fields) = score_case_with(&case.expected, out, &case.tolerance);
+    if case.checks.is_empty() {
+        return (exact, fields);
+    }
+    let (rules, rule_fields) = score_checks(&case.checks, &case.vars, out);
+    fields.extend(rule_fields);
+    if has_expected {
+        ((exact + rules) / 2.0, fields)
+    } else {
+        (rules, fields)
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -247,7 +405,7 @@ pub async fn run_eval_within(
         let took = started.elapsed();
         reports.push(match outcome {
             Ok(out) => {
-                let (score, fields) = score_case_with(&case.expected, &out.value, &case.tolerance);
+                let (score, fields) = score_any(case, &out.value);
                 CaseReport {
                     name: case.name.clone(),
                     score: Some(score),
@@ -281,6 +439,8 @@ pub fn builtin_cases(task_id: &str) -> Option<&'static str> {
         "extract_posting" => Some(include_str!("../evals/extract_posting.json")),
         "import_resume" => Some(include_str!("../evals/import_resume.json")),
         "score_match" => Some(include_str!("../evals/score_match.json")),
+        "write_cover_letter" => Some(include_str!("../evals/write_cover_letter.json")),
+        "tailor_resume" => Some(include_str!("../evals/tailor_resume.json")),
         _ => None,
     }
 }

@@ -56,3 +56,26 @@ test('thresholds fall back to the default and a missing floor is "not set"', () 
   assert.equal(verdict(0.2, 0.5), 'fail');
   assert.equal(verdict(0.2, null), 'not set');
 });
+
+import { readFileSync } from 'node:fs';
+
+test('eval models have pinned hashes and match the model catalog', () => {
+  const models = JSON.parse(readFileSync(new URL('../evals/models.json', import.meta.url), 'utf8')).models;
+  const catalog = JSON.parse(readFileSync(new URL('../crates/ceevee-ai/catalog.json', import.meta.url), 'utf8')).models;
+  assert.ok(models.length >= 3);
+  const ids = new Set();
+  for (const m of models) {
+    assert.ok(!ids.has(m.id), `duplicate ${m.id}`);
+    ids.add(m.id);
+    assert.match(m.sha256, /^[0-9a-f]{64}$/, m.id);
+    assert.match(m.url, /^https:\/\/huggingface\.co\//, m.id);
+    assert.ok(Number.isInteger(m.budget_secs) && m.budget_secs > 0, m.id);
+    assert.equal(typeof m.cache, 'boolean', m.id);
+    // A model that ships in the catalog must be scored with the very same file.
+    const shipped = catalog.find((c) => c.url === m.url);
+    if (shipped) assert.equal(shipped.sha256, m.sha256, m.id);
+  }
+  for (const c of catalog.filter((x) => x.role === 'general')) {
+    assert.ok(models.some((m) => m.url === c.url), `${c.id} is shipped but not scored`);
+  }
+});

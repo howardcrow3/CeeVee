@@ -1,29 +1,10 @@
 [
-  {
-    "name": "strong match",
-    "vars": {
-      "profile": "Maria Lopez, Columbus OH. Senior Analyst at Northfield Logistics since 2021: built Tableau dashboards, SQL reporting for 40 depots. Analyst at Harbor Freight Co. 2018 to 2021: SQL reports. B.S. Industrial Engineering. Skills: SQL, Tableau, Excel, Python.",
-      "posting": "Data Analyst at Acme Analytics, remote. Requirements: 2+ years of SQL, experience building Tableau dashboards, clear written communication. Nice to have: Python."
-    },
-    "expected": {"score": 88},
-    "tolerance": {"score": 14}
-  },
-  {
-    "name": "weak match",
-    "vars": {
-      "profile": "Dev Patel, Seattle WA. Barista at Daily Grind Cafe since 2022. Student at Seattle Central College. Skills: customer service, espresso.",
-      "posting": "Senior Backend Engineer at Brightpath. Requirements: 6+ years of Go, AWS, distributed systems, on-call experience, mentoring junior engineers."
-    },
-    "expected": {"score": 5},
-    "tolerance": {"score": 20}
-  },
-  {
-    "name": "partial match",
-    "vars": {
-      "profile": "Sam Rivera, Austin TX. Marketing coordinator at Bluebird Media 2020 to present: email campaigns, HubSpot, weekly reports in Excel. B.A. Communications. Skills: HubSpot, Excel, copywriting.",
-      "posting": "Marketing Analyst at Orbit Software. Requirements: 3+ years in marketing, SQL, Google Analytics, A/B testing, dashboards in Looker."
-    },
-    "expected": {"score": 40},
-    "tolerance": {"score": 25}
-  }
+  {"name": "strong match", "vars": {"profile": "Maria Lopez, Columbus OH. Senior Analyst at Northfield Logistics since 2021: built Tableau dashboards, SQL reporting for 40 depots. Analyst at Harbor Freight Co. 2018 to 2021: SQL reports. B.S. Industrial Engineering. Skills: SQL, Tableau, Excel, Python.", "posting": "Data Analyst at Acme Analytics, remote. Requirements: 2+ years of SQL, experience building Tableau dashboards, clear written communication. Nice to have: Python."}, "expected": {"score": 88}, "tolerance": {"score": 14}},
+  {"name": "weak match", "vars": {"profile": "Dev Patel, Seattle WA. Barista at Daily Grind Cafe since 2022. Student at Seattle Central College. Skills: customer service, espresso.", "posting": "Senior Backend Engineer at Brightpath. Requirements: 6+ years of Go, AWS, distributed systems, on-call experience, mentoring junior engineers."}, "expected": {"score": 5}, "tolerance": {"score": 20}},
+  {"name": "partial match", "vars": {"profile": "Sam Rivera, Austin TX. Marketing coordinator at Bluebird Media 2020 to present: email campaigns, HubSpot, weekly reports in Excel. B.A. Communications. Skills: HubSpot, Excel, copywriting.", "posting": "Marketing Analyst at Orbit Software. Requirements: 3+ years in marketing, SQL, Google Analytics, A/B testing, dashboards in Looker."}, "expected": {"score": 40}, "tolerance": {"score": 25}},
+  {"name": "exact fit", "vars": {"profile": "Nadia Haddad, Chicago IL. Backend Developer at Orbit Labs 2020 to 2023: Python and Go services on AWS, owned on-call, mentored two junior engineers. Senior Backend Developer at Meridian Software 2023 to present: distributed systems, six years total of Go. Skills: Go, Python, AWS, Docker.", "posting": "Senior Backend Engineer at Brightpath. Requirements: 6+ years of Go, AWS, distributed systems, on-call experience, mentoring junior engineers."}, "expected": {"score": 92}, "tolerance": {"score": 12}},
+  {"name": "right field, too junior", "vars": {"profile": "Taylor Brooks, Boston MA. Junior Data Analyst at Bayside Retail since 2025: weekly Excel reports, learning SQL. B.S. Statistics, 2025. Skills: Excel, SQL basics.", "posting": "Senior Data Analyst at Acme Analytics. Requirements: 5+ years of SQL, Tableau, experience leading analysts, stakeholder presentations."}, "expected": {"score": 30}, "tolerance": {"score": 22}},
+  {"name": "only nice-to-haves missing", "vars": {"profile": "Priya Raman, Seattle WA. Product Manager at Skyline Apps 2022 to present: launched onboarding flow, roadmap ownership, SQL for funnel analysis. Associate PM 2019 to 2021. Skills: roadmapping, SQL, Figma.", "posting": "Product Manager at Northwind Apps. Requirements: 3+ years of product management, roadmap ownership, SQL. Nice to have: experience with mobile payments, Looker."}, "expected": {"score": 85}, "tolerance": {"score": 15}},
+  {"name": "different field entirely", "vars": {"profile": "Rosa Alvarez, Phoenix AZ. Registered Nurse at St. Mary's Hospital 2016 to present, medical-surgical unit. Active Arizona RN license, BLS certified. Skills: patient care, charting, IV therapy.", "posting": "Software Engineer at Nimbus Cloud. Requirements: 3+ years of Python or Go, Kubernetes, Terraform, CI pipelines."}, "expected": {"score": 3}, "tolerance": {"score": 12}},
+  {"name": "transferable skills only", "vars": {"profile": "Alex Kim, Remote. High school math teacher 2014 to 2024: curriculum design, statistics, public speaking, Google Classroom. B.Ed. Mathematics.", "posting": "Instructional Designer at Brightpath Learning. Requirements: 2+ years of instructional design, curriculum writing, Articulate Storyline, adult learning."}, "expected": {"score": 50}, "tolerance": {"score": 25}}
 ]
