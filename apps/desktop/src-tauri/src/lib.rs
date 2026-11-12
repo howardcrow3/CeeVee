@@ -1,10 +1,11 @@
 //! CeeVee desktop shell: window, tray, single instance and the typed command
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
+#[allow(dead_code)] // called by feature crates as they land
+mod notifications;
 mod scheduler;
+mod tray;
 
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
 #[tauri::command]
@@ -34,12 +35,35 @@ pub fn export_bindings() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn show_main_window(app: &AppHandle) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
+}
+
+/// Launch at login is on by default; the first run switches it on and records
+/// that it did, so a later "off" in Settings sticks.
+fn launch_at_login_default(app: &tauri::App) {
+    use tauri_plugin_autostart::ManagerExt;
+    let db = app.state::<ceevee_db::Db>().inner().clone();
+    let handle = app.handle().clone();
+    tauri::async_runtime::spawn(async move {
+        if db
+            .get_setting("launch_at_login.initialized")
+            .await
+            .ok()
+            .flatten()
+            .is_some()
+        {
+            return;
+        }
+        if let Err(e) = handle.autolaunch().enable() {
+            tracing::warn!("could not enable launch at login: {e}");
+        }
+        let _ = db.set_setting("launch_at_login.initialized", "1").await;
+    });
 }
 
 pub fn run() {
@@ -50,6 +74,11 @@ pub fn run() {
     }
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--minimized"]),
+        ))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
@@ -61,21 +90,13 @@ pub fn run() {
             app.manage(bus);
             app.manage(db);
 
-            let open = MenuItem::with_id(app, "open", "Open CeeVee", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open, &quit])?;
-            let mut tray =
-                TrayIconBuilder::new()
-                    .menu(&menu)
-                    .on_menu_event(|app, event| match event.id.as_ref() {
-                        "open" => show_main_window(app),
-                        "quit" => app.exit(0),
-                        _ => {}
-                    });
-            if let Some(icon) = app.default_window_icon() {
-                tray = tray.icon(icon.clone());
+            tray::build(app)?;
+            launch_at_login_default(app);
+            if std::env::args().any(|a| a == "--minimized") {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.hide();
+                }
             }
-            tray.build(app)?;
             Ok(())
         })
         // Closing the window hides to the tray; Quit is in the tray menu.
