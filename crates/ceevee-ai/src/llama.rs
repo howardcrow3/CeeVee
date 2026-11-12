@@ -114,7 +114,13 @@ impl LlmBackend for LlamaCppBackend {
         }
         let backend = runtime()?;
         // 999 asks for every layer on the GPU; with no GPU support compiled in, it runs on the CPU.
-        let params = LlamaModelParams::default().with_n_gpu_layers(999);
+        // All layers on the GPU by default. CEEVEE_GPU_LAYERS overrides it, which CI uses to run on
+        // the CPU because hosted macOS runners have no real GPU and Metal there is very slow.
+        let gpu_layers = std::env::var("CEEVEE_GPU_LAYERS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(999);
+        let params = LlamaModelParams::default().with_n_gpu_layers(gpu_layers);
         let model = LlamaModel::load_from_file(backend, &self.path, &params)
             .map_err(|e| other("load model", e))?;
         self.model = Some(model);
