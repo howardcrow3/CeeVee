@@ -106,10 +106,27 @@ mod tests {
     }
 
     #[test]
-    fn unpublished_entries_are_not_downloadable() {
-        assert!(Catalog::builtin()
-            .models
-            .iter()
-            .all(|m| !m.is_downloadable()));
+    fn every_builtin_entry_is_pinned_to_a_url_and_a_sha256() {
+        for m in &Catalog::builtin().models {
+            let url = m.url.as_deref().unwrap_or("");
+            let hash = m.sha256.as_deref().unwrap_or("");
+            assert!(url.starts_with("https://"), "{}: url", m.id);
+            assert!(
+                hash.len() == 64 && hash.chars().all(|c| c.is_ascii_hexdigit()),
+                "{}: sha256",
+                m.id
+            );
+            assert!(m.is_downloadable(), "{}", m.id);
+        }
+    }
+
+    #[test]
+    fn an_entry_without_a_url_or_a_hash_is_not_downloadable() {
+        let mut m = Catalog::builtin().models[0].clone();
+        m.url = None;
+        assert!(!m.is_downloadable());
+        let mut m = Catalog::builtin().models[0].clone();
+        m.sha256 = Some("abc".into());
+        assert!(!m.is_downloadable());
     }
 }
