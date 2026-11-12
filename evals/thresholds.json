@@ -1,0 +1,8 @@
+{
+  "note": "Pass/fail floors per model and task, as a mean score from 0 to 1. null means not established yet. The report shows the outcome but never fails a build. Fill these in from a few reports, then consider gating.",
+  "default": {
+    "extract_posting": null,
+    "import_resume": null
+  },
+  "models": {}
+}
