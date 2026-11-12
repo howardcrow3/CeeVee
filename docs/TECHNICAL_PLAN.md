@@ -82,7 +82,7 @@ Each type can be turned off, and notifications are batched so the user gets at m
 - `sqlx` with compile-time checked queries and embedded, numbered migrations. A backup copy is written before every migration.
 - FTS5 virtual tables over postings, applications, emails and notes for global search.
 - JSON columns for AI output (`extracted`, `match`, `score_reasons`, `email_label`) with a `*_with` column holding the prompt version that produced it.
-- Tables as listed in PLAN.md (20 core tables). Indexes: `posting(company_id)`, `posting_category(category_id, score)`, `posting_category(posting_id)`, `application(company_id)`, `application(category_id, status)`, `contact_role(company_id, is_current)`, `email_message(application_id)`, `email_message(thread_id)`.
+- Tables as listed in PLAN.md (37 core tables). Indexes: `posting(company_id)`, `posting_category(category_id, score)`, `posting_category(posting_id)`, `application(company_id)`, `application(category_id, status)`, `contact_role(company_id, is_current)`, `email_message(application_id)`, `email_message(thread_id)`.
 - Secrets (OAuth refresh tokens, IMAP app passwords, optional API keys) live in the OS keychain only. The database stores a reference.
 - Export and import: one JSON file with a schema version, plus a zip of rendered documents. Nightly local backup with 14-day retention.
 
