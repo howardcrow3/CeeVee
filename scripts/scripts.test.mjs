@@ -29,3 +29,30 @@ test('manifest lists signed platforms with rollout', () => {
 test('manifest without any signed file is an error', () => {
   assert.throws(() => buildManifest({ version: '1.0.0', base: 'x', files: { a: { file: 'f', signature: undefined } } }));
 });
+
+import { summarize, toMarkdown, toHtml, verdict, threshold } from './eval-report.mjs';
+
+const rep = (model, task, mean, cases) => ({ model, task, version: 1, mean_score: mean, failed: 0, skipped: 0, total: cases.length, seconds: 1, cases: cases.map(([name, score]) => ({ name, score })) });
+
+test('eval report compares models per task and applies thresholds without failing', () => {
+  const results = [
+    rep('small', 'extract_posting', 0.4, [['a', 0.4], ['b', null]]),
+    rep('big', 'extract_posting', 0.9, [['a', 1], ['b', 0.8]]),
+  ];
+  const th = { default: { extract_posting: null }, models: { big: { extract_posting: 0.8 } } };
+  const sum = summarize(results, th);
+  assert.deepEqual(sum.models, ['big', 'small']);
+  assert.equal(sum.cells['big|extract_posting'].verdict, 'pass');
+  assert.equal(sum.cells['small|extract_posting'].verdict, 'not set');
+  const md = toMarkdown(sum);
+  assert.match(md, /\| big \| 0\.90 \(pass, floor 0\.80\)/);
+  assert.match(md, /\| b \| 0\.80 \| FAIL \|/);
+  assert.match(toHtml(sum), /<table>/);
+});
+
+test('thresholds fall back to the default and a missing floor is "not set"', () => {
+  assert.equal(threshold({ default: { t: 0.5 }, models: {} }, 'm', 't'), 0.5);
+  assert.equal(threshold({}, 'm', 't'), null);
+  assert.equal(verdict(0.2, 0.5), 'fail');
+  assert.equal(verdict(0.2, null), 'not set');
+});

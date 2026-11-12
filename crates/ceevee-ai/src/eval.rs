@@ -114,6 +114,8 @@ pub struct Report {
     pub task: &'static str,
     pub version: u32,
     pub cases: Vec<CaseReport>,
+    /// Cases not run because the time budget ran out.
+    pub skipped: usize,
 }
 
 impl Report {
@@ -137,6 +139,35 @@ impl Report {
         self.cases.iter().map(|c| c.took).sum()
     }
 
+    /// The report as JSON for `scripts/eval-report.mjs`, which compares models.
+    pub fn to_json(&self, model: &str) -> Value {
+        let cases: Vec<Value> = self
+            .cases
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "name": c.name,
+                    "score": c.score,
+                    "fields": c.fields,
+                    "attempts": c.attempts,
+                    "seconds": c.took.as_secs_f64(),
+                    "error": c.error,
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "model": model,
+            "task": self.task,
+            "version": self.version,
+            "mean_score": self.mean_score(),
+            "failed": self.failures(),
+            "skipped": self.skipped,
+            "total": self.cases.len() + self.skipped,
+            "seconds": self.total_time().as_secs_f64(),
+            "cases": cases,
+        })
+    }
+
     /// A plain-text summary for the terminal or a pull request.
     pub fn summary(&self) -> String {
         let mut out = format!(
@@ -148,6 +179,12 @@ impl Report {
             self.cases.len(),
             self.total_time().as_secs_f64()
         );
+        if self.skipped > 0 {
+            out.push_str(&format!(
+                "  {} case(s) skipped: time budget used up\n",
+                self.skipped
+            ));
+        }
         for c in &self.cases {
             match (&c.score, &c.error) {
                 (Some(s), _) => {
@@ -183,8 +220,23 @@ impl Report {
 
 /// Run every case through the task on the worker and score it.
 pub async fn run_eval(worker: &ModelWorker, spec: &TaskSpec, cases: &[Case]) -> Report {
+    run_eval_within(worker, spec, cases, None).await
+}
+
+/// Like [`run_eval`], but stop starting new cases once `budget` has passed. Slow hosted runners
+/// then report the cases they reached instead of hitting a job timeout.
+pub async fn run_eval_within(
+    worker: &ModelWorker,
+    spec: &TaskSpec,
+    cases: &[Case],
+    budget: Option<Duration>,
+) -> Report {
+    let begun = Instant::now();
     let mut reports = Vec::new();
     for case in cases {
+        if budget.is_some_and(|b| begun.elapsed() >= b) {
+            break;
+        }
         let vars: Vec<(&str, &str)> = case
             .vars
             .iter()
@@ -218,6 +270,7 @@ pub async fn run_eval(worker: &ModelWorker, spec: &TaskSpec, cases: &[Case]) -> 
     Report {
         task: spec.id,
         version: spec.version,
+        skipped: cases.len() - reports.len(),
         cases: reports,
     }
 }
