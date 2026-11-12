@@ -120,6 +120,35 @@ impl Report {
         self.cases.iter().map(|c| c.took).sum()
     }
 
+    /// The report as JSON for `scripts/eval-report.mjs`, which compares models.
+    pub fn to_json(&self, model: &str) -> Value {
+        let cases: Vec<Value> = self
+            .cases
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "name": c.name,
+                    "score": c.score,
+                    "fields": c.fields,
+                    "attempts": c.attempts,
+                    "seconds": c.took.as_secs_f64(),
+                    "error": c.error,
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "model": model,
+            "task": self.task,
+            "version": self.version,
+            "mean_score": self.mean_score(),
+            "failed": self.failures(),
+            "skipped": self.skipped,
+            "total": self.cases.len() + self.skipped,
+            "seconds": self.total_time().as_secs_f64(),
+            "cases": cases,
+        })
+    }
+
     /// A plain-text summary for the terminal or a pull request.
     pub fn summary(&self) -> String {
         let mut out = format!(
