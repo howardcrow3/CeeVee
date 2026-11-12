@@ -164,3 +164,23 @@ async fn a_spent_budget_skips_the_remaining_cases_and_says_so() {
     assert_eq!(report.skipped, cases.len());
     assert!(report.summary().contains("skipped"));
 }
+
+#[tokio::test]
+async fn report_json_carries_model_scores_and_skips() {
+    let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
+    let w = ModelWorker::spawn(
+        Scripted(
+            Arc::new(Mutex::new(vec![cases[0].expected.to_string()])),
+            false,
+        ),
+        std::time::Duration::from_secs(60),
+    );
+    let one = &cases[..1];
+    let report = run_eval(&w, &EXTRACT_POSTING, one).await;
+    let j = report.to_json("qwen3-0.6b");
+    assert_eq!(j["model"], "qwen3-0.6b");
+    assert_eq!(j["task"], "extract_posting");
+    assert_eq!(j["mean_score"], 1.0);
+    assert_eq!(j["total"], 1);
+    assert_eq!(j["cases"][0]["name"], one[0].name);
+}
