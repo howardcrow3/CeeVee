@@ -593,6 +593,9 @@ name = "ceevee-docs"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "ceevee-db",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]
