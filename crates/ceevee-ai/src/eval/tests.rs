@@ -30,14 +30,20 @@ fn case_score_is_the_mean_and_missing_fields_score_zero() {
 
 #[test]
 fn built_in_cases_parse_and_use_fields_the_schema_defines() {
-    for id in ["extract_posting", "import_resume"] {
+    for id in ["extract_posting", "import_resume", "score_match"] {
         let spec = builtin_task(id).unwrap();
         let schema = spec.schema_value().unwrap();
         let props = schema["properties"].as_object().unwrap();
         let cases = parse_cases(builtin_cases(id).unwrap()).unwrap();
         assert!(cases.len() >= 2, "{id}");
         for c in &cases {
-            assert!(c.vars.len() == 1, "{id}/{}", c.name);
+            let vars: Vec<(&str, &str)> = c
+                .vars
+                .iter()
+                .map(|(k, v)| (k.as_str(), v.as_str()))
+                .collect();
+            crate::task::render(spec.prompt, &vars)
+                .unwrap_or_else(|e| panic!("{id}/{}: {e}", c.name));
             for key in c.expected.as_object().unwrap().keys() {
                 assert!(
                     props.contains_key(key),
@@ -97,6 +103,24 @@ async fn runs_cases_and_reports() {
             && text.contains("FAIL")
             && text.contains("weak: remote=0.00"),
         "{text}"
+    );
+}
+
+#[test]
+fn tolerance_makes_a_near_number_right() {
+    let tol = [("score".to_string(), 10.0)].into_iter().collect();
+    assert_eq!(
+        score_case_with(&json!({"score": 85}), &json!({"score": 92}), &tol).0,
+        1.0
+    );
+    assert_eq!(
+        score_case_with(&json!({"score": 85}), &json!({"score": 60}), &tol).0,
+        0.0
+    );
+    // Without a tolerance the number must match exactly.
+    assert_eq!(
+        score_case(&json!({"score": 85}), &json!({"score": 86})).0,
+        0.0
     );
 }
 
@@ -163,4 +187,24 @@ async fn a_spent_budget_skips_the_remaining_cases_and_says_so() {
     assert!(report.cases.is_empty());
     assert_eq!(report.skipped, cases.len());
     assert!(report.summary().contains("skipped"));
+}
+
+#[tokio::test]
+async fn report_json_carries_model_scores_and_skips() {
+    let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
+    let w = ModelWorker::spawn(
+        Scripted(
+            Arc::new(Mutex::new(vec![cases[0].expected.to_string()])),
+            false,
+        ),
+        std::time::Duration::from_secs(60),
+    );
+    let one = &cases[..1];
+    let report = run_eval(&w, &EXTRACT_POSTING, one).await;
+    let j = report.to_json("qwen3-0.6b");
+    assert_eq!(j["model"], "qwen3-0.6b");
+    assert_eq!(j["task"], "extract_posting");
+    assert_eq!(j["mean_score"], 1.0);
+    assert_eq!(j["total"], 1);
+    assert_eq!(j["cases"][0]["name"], one[0].name);
 }

@@ -594,8 +594,10 @@ dependencies = [
 name = "ceevee-docs"
 version = "0.1.0"
 dependencies = [
+ "ceevee-ai",
  "ceevee-core",
  "ceevee-db",
+ "serde",
  "serde_json",
  "sqlx",
  "tokio",
@@ -646,6 +648,11 @@ name = "ceevee-search"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "ceevee-db",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "tokio",
 ]
 
 [[package]]

@@ -188,17 +188,23 @@ struct Known {
     numbers: BTreeSet<String>,
 }
 
-fn index(sources: &[&str]) -> Known {
+/// Words are learned from `word_sources`, numbers from `number_sources`.
+fn index(word_sources: &[&str], number_sources: &[&str]) -> Known {
     let mut k = Known {
         words: BTreeSet::new(),
         numbers: BTreeSet::new(),
     };
-    for s in sources {
+    for s in word_sources {
+        for t in tokens(s) {
+            if !is_number(&t.text) {
+                k.words.insert(word_key(&t.text));
+            }
+        }
+    }
+    for s in number_sources {
         for t in tokens(s) {
             if is_number(&t.text) {
                 k.numbers.extend(number_parts(&t.text));
-            } else {
-                k.words.insert(word_key(&t.text));
             }
         }
     }
@@ -245,7 +251,7 @@ fn scan(
 /// Check `output` against the texts it was allowed to draw from. Returns one flag per distinct
 /// number or name that the sources do not contain, in order of appearance.
 pub fn check(output: &str, sources: &[&str]) -> Vec<Flag> {
-    let known = index(sources);
+    let known = index(sources, sources);
     let (mut seen, mut flags) = (BTreeSet::new(), Vec::new());
     scan(output, &known, false, &mut seen, &mut flags);
     flags
@@ -255,6 +261,17 @@ pub fn check(output: &str, sources: &[&str]) -> Vec<Flag> {
 /// company, a title) are checked word by word including their first word; longer ones, such as
 /// bullet points, are treated as sentences.
 pub fn check_value(value: &Value, sources: &[&str]) -> Vec<Flag> {
+    check_value_split(value, sources, sources)
+}
+
+/// Like [`check_value`], but names may come from `word_sources` while numbers must come from
+/// `number_sources`. Tailoring uses this so a number in the posting ("2+ years") cannot
+/// become a claim about the candidate.
+pub fn check_value_split(
+    value: &Value,
+    word_sources: &[&str],
+    number_sources: &[&str],
+) -> Vec<Flag> {
     fn walk(
         v: &Value,
         known: &Known,
@@ -269,10 +286,27 @@ pub fn check_value(value: &Value, sources: &[&str]) -> Vec<Flag> {
             _ => {}
         }
     }
-    let known = index(sources);
+    let known = index(word_sources, number_sources);
     let (mut seen, mut flags) = (BTreeSet::new(), Vec::new());
     walk(value, &known, &mut seen, &mut flags);
     flags
+}
+
+/// All the text inside a JSON value (a resume), one string per line. Used to build the source text
+/// for [`check_value_split`] from a resume.
+pub fn text_of(value: &Value) -> String {
+    fn walk(v: &Value, out: &mut Vec<String>) {
+        match v {
+            Value::String(s) => out.push(s.clone()),
+            Value::Number(n) => out.push(n.to_string()),
+            Value::Array(a) => a.iter().for_each(|x| walk(x, out)),
+            Value::Object(o) => o.values().for_each(|x| walk(x, out)),
+            _ => {}
+        }
+    }
+    let mut parts = Vec::new();
+    walk(value, &mut parts);
+    parts.join("\n")
 }
 
 #[cfg(test)]

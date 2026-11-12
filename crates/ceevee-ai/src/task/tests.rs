@@ -156,3 +156,27 @@ fn import_resume_task_compiles_and_accepts_a_sample() {
         .unwrap()
         .contains("RESUME TEXT"));
 }
+
+#[test]
+fn drafting_and_scoring_tasks_are_well_formed() {
+    for spec in [&SCORE_MATCH, &WRITE_COVER_LETTER, &TAILOR_RESUME] {
+        assert!(spec.grammar().unwrap().contains("root ::="), "{}", spec.id);
+    }
+    let vars = [
+        ("profile", "P"),
+        ("posting", "J"),
+        ("instructions", ""),
+        ("resume", "{}"),
+    ];
+    for spec in [&SCORE_MATCH, &WRITE_COVER_LETTER, &TAILOR_RESUME] {
+        let text = render(spec.prompt, &vars).unwrap();
+        assert!(!text.contains("{{"), "{}", spec.id);
+    }
+    let score = SCORE_MATCH.schema_value().unwrap();
+    assert!(
+        parse_output::<Value>(&score, r#"{"score":72,"reasons":["Knows SQL"],"gaps":[]}"#).is_ok()
+    );
+    assert!(parse_output::<Value>(&score, r#"{"score":172,"reasons":[],"gaps":[]}"#).is_err());
+    let letter = WRITE_COVER_LETTER.schema_value().unwrap();
+    assert!(parse_output::<Value>(&letter, r#"{"letter":"short"}"#).is_err());
+}

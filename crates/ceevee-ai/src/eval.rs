@@ -20,6 +20,10 @@ pub struct Case {
     pub name: String,
     pub vars: std::collections::BTreeMap<String, String>,
     pub expected: Value,
+    /// Numeric fields that count as right when within this distance of the expected value (for
+    /// example a match score of 88 against an expected 85 with a tolerance of 10).
+    #[serde(default)]
+    pub tolerance: std::collections::BTreeMap<String, f64>,
 }
 
 pub fn parse_cases(json: &str) -> Result<Vec<Case>> {
@@ -62,12 +66,27 @@ pub fn score_field(expected: &Value, actual: &Value) -> f64 {
 
 /// Mean field score over the expected object's fields. A field missing from `actual` scores 0.
 pub fn score_case(expected: &Value, actual: &Value) -> (f64, Map<String, Value>) {
+    score_case_with(expected, actual, &Default::default())
+}
+
+/// Like [`score_case`], with per-field numeric tolerances.
+pub fn score_case_with(
+    expected: &Value,
+    actual: &Value,
+    tolerance: &std::collections::BTreeMap<String, f64>,
+) -> (f64, Map<String, Value>) {
     let empty = Map::new();
     let exp = expected.as_object().unwrap_or(&empty);
     let mut fields = Map::new();
     let mut total = 0.0;
     for (k, ev) in exp {
-        let s = actual.get(k).map_or(0.0, |av| score_field(ev, av));
+        let near = |a: &Value| match (ev.as_f64(), a.as_f64(), tolerance.get(k)) {
+            (Some(e), Some(x), Some(t)) => Some(f64::from((e - x).abs() <= *t)),
+            _ => None,
+        };
+        let s = actual
+            .get(k)
+            .map_or(0.0, |av| near(av).unwrap_or_else(|| score_field(ev, av)));
         total += s;
         fields.insert(k.clone(), Value::from(s));
     }
@@ -118,6 +137,35 @@ impl Report {
 
     pub fn total_time(&self) -> Duration {
         self.cases.iter().map(|c| c.took).sum()
+    }
+
+    /// The report as JSON for `scripts/eval-report.mjs`, which compares models.
+    pub fn to_json(&self, model: &str) -> Value {
+        let cases: Vec<Value> = self
+            .cases
+            .iter()
+            .map(|c| {
+                serde_json::json!({
+                    "name": c.name,
+                    "score": c.score,
+                    "fields": c.fields,
+                    "attempts": c.attempts,
+                    "seconds": c.took.as_secs_f64(),
+                    "error": c.error,
+                })
+            })
+            .collect();
+        serde_json::json!({
+            "model": model,
+            "task": self.task,
+            "version": self.version,
+            "mean_score": self.mean_score(),
+            "failed": self.failures(),
+            "skipped": self.skipped,
+            "total": self.cases.len() + self.skipped,
+            "seconds": self.total_time().as_secs_f64(),
+            "cases": cases,
+        })
     }
 
     /// A plain-text summary for the terminal or a pull request.
@@ -199,7 +247,7 @@ pub async fn run_eval_within(
         let took = started.elapsed();
         reports.push(match outcome {
             Ok(out) => {
-                let (score, fields) = score_case(&case.expected, &out.value);
+                let (score, fields) = score_case_with(&case.expected, &out.value, &case.tolerance);
                 CaseReport {
                     name: case.name.clone(),
                     score: Some(score),
@@ -232,6 +280,7 @@ pub fn builtin_cases(task_id: &str) -> Option<&'static str> {
     match task_id {
         "extract_posting" => Some(include_str!("../evals/extract_posting.json")),
         "import_resume" => Some(include_str!("../evals/import_resume.json")),
+        "score_match" => Some(include_str!("../evals/score_match.json")),
         _ => None,
     }
 }
@@ -241,6 +290,9 @@ pub fn builtin_task(task_id: &str) -> Option<&'static TaskSpec> {
     match task_id {
         "extract_posting" => Some(&crate::task::EXTRACT_POSTING),
         "import_resume" => Some(&crate::task::IMPORT_RESUME),
+        "score_match" => Some(&crate::task::SCORE_MATCH),
+        "write_cover_letter" => Some(&crate::task::WRITE_COVER_LETTER),
+        "tailor_resume" => Some(&crate::task::TAILOR_RESUME),
         _ => None,
     }
 }

@@ -151,5 +151,37 @@ pub const IMPORT_RESUME: TaskSpec = TaskSpec {
     temperature: 0.0,
 };
 
+/// Score how well a profile fits a posting, with reasons and gaps.
+pub const SCORE_MATCH: TaskSpec = TaskSpec {
+    id: "score_match",
+    version: 1,
+    prompt: include_str!("../prompts/score_match.md"),
+    schema: include_str!("../prompts/score_match.schema.json"),
+    max_tokens: 500,
+    temperature: 0.0,
+};
+
+/// Write a cover letter from facts in the profile and posting. The caller runs the fact guard on
+/// the result before saving it.
+pub const WRITE_COVER_LETTER: TaskSpec = TaskSpec {
+    id: "write_cover_letter",
+    version: 1,
+    prompt: include_str!("../prompts/write_cover_letter.md"),
+    schema: include_str!("../prompts/write_cover_letter.schema.json"),
+    max_tokens: 900,
+    temperature: 0.3,
+};
+
+/// Select and order the content of a resume for a posting, without adding anything. The answer
+/// has the same shape as `import_resume`'s. The caller runs the fact guard on the result.
+pub const TAILOR_RESUME: TaskSpec = TaskSpec {
+    id: "tailor_resume",
+    version: 1,
+    prompt: include_str!("../prompts/tailor_resume.md"),
+    schema: include_str!("../prompts/tailor_resume.schema.json"),
+    max_tokens: 1800,
+    temperature: 0.0,
+};
+
 #[cfg(test)]
 mod tests;
