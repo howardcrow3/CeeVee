@@ -509,9 +509,11 @@ dependencies = [
 name = "ceevee-agent"
 version = "0.1.0"
 dependencies = [
+ "ceevee-ai",
  "ceevee-core",
  "ceevee-db",
  "chrono",
+ "serde_json",
  "tokio",
  "tracing",
 ]
