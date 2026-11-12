@@ -87,9 +87,13 @@ jobs:
           CEEVEE_TEST_MODEL="$PWD/model/model.gguf" \
             cargo test --release --locked -p ceevee-ai --features llama -- --ignored --nocapture
 
+      # Windows gates on the evals. Hosted macOS runners are small shared VMs where the same
+      # evals take several times longer, so there they are report-only with a time cap; the
+      # backend test above still gates on macOS. (Howard's decision, 2026-11-12.)
       - name: Eval cases
         if: hashFiles('crates/ceevee-ai/src/bin/ceevee-eval.rs') != ''
-        timeout-minutes: 15
+        timeout-minutes: ${{ runner.os == 'macOS' && 12 || 25 }}
+        continue-on-error: ${{ runner.os == 'macOS' }}
         shell: bash
         run: |
           : > eval.txt
