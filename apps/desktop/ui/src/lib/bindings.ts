@@ -19,6 +19,8 @@ export type AppInfo = {
 export type Event = 
 /**  A job row changed state or progress (`job` table). */
 { type: "job_updated"; job_id: number } | 
+/**  A scheduled task is due; the owning feature crate should start it. */
+{ type: "task_due"; task: string } | 
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
 

@@ -5,6 +5,7 @@
 
 mod bus;
 mod error;
+pub mod schedule;
 
 pub use bus::{Event, EventBus};
 pub use error::{Error, Result};

@@ -158,3 +158,12 @@ async fn pending_migration_triggers_backup() {
     let backup = backup_file(&path).unwrap();
     assert!(backup.exists());
 }
+
+#[tokio::test]
+async fn settings_round_trip_and_overwrite() {
+    let db = Db::open_in_memory().await.unwrap();
+    assert_eq!(db.get_setting("a").await.unwrap(), None);
+    db.set_setting("a", "1").await.unwrap();
+    db.set_setting("a", "2").await.unwrap();
+    assert_eq!(db.get_setting("a").await.unwrap().as_deref(), Some("2"));
+}

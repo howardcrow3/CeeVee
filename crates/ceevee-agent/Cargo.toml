@@ -9,6 +9,12 @@ publish.workspace = true
 
 [dependencies]
 ceevee-core.workspace = true
+ceevee-db.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true

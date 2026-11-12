@@ -474,6 +474,10 @@ name = "ceevee-agent"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "ceevee-db",
+ "chrono",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -494,6 +498,7 @@ dependencies = [
 name = "ceevee-core"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "serde",
  "serde_json",
  "specta",
@@ -516,8 +521,10 @@ dependencies = [
 name = "ceevee-desktop"
 version = "0.1.0"
 dependencies = [
+ "ceevee-agent",
  "ceevee-core",
  "ceevee-db",
+ "chrono",
  "serde",
  "serde_json",
  "specta",
