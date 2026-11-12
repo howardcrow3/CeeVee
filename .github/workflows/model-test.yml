@@ -87,10 +87,14 @@ jobs:
           CEEVEE_TEST_MODEL="$PWD/model/model.gguf" \
             cargo test --release --locked -p ceevee-ai --features llama -- --ignored --nocapture
 
+      # Stops starting new cases after 10 minutes and reports the ones it reached. Set
+      # CEEVEE_EVAL_MIN_SCORE here to fail on a low mean once we know what the 0.6B model scores.
       - name: Eval cases (extract_posting)
         if: hashFiles('crates/ceevee-ai/src/bin/ceevee-eval.rs') != ''
         timeout-minutes: 15
         shell: bash
+        env:
+          CEEVEE_EVAL_BUDGET_SECS: "600"
         run: |
           cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" extract_posting | tee eval.txt
           { echo '### Eval extract_posting: ${{ matrix.name }}'; echo '```'; cat eval.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
@@ -103,6 +107,8 @@ jobs:
         timeout-minutes: 12
         continue-on-error: true
         shell: bash
+        env:
+          CEEVEE_EVAL_BUDGET_SECS: "480"
         run: |
           cargo run --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval -- "$PWD/model/model.gguf" import_resume | tee eval-resume.txt
           { echo '### Eval import_resume: ${{ matrix.name }}'; echo '```'; cat eval-resume.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
