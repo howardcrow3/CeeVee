@@ -20,5 +20,11 @@
     "targets": ["nsis", "dmg", "app"],
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"],
     "windows": { "nsis": { "installMode": "currentUser" } }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDE1M0M4Q0UwQTY5RTUwMkMKUldRc1VKNm00SXc4RlMva2RpRTllTGdkLzRkazNtQ2IrQkhyd0dQclJ0d3lMR2hHT3ljTEU5dlgK",
+      "endpoints": ["https://dl.turtlebox.studio/ceevee/updates/v1/stable.json"]
+    }
   }
 }
