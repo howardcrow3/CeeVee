@@ -81,6 +81,7 @@ impl LlmBackend for Scripted {
 #[tokio::test]
 async fn runs_cases_and_reports() {
     let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
+    let cases = &cases[..3];
     // Case 1 answered perfectly, case 2 wrong in one field, case 3 never valid.
     let first = cases[0].expected.to_string();
     let mut second = cases[1].expected.clone();
@@ -90,7 +91,7 @@ async fn runs_cases_and_reports() {
         Scripted(Arc::new(Mutex::new(replies)), false),
         std::time::Duration::from_secs(60),
     );
-    let report = run_eval(&w, &EXTRACT_POSTING, &cases).await;
+    let report = run_eval(&w, &EXTRACT_POSTING, cases).await;
     assert_eq!(report.cases[0].score, Some(1.0));
     let s1 = report.cases[1].score.unwrap();
     assert!((s1 - 6.0 / 7.0).abs() < 1e-9, "{s1}");
@@ -121,4 +122,69 @@ fn tolerance_makes_a_near_number_right() {
         score_case(&json!({"score": 85}), &json!({"score": 86})).0,
         0.0
     );
+}
+
+/// Every expected value must itself be a legal answer, so a typo in the data cannot make a case
+/// impossible to score 1.0 on.
+#[test]
+fn expected_values_satisfy_the_task_schema_and_names_are_unique() {
+    let minimum = [("extract_posting", 12), ("import_resume", 8)];
+    for (id, min) in minimum {
+        let schema = builtin_task(id).unwrap().schema_value().unwrap();
+        let props = schema["properties"].as_object().unwrap();
+        let cases = parse_cases(builtin_cases(id).unwrap()).unwrap();
+        assert!(
+            cases.len() >= min,
+            "{id} has {} cases, want at least {min}",
+            cases.len()
+        );
+        let mut names = std::collections::BTreeSet::new();
+        for c in &cases {
+            assert!(
+                names.insert(c.name.clone()),
+                "{id}: duplicate case name {}",
+                c.name
+            );
+            for (key, value) in c.expected.as_object().unwrap() {
+                crate::validate::validate(&props[key], value)
+                    .unwrap_or_else(|e| panic!("{id}/{}: {key}: {e}", c.name));
+            }
+            let text = c.vars.values().next().unwrap();
+            assert!(!text.trim().is_empty(), "{id}/{}", c.name);
+        }
+    }
+}
+
+/// A model that answers every case exactly as expected scores 1.0; this guards the scorer and
+/// the case files together.
+#[tokio::test]
+async fn a_perfect_model_scores_one_on_every_extract_posting_case() {
+    let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
+    let replies: Vec<String> = cases.iter().map(|c| c.expected.to_string()).collect();
+    let w = ModelWorker::spawn(
+        Scripted(Arc::new(Mutex::new(replies)), false),
+        std::time::Duration::from_secs(60),
+    );
+    let report = run_eval(&w, &EXTRACT_POSTING, &cases).await;
+    assert_eq!(report.failures(), 0, "{}", report.summary());
+    assert_eq!(report.mean_score(), 1.0);
+}
+
+#[tokio::test]
+async fn a_spent_budget_skips_the_remaining_cases_and_says_so() {
+    let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
+    let w = ModelWorker::spawn(
+        Scripted(Arc::new(Mutex::new(vec![])), false),
+        std::time::Duration::from_secs(60),
+    );
+    let report = run_eval_within(
+        &w,
+        &EXTRACT_POSTING,
+        &cases,
+        Some(std::time::Duration::ZERO),
+    )
+    .await;
+    assert!(report.cases.is_empty());
+    assert_eq!(report.skipped, cases.len());
+    assert!(report.summary().contains("skipped"));
 }
