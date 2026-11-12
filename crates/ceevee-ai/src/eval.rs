@@ -207,6 +207,16 @@ pub async fn run_eval(worker: &ModelWorker, spec: &TaskSpec, cases: &[Case]) -> 
 pub fn builtin_cases(task_id: &str) -> Option<&'static str> {
     match task_id {
         "extract_posting" => Some(include_str!("../evals/extract_posting.json")),
+        "import_resume" => Some(include_str!("../evals/import_resume.json")),
+        _ => None,
+    }
+}
+
+/// Look up a built-in task by id.
+pub fn builtin_task(task_id: &str) -> Option<&'static TaskSpec> {
+    match task_id {
+        "extract_posting" => Some(&crate::task::EXTRACT_POSTING),
+        "import_resume" => Some(&crate::task::IMPORT_RESUME),
         _ => None,
     }
 }

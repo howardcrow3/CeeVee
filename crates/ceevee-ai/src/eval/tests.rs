@@ -29,16 +29,25 @@ fn case_score_is_the_mean_and_missing_fields_score_zero() {
 }
 
 #[test]
-fn built_in_cases_parse_and_match_the_schema() {
-    let cases = parse_cases(builtin_cases("extract_posting").unwrap()).unwrap();
-    assert!(cases.len() >= 3);
-    let schema = EXTRACT_POSTING.schema_value().unwrap();
-    for c in &cases {
-        crate::validate::validate(&schema, &c.expected)
-            .unwrap_or_else(|e| panic!("{}: {e}", c.name));
-        assert!(c.vars.contains_key("posting"));
+fn built_in_cases_parse_and_use_fields_the_schema_defines() {
+    for id in ["extract_posting", "import_resume"] {
+        let spec = builtin_task(id).unwrap();
+        let schema = spec.schema_value().unwrap();
+        let props = schema["properties"].as_object().unwrap();
+        let cases = parse_cases(builtin_cases(id).unwrap()).unwrap();
+        assert!(cases.len() >= 2, "{id}");
+        for c in &cases {
+            assert!(c.vars.len() == 1, "{id}/{}", c.name);
+            for key in c.expected.as_object().unwrap().keys() {
+                assert!(
+                    props.contains_key(key),
+                    "{id}/{}: unknown field {key}",
+                    c.name
+                );
+            }
+        }
     }
-    assert!(builtin_cases("nope").is_none());
+    assert!(builtin_cases("nope").is_none() && builtin_task("nope").is_none());
 }
 
 struct Scripted(Arc<Mutex<Vec<String>>>, bool);

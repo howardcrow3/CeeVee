@@ -6,6 +6,7 @@ use serde::Deserialize;
 
 use super::*;
 use crate::backend::LlmBackend;
+use serde_json::Value;
 
 /// Fake engine that answers from a script and records every prompt it was given.
 struct Scripted {
@@ -135,4 +136,23 @@ async fn gives_up_after_two_attempts() {
     .await
     .unwrap_err();
     assert!(err.to_string().contains("failed after 2 attempts"), "{err}");
+}
+
+#[test]
+fn import_resume_task_compiles_and_accepts_a_sample() {
+    let spec = &IMPORT_RESUME;
+    assert!(spec.grammar().unwrap().contains("root ::="));
+    let schema = spec.schema_value().unwrap();
+    let sample = r#"{"name":"Maria Lopez","email":null,"phone":null,"location":"Columbus, OH","summary":null,
+        "work":[{"company":"Northfield","title":"Analyst","start":"2021-03","end":null,"current":true,"highlights":["Built dashboards"]}],
+        "education":[{"school":"Ohio State","degree":"B.S.","field":"Industrial Engineering","end":"2018"}],
+        "skills":["SQL"]}"#;
+    assert!(parse_output::<Value>(&schema, sample).is_ok());
+    let bad = sample.replace("\"current\":true", "\"current\":\"yes\"");
+    assert!(parse_output::<Value>(&schema, &bad)
+        .unwrap_err()
+        .contains("work[0].current"));
+    assert!(render(spec.prompt, &[("resume", "RESUME TEXT")])
+        .unwrap()
+        .contains("RESUME TEXT"));
 }
