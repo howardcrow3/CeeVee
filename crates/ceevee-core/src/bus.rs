@@ -2,11 +2,14 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
 /// Events published by feature crates. Variants are added as features land.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, specta::Type)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
     /// A job row changed state or progress (`job` table).
-    JobUpdated { job_id: i64 },
+    JobUpdated {
+        #[specta(type = u32)] // specta forbids i64; ids stay far below 2^32
+        job_id: i64,
+    },
     /// A setting changed.
     SettingChanged { key: String },
 }
