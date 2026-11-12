@@ -37,7 +37,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - id: m
-        run: echo "matrix=$(jq -c '{include: .models}' evals/models.json)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "matrix=$(jq -c '{include: .models}' evals/models.json)" >> "$GITHUB_OUTPUT"
 
   score:
     name: score ${{ matrix.id }}
