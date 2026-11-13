@@ -119,3 +119,40 @@ async fn state_changes() {
     set_state(&db, id, State::Dismissed).await.unwrap();
     assert!(set_state(&db, 999, State::Saved).await.is_err());
 }
+
+#[tokio::test]
+async fn recent_lists_newest_first_and_hides_dismissed() {
+    let db = Db::open_in_memory().await.unwrap();
+    let Ingest::New(a) = ingest(
+        &db,
+        &p("x", "https://a/1", "Acme", "Engineer", "Columbus"),
+        T0,
+    )
+    .await
+    .unwrap() else {
+        panic!()
+    };
+    let Ingest::New(b) = ingest(
+        &db,
+        &p("x", "https://a/2", "Globex", "Designer", "Remote"),
+        T1,
+    )
+    .await
+    .unwrap() else {
+        panic!()
+    };
+    let Ingest::New(c) = ingest(
+        &db,
+        &p("x", "https://a/3", "Initech", "Analyst", "Austin"),
+        T1,
+    )
+    .await
+    .unwrap() else {
+        panic!()
+    };
+    set_state(&db, c, State::Dismissed).await.unwrap();
+    let rows = recent(&db, 10).await.unwrap();
+    assert_eq!(rows.iter().map(|r| r.id).collect::<Vec<_>>(), vec![b, a]);
+    assert_eq!(rows[0].company.as_deref(), Some("Globex"));
+    assert_eq!(recent(&db, 1).await.unwrap().len(), 1);
+}

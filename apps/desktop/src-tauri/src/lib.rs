@@ -29,7 +29,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
-            commands::export_resume_pdf
+            commands::export_resume_pdf,
+            commands::list_jobs,
+            commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()
 }

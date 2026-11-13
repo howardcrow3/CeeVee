@@ -14,6 +14,7 @@ tauri-build = { version = "2", features = [] }
 ceevee-core.workspace = true
 ceevee-agent.workspace = true
 ceevee-db.workspace = true
+ceevee-search = { path = "../../../crates/ceevee-search" }
 ceevee-network = { path = "../../../crates/ceevee-network" }
 ceevee-docs = { path = "../../../crates/ceevee-docs" }
 chrono.workspace = true
