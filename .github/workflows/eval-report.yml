@@ -1,7 +1,7 @@
 name: Model eval report
 
 # Scores every model listed in evals/models.json on every eval task and builds one comparison
-# report (job summary plus an eval-report artifact with markdown and HTML). Nothing here can fail a
+# report (job summary plus an eval-report artifact with markdown, HTML and an interactive dashboard). Nothing here can fail a
 # pull request or a merge: the jobs are not required checks and every step tolerates failure.
 # Pass/fail floors live in evals/thresholds.json and are null until we have enough history.
 
@@ -16,6 +16,7 @@ on:
       - "crates/ceevee-ai/prompts/**"
       - "evals/**"
       - "scripts/eval-report.mjs"
+      - "scripts/eval-dashboard.*"
       - ".github/workflows/eval-report.yml"
 
 permissions:
@@ -131,6 +132,10 @@ jobs:
           cat report/eval-report.md >> "$GITHUB_STEP_SUMMARY"
           # Also in the log, so it can be read without downloading the artifact.
           echo "----- eval-report.md -----"; cat report/eval-report.md
+          # The interactive dashboard (needs evals/history.json from the checkout for the trends).
+          node scripts/eval-dashboard.mjs results report --history evals/history.json --thresholds evals/thresholds.json
+          # One history entry, so it can be committed to evals/history.json.
+          echo "----- eval-data.json -----"; cat report/eval-data.json | node -e 'const h=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(JSON.stringify(h.runs[h.runs.length-1]))' || true
           echo "----- raw results -----"; cat results/*.json 2>/dev/null | head -c 20000 || true
       - uses: actions/upload-artifact@v4
         with:

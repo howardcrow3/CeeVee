@@ -79,3 +79,27 @@ test('eval models have pinned hashes and match the model catalog', () => {
     assert.ok(models.some((m) => m.url === c.url), `${c.id} is shipped but not scored`);
   }
 });
+
+import { buildRun, mergeHistory, buildData, render } from './eval-dashboard.mjs';
+import { readFileSync } from 'node:fs';
+
+test('dashboard keeps one entry per run and embeds data safely', () => {
+  const r = [{ model: 'm', task: 'extract_posting', version: 1, mean_score: 0.5, failed: 1, skipped: 2, total: 5, seconds: 3,
+    cases: [{ name: 'a</script>', score: 1, seconds: 1, attempts: 1, error: null, fields: { x: 1 } }, { name: 'b', score: 0, error: 'bad' }] }];
+  const run = buildRun(r, { id: 'run-1', commit: 'abc', date: '2026-01-01' });
+  assert.equal(run.results[0].cases[1].score, null);
+  let h = mergeHistory({ runs: [] }, run);
+  h = mergeHistory(h, { ...run, commit: 'def' });
+  assert.equal(h.runs.length, 1);
+  assert.equal(h.runs[0].commit, 'def');
+  const tpl = readFileSync(new URL('./eval-dashboard.template.html', import.meta.url), 'utf8');
+  const html = render(tpl, buildData({ history: h, models: [{ id: 'm' }], thresholds: {} }));
+  assert.ok(!html.includes('/*__DATA__*/'));
+  assert.ok(!html.includes('a</script>'));
+});
+
+test('committed history matches the models and tasks the dashboard expects', () => {
+  const h = JSON.parse(readFileSync(new URL('../evals/history.json', import.meta.url), 'utf8'));
+  const ids = JSON.parse(readFileSync(new URL('../evals/models.json', import.meta.url), 'utf8')).models.map((m) => m.id);
+  for (const run of h.runs) for (const x of run.results) assert.ok(ids.includes(x.model), x.model);
+});
