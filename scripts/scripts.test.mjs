@@ -81,7 +81,6 @@ test('eval models have pinned hashes and match the model catalog', () => {
 });
 
 import { buildRun, mergeHistory, buildData, render } from './eval-dashboard.mjs';
-import { readFileSync } from 'node:fs';
 
 test('dashboard keeps one entry per run and embeds data safely', () => {
   const r = [{ model: 'm', task: 'extract_posting', version: 1, mean_score: 0.5, failed: 1, skipped: 2, total: 5, seconds: 3,
