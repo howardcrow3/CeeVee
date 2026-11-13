@@ -16,8 +16,8 @@
         "properties": {
           "company": {"type": "string", "maxLength": 160},
           "title": {"type": "string", "maxLength": 160},
-          "start": {"type": ["string", "null"], "maxLength": 7},
-          "end": {"type": ["string", "null"], "maxLength": 7},
+          "start": {"type": ["string", "null"], "maxLength": 20},
+          "end": {"type": ["string", "null"], "maxLength": 20},
           "current": {"type": "boolean"},
           "highlights": {"type": "array", "maxItems": 8, "items": {"type": "string", "maxLength": 300}}
         }
@@ -33,7 +33,7 @@
           "school": {"type": "string", "maxLength": 160},
           "degree": {"type": ["string", "null"], "maxLength": 120},
           "field": {"type": ["string", "null"], "maxLength": 120},
-          "end": {"type": ["string", "null"], "maxLength": 7}
+          "end": {"type": ["string", "null"], "maxLength": 20}
         }
       }
     },
