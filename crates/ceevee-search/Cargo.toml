@@ -12,6 +12,7 @@ ceevee-core.workspace = true
 ceevee-db.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+reqwest.workspace = true
 sqlx.workspace = true
 
 [dev-dependencies]
