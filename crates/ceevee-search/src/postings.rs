@@ -190,5 +190,44 @@ pub async fn for_category(db: &Db, category_id: i64, min_score: f64) -> Result<V
     Ok(out)
 }
 
+/// One line of the jobs list.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JobRow {
+    pub id: i64,
+    pub title: String,
+    pub company: Option<String>,
+    pub location: Option<String>,
+    pub state: String,
+    pub score: Option<f64>,
+    pub url: String,
+    pub first_seen: String,
+}
+
+/// Postings you have not dismissed, newest first.
+pub async fn recent(db: &Db, limit: i64) -> Result<Vec<JobRow>> {
+    let rows = sqlx::query(
+        "SELECT p.id, p.title, c.name AS company, p.location, p.state, p.score, p.url, p.first_seen \
+         FROM posting p LEFT JOIN company c ON c.id = p.company_id \
+         WHERE p.state != 'dismissed' ORDER BY p.first_seen DESC, p.id DESC LIMIT ?",
+    )
+    .bind(limit)
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    Ok(rows
+        .iter()
+        .map(|r| JobRow {
+            id: r.get("id"),
+            title: r.get("title"),
+            company: r.get("company"),
+            location: r.get("location"),
+            state: r.get("state"),
+            score: r.get("score"),
+            url: r.get("url"),
+            first_seen: r.get("first_seen"),
+        })
+        .collect())
+}
+
 #[cfg(test)]
 mod tests;

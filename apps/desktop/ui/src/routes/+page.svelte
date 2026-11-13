@@ -1,27 +1,29 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { appInfo, describe, type AppInfo } from '$lib/api';
+  import { commands } from '$lib/bindings';
 
   let info = $state<AppInfo | null>(null);
   let error = $state('');
+  let waiting = $state(0);
 
   onMount(async () => {
     try {
       info = await appInfo();
+      const n = await commands.pendingApprovalCount();
+      if (n.status === 'ok') waiting = n.data;
     } catch (e) {
       error = String(e);
     }
   });
 </script>
 
-<main>
-  <h1>CeeVee</h1>
-  <p>Your job search, on your own computer.</p>
-  {#if info}<p class="meta">{describe(info)}</p>{/if}
-  {#if error}<p class="meta">Running outside the desktop app: {error}</p>{/if}
-</main>
-
-<style>
-  main { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
-  .meta { color: #666; font-size: 0.9rem; }
-</style>
+<span class="label">Today</span>
+<h1>Your job search, on your own computer</h1>
+{#if waiting > 0}
+  <p><span class="dot on"></span>{waiting} {waiting === 1 ? 'item is' : 'items are'} waiting for your approval.</p>
+{:else}
+  <p>Nothing is waiting on you yet. Add your resume in Documents and set the kinds of jobs you want in Settings, and CeeVee starts searching.</p>
+{/if}
+{#if info}<p>{describe(info)}</p>{/if}
+{#if error}<p>Running outside the desktop app: {error}</p>{/if}

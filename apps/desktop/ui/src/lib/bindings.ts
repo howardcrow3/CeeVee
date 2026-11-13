@@ -9,6 +9,14 @@ export const commands = {
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
 	installUpdate: () => typedError<null, string>(__TAURI_INVOKE("install_update")),
+	/**  Import the text of LinkedIn's Connections.csv. */
+	importLinkedinConnections: (csvText: string) => typedError<LinkedInImport, string>(__TAURI_INVOKE("import_linkedin_connections", { csvText })),
+	/**  Render resume JSON to PDF and write it to `path`. */
+	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
+	/**  Jobs found by searches that you have not dismissed, newest first. */
+	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
+	/**  How many proposals are waiting for you to approve. */
+	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
 
 /* Types */
@@ -27,6 +35,36 @@ export type Event =
 { type: "task_due"; task: string } | 
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
+
+/**  One line of the jobs list. */
+export type JobLine = JobLine_Serialize | JobLine_Deserialize;
+
+/**  One line of the jobs list. */
+export type JobLine_Deserialize = {
+	id: number,
+	title: string,
+	company?: string | null,
+	location?: string | null,
+	state: string,
+	score?: number | null,
+	url: string,
+};
+
+/**  One line of the jobs list. */
+export type JobLine_Serialize = {
+	id: number,
+	title: string,
+	company: string | null,
+	location: string | null,
+	state: string,
+	score: number | null,
+	url: string,
+};
+
+export type LinkedInImport = {
+	added: number,
+	updated: number,
+};
 
 export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;
 
