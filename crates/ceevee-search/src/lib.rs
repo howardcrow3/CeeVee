@@ -5,6 +5,7 @@
 pub mod categories;
 pub mod companies;
 pub mod postings;
+pub mod sources;
 pub mod tracking;
 
 fn db_err(e: sqlx::Error) -> ceevee_core::Error {
