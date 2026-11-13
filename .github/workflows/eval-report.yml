@@ -76,6 +76,11 @@ jobs:
       - name: Build the eval tool
         run: cargo build --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval
 
+      - name: Machine info
+        run: |
+          echo "cpu: $(sysctl -n machdep.cpu.brand_string)  cores: $(sysctl -n hw.ncpu)  ram bytes: $(sysctl -n hw.memsize)"
+          sw_vers
+
       - name: Score each task
         continue-on-error: true
         # macOS has no `timeout` command, so each task runs in the background and is killed after

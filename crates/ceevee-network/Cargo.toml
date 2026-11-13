@@ -9,6 +9,13 @@ publish.workspace = true
 
 [dependencies]
 ceevee-core.workspace = true
+ceevee-db.workspace = true
+ceevee-search = { path = "../ceevee-search" }
+csv = "1"
+sqlx.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
 
 [lints]
 workspace = true
