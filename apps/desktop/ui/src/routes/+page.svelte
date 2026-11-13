@@ -14,14 +14,8 @@
   });
 </script>
 
-<main>
-  <h1>CeeVee</h1>
-  <p>Your job search, on your own computer.</p>
-  {#if info}<p class="meta">{describe(info)}</p>{/if}
-  {#if error}<p class="meta">Running outside the desktop app: {error}</p>{/if}
-</main>
-
-<style>
-  main { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
-  .meta { color: #666; font-size: 0.9rem; }
-</style>
+<span class="label">Today</span>
+<h1>Your job search, on your own computer</h1>
+<p>Nothing is waiting on you yet. Add your resume in Documents and set the kinds of jobs you want in Settings, and CeeVee starts searching.</p>
+{#if info}<p>{describe(info)}</p>{/if}
+{#if error}<p>Running outside the desktop app: {error}</p>{/if}
