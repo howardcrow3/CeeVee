@@ -46,3 +46,46 @@ pub async fn export_resume_pdf(resume_json: String, path: String, a4: bool) -> R
     .map_err(|e| e.to_string())?;
     std::fs::write(path, pdf).map_err(|e| e.to_string())
 }
+
+/// One line of the jobs list.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct JobLine {
+    pub id: u32,
+    pub title: String,
+    pub company: Option<String>,
+    pub location: Option<String>,
+    pub state: String,
+    pub score: Option<f64>,
+    pub url: String,
+}
+
+/// Jobs found by searches that you have not dismissed, newest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLine>, String> {
+    let rows = ceevee_search::postings::recent(&db, 200)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|r| JobLine {
+            id: r.id as u32,
+            title: r.title,
+            company: r.company,
+            location: r.location,
+            state: r.state,
+            score: r.score,
+            url: r.url,
+        })
+        .collect())
+}
+
+/// How many proposals are waiting for you to approve.
+#[tauri::command]
+#[specta::specta]
+pub async fn pending_approval_count(db: tauri::State<'_, ceevee_db::Db>) -> Result<u32, String> {
+    let n = ceevee_agent::approvals::pending_count(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(n as u32)
+}
