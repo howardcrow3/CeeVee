@@ -1,0 +1,250 @@
+<title>Model Eval Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column. Verdict strip first, then model-by-task chart, status matrix, case drilldown, trends. */
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --fg: #15191f; --muted: #5d6673; --line: #dde1e7;
+  --good: #1b7f4c; --warn: #9a6200; --bad: #b3261e;
+  --good-bg: #dff3e7; --warn-bg: #fbecc8; --bad-bg: #f8dbd8; --none-bg: #eceef2;
+  --m0: #1f7a8c; --m1: #d9822b; --m2: #6a4fb3;
+  --focus: #1f5fd6;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #101318; --panel: #181c23; --fg: #e8ebf0; --muted: #9aa3b0; --line: #2a303a;
+  --good: #58c98a; --warn: #e0b04a; --bad: #f08a82;
+  --good-bg: #17382a; --warn-bg: #3d3014; --bad-bg: #402220; --none-bg: #222833;
+  --m0: #4fb6c9; --m1: #f0a35a; --m2: #a38cf0; --focus: #7fa8ff; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #101318; --panel: #181c23; --fg: #e8ebf0; --muted: #9aa3b0; --line: #2a303a;
+  --good: #58c98a; --warn: #e0b04a; --bad: #f08a82;
+  --good-bg: #17382a; --warn-bg: #3d3014; --bad-bg: #402220; --none-bg: #222833;
+  --m0: #4fb6c9; --m1: #f0a35a; --m2: #a38cf0; --focus: #7fa8ff; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.5 var(--sans); padding-block: 24px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+main { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+h1 { font: 600 22px/1.2 var(--sans); margin: 0; }
+h2 { font: 600 15px/1.3 var(--sans); margin: 0 0 12px; }
+.sub { color: var(--muted); font-size: 13px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+header { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; align-items: end; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select, button.tab { font: 13px var(--sans); color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+button.tab[aria-selected="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+select:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.models { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.mcard { border-top: 4px solid var(--c); }
+.mcard .name { font-weight: 600; }
+.mcard .big { font: 500 28px/1.1 var(--mono); margin: 6px 0 2px; }
+.chip { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; margin: 2px 4px 2px 0; background: var(--none-bg); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); } .chip.bad { background: var(--bad-bg); color: var(--bad); } .chip.good { background: var(--good-bg); color: var(--good); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 8px; font-size: 13px; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; background: var(--c); }
+.scroll { overflow-x: auto; }
+svg text { fill: var(--muted); font: 11px var(--mono); }
+svg .axis { stroke: var(--line); } svg .val { fill: var(--fg); }
+table { border-collapse: collapse; width: 100%; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 500; color: var(--muted); font-size: 12px; }
+td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.cellbox { border-radius: 4px; padding: 4px 8px; display: inline-block; min-width: 56px; text-align: center; font-family: var(--mono); }
+.s-good { background: var(--good-bg); color: var(--good); } .s-warn { background: var(--warn-bg); color: var(--warn); }
+.s-bad { background: var(--bad-bg); color: var(--bad); } .s-none { background: var(--none-bg); color: var(--muted); }
+.tag { display: block; font: 11px var(--sans); margin-top: 2px; }
+tr.case { cursor: pointer; } tr.case:hover td { background: var(--none-bg); }
+tr.detail td { background: var(--none-bg); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.fields h4 { margin: 0 0 4px; font-size: 12px; }
+.fields .f { display: flex; justify-content: space-between; gap: 8px; font-family: var(--mono); font-size: 12px; }
+.err { color: var(--bad); font-family: var(--mono); font-size: 12px; overflow-wrap: anywhere; }
+.flags { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.flags li { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+.empty { color: var(--muted); padding: 8px 0; }
+@media (prefers-reduced-motion: no-preference) { .cellbox { transition: background .15s; } }
+</style>
+
+<main>
+  <header>
+    <div>
+      <h1>CeeVee model eval dashboard</h1>
+      <div class="sub" id="runline"></div>
+    </div>
+    <div class="controls">
+      <label class="sub" for="runsel">Run</label>
+      <select id="runsel"></select>
+    </div>
+  </header>
+
+  <section id="models" class="models" aria-label="Model summary"></section>
+
+  <section class="panel">
+    <h2>Mean score by task</h2>
+    <div class="legend" id="legend"></div>
+    <div class="scroll"><div id="bars" style="min-width:560px"></div></div>
+    <div class="sub">Hatched bars did not run every case (time budget or cap), so they cover fewer cases. 0 to 1, higher is better.</div>
+  </section>
+
+  <section class="panel">
+    <h2>Needs attention</h2>
+    <ul class="flags" id="flags"></ul>
+  </section>
+
+  <section class="panel">
+    <h2>Status by model and task</h2>
+    <div class="scroll"><table id="matrix"></table></div>
+  </section>
+
+  <section class="panel">
+    <h2>Cases</h2>
+    <div class="controls" id="tasktabs" role="tablist" style="margin-bottom:12px"></div>
+    <div class="scroll"><table id="cases"></table></div>
+    <div class="sub" style="margin-top:8px">Select a row to see field scores, time, attempts and errors for each model.</div>
+  </section>
+
+  <section class="panel">
+    <h2>Trend across runs</h2>
+    <div class="controls" id="trendtabs" role="tablist" style="margin-bottom:12px"></div>
+    <div class="scroll"><div id="trend" style="min-width:480px"></div></div>
+    <div class="sub">Hollow points are runs where that model did not finish every case.</div>
+  </section>
+</main>
+
+<script>
+const DATA = /*__DATA__*/null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const f2 = (x) => (x === null || x === undefined ? 'n/a' : x.toFixed(2));
+const mcolor = (i) => `var(--m${i % 3})`;
+const runs = DATA.runs.slice().sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+const models = DATA.models, tasks = DATA.tasks;
+let runIdx = runs.length - 1, task = tasks[0], ttask = tasks[0];
+
+const cell = (run, m, t) => run.results.find((r) => r.model === m && r.task === t) || null;
+const incomplete = (c) => c && (c.skipped > 0 || c.cases.length < c.total);
+const scoreClass = (s) => (s === null ? 's-bad' : s >= 0.9 ? 's-good' : s >= 0.5 ? 's-warn' : 's-bad');
+const floorOf = (m, t) => { const v = DATA.thresholds?.models?.[m]?.[t] ?? DATA.thresholds?.default?.[t]; return typeof v === 'number' ? v : null; };
+const caseFailed = (c) => c.score === null || c.error;
+const label = (m) => models.find((x) => x.id === m)?.label ?? m;
+const short = (m) => label(m).replace(/ \(.*/, '');
+
+function render() {
+  const run = runs[runIdx];
+  $('runline').innerHTML = `Commit <span class="mono">${esc(run.commit)}</span> · ${esc(run.date)}` +
+    (run.url ? ` · <a href="${esc(run.url)}" target="_blank" rel="noopener">workflow run</a>` : '') +
+    ` · Pass/fail floors: ${tasks.some((t) => models.some((m) => floorOf(m.id, t) !== null)) ? 'set' : 'not set yet'}`;
+  $('runsel').innerHTML = runs.map((r, i) => `<option value="${i}" ${i === runIdx ? 'selected' : ''}>${esc(r.date)} · ${esc(r.commit)}${r.partial ? ' (partial)' : ''}</option>`).join('');
+
+  // Model cards
+  $('models').innerHTML = models.map((m, i) => {
+    const cs = tasks.map((t) => cell(run, m.id, t));
+    const done = cs.filter(Boolean);
+    const avg = done.length ? done.reduce((a, c) => a + c.mean, 0) / done.length : null;
+    const notRun = cs.filter((c) => !c).length, cut = done.filter(incomplete).length;
+    const fails = done.reduce((a, c) => a + c.failed, 0);
+    const secs = done.reduce((a, c) => a + (c.seconds || 0), 0);
+    const chips = [
+      notRun ? `<span class="chip bad">${notRun} task${notRun > 1 ? 's' : ''} not run</span>` : '',
+      cut ? `<span class="chip warn">${cut} cut off</span>` : '',
+      fails ? `<span class="chip bad">${fails} case${fails > 1 ? 's' : ''} failed</span>` : '',
+      !notRun && !cut && !fails ? '<span class="chip good">complete</span>' : '',
+    ].join('');
+    return `<div class="panel mcard" style="--c:${mcolor(i)}"><div class="name">${esc(m.label)}</div>
+      <div class="big">${f2(avg)}</div><div class="sub">average over ${done.length} of ${tasks.length} tasks${secs ? ` · ${(secs / 60).toFixed(0)} min scored` : ''}</div><div>${chips}</div></div>`;
+  }).join('');
+
+  $('legend').innerHTML = models.map((m, i) => `<span><i style="--c:${mcolor(i)}"></i>${esc(short(m.id))}</span>`).join('');
+  $('bars').innerHTML = barChart(run);
+  flags(run); matrix(run); caseTable(run); trend();
+}
+
+function barChart(run) {
+  const W = 760, H = 280, L = 36, B = 52, T = 14, R = 8, pw = W - L - R, ph = H - T - B;
+  const gw = pw / tasks.length, bw = Math.min(40, (gw - 16) / models.length);
+  const y = (v) => T + ph * (1 - v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Mean score by task and model"><defs>` +
+    models.map((m, i) => `<pattern id="h${i}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="${mcolor(i)}" opacity=".35"/><rect width="3" height="6" fill="${mcolor(i)}"/></pattern>`).join('') + '</defs>';
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v.toFixed(2)}</text>`;
+  tasks.forEach((t, ti) => {
+    const x0 = L + ti * gw + (gw - bw * models.length) / 2;
+    models.forEach((m, mi) => {
+      const c = cell(run, m.id, t), x = x0 + mi * bw;
+      if (!c) { s += `<text x="${x + bw / 2}" y="${y(0) - 6}" text-anchor="middle" style="fill:var(--bad)">n/r</text>`; return; }
+      const h = ph * c.mean;
+      s += `<rect x="${x + 1}" y="${y(c.mean)}" width="${bw - 2}" height="${Math.max(h, 1)}" fill="${incomplete(c) ? `url(#h${mi})` : mcolor(mi)}" rx="2"><title>${esc(short(m.id))} · ${t}: ${f2(c.mean)}${incomplete(c) ? ` (${c.cases.length} of ${c.total} cases)` : ''}</title></rect>` +
+        `<text class="val" x="${x + bw / 2}" y="${y(c.mean) - 4}" text-anchor="middle">${c.mean.toFixed(2)}</text>`;
+    });
+    s += `<text x="${L + ti * gw + gw / 2}" y="${H - B + 18}" text-anchor="middle">${esc(t)}</text>`;
+  });
+  return s + '</svg>';
+}
+
+function flags(run) {
+  const out = [];
+  for (const m of models) for (const t of tasks) {
+    const c = cell(run, m.id, t);
+    if (!c) { out.push(['bad', 'not run', `${short(m.id)} · ${t}`, 'Hit its wall-clock cap or crashed before writing results.']); continue; }
+    if (incomplete(c)) out.push(['warn', 'cut off', `${short(m.id)} · ${t}`, `Scored ${c.cases.length} of ${c.total} cases before the time budget ran out.`]);
+    for (const k of c.cases.filter(caseFailed)) out.push(['bad', 'failed', `${short(m.id)} · ${t} · ${k.name}`, k.error || 'No valid output after the retry.']);
+  }
+  $('flags').innerHTML = out.length ? out.map(([k, tag, who, why]) => `<li><span class="chip ${k}">${tag}</span><b>${esc(who)}</b><span class="sub">${esc(why)}</span></li>`).join('') : '<li class="empty">Nothing flagged in this run.</li>';
+}
+
+function matrix(run) {
+  $('matrix').innerHTML = `<tr><th>Model</th>${tasks.map((t) => `<th>${esc(t)}</th>`).join('')}</tr>` + models.map((m, i) =>
+    `<tr><th style="color:var(--fg)"><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${mcolor(i)};margin-right:6px"></i>${esc(short(m.id))}</th>` + tasks.map((t) => {
+      const c = cell(run, m.id, t);
+      if (!c) return '<td><span class="cellbox s-bad">not run</span></td>';
+      const fl = floorOf(m.id, t);
+      const note = [c.failed ? `${c.failed} failed` : '', incomplete(c) ? `${c.cases.length}/${c.total} cases` : '', fl === null ? '' : (c.mean >= fl ? 'pass' : 'fail'), c.seconds ? `${Math.round(c.seconds)}s` : ''].filter(Boolean).join(' · ');
+      return `<td><span class="cellbox ${scoreClass(c.mean)}">${f2(c.mean)}</span>${note ? `<span class="tag sub">${esc(note)}</span>` : ''}</td>`;
+    }).join('') + '</tr>').join('');
+}
+
+function tabs(el, cur, onpick) {
+  el.innerHTML = tasks.map((t) => `<button class="tab" role="tab" aria-selected="${t === cur}" data-t="${t}">${esc(t)}</button>`).join('');
+  el.onclick = (e) => { const b = e.target.closest('button'); if (b) onpick(b.dataset.t); };
+}
+
+function caseTable(run) {
+  tabs($('tasktabs'), task, (t) => { task = t; caseTable(runs[runIdx]); });
+  const names = [];
+  for (const m of models) for (const k of cell(run, m.id, task)?.cases ?? []) if (!names.includes(k.name)) names.push(k.name);
+  const rows = names.map((n, ri) => {
+    const cs = models.map((m) => cell(run, m.id, task)?.cases.find((k) => k.name === n) ?? null);
+    const tds = cs.map((k) => !k ? '<td><span class="cellbox s-none">-</span></td>' :
+      caseFailed(k) ? '<td><span class="cellbox s-bad">FAIL</span></td>' : `<td><span class="cellbox ${scoreClass(k.score)}">${f2(k.score)}</span></td>`).join('');
+    const det = models.map((m, i) => {
+      const k = cs[i];
+      if (!k) return `<div><h4>${esc(short(m.id))}</h4><span class="sub">not scored</span></div>`;
+      const fl = Object.entries(k.fields || {}).map(([a, b]) => `<div class="f"><span>${esc(a)}</span><span style="color:var(--${b >= 0.99 ? 'good' : b >= 0.5 ? 'warn' : 'bad'})">${f2(b)}</span></div>`).join('');
+      return `<div><h4>${esc(short(m.id))}${k.seconds ? ` · ${k.seconds.toFixed(0)}s` : ''}${k.attempts ? ` · ${k.attempts} attempt${k.attempts > 1 ? 's' : ''}` : ''}</h4>${fl || '<span class="sub">no field breakdown</span>'}${k.error ? `<div class="err">${esc(k.error)}</div>` : ''}</div>`;
+    }).join('');
+    return `<tr class="case" data-r="${ri}" tabindex="0"><td>${esc(n)}</td>${tds}</tr><tr class="detail" id="d${ri}" hidden><td colspan="${models.length + 1}"><div class="fields">${det}</div></td></tr>`;
+  }).join('');
+  $('cases').innerHTML = `<tr><th>Case</th>${models.map((m) => `<th>${esc(short(m.id))}</th>`).join('')}</tr>` + (rows || `<tr><td class="empty" colspan="${models.length + 1}">No cases scored for this task in this run.</td></tr>`);
+  const toggle = (tr) => { const d = $('d' + tr.dataset.r); d.hidden = !d.hidden; };
+  $('cases').onclick = (e) => { const tr = e.target.closest('tr.case'); if (tr) toggle(tr); };
+  $('cases').onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { const tr = e.target.closest('tr.case'); if (tr) { e.preventDefault(); toggle(tr); } } };
+}
+
+function trend() {
+  tabs($('trendtabs'), ttask, (t) => { ttask = t; trend(); });
+  const W = 760, H = 240, L = 36, R = 16, T = 14, B = 36, pw = W - L - R, ph = H - T - B;
+  const x = (i) => L + (runs.length === 1 ? pw / 2 : (pw * i) / (runs.length - 1)), y = (v) => T + ph * (1 - v);
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Mean score per run for ${esc(ttask)}">`;
+  for (const v of [0, 0.25, 0.5, 0.75, 1]) s += `<line class="axis" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L - 6}" y="${y(v) + 4}" text-anchor="end">${v.toFixed(2)}</text>`;
+  runs.forEach((r, i) => { s += `<text x="${x(i)}" y="${H - 12}" text-anchor="${runs.length === 1 ? 'middle' : i === 0 ? 'start' : i === runs.length - 1 ? 'end' : 'middle'}">${esc(r.date.slice(5))} ${esc(r.commit)}</text>`; });
+  models.forEach((m, mi) => {
+    const pts = runs.map((r, i) => ({ i, c: cell(r, m.id, ttask) })).filter((p) => p.c);
+    if (pts.length > 1) s += `<polyline fill="none" stroke="${mcolor(mi)}" stroke-width="2" points="${pts.map((p) => `${x(p.i)},${y(p.c.mean)}`).join(' ')}"/>`;
+    for (const p of pts) s += `<circle cx="${x(p.i)}" cy="${y(p.c.mean)}" r="5" fill="${incomplete(p.c) ? 'var(--panel)' : mcolor(mi)}" stroke="${mcolor(mi)}" stroke-width="2"><title>${esc(short(m.id))} · ${f2(p.c.mean)}${incomplete(p.c) ? ` (${p.c.cases.length} of ${p.c.total} cases)` : ''}</title></circle>`;
+  });
+  $('trend').innerHTML = s + '</svg>' + `<div class="legend" style="margin-top:6px">${models.map((m, i) => `<span><i style="--c:${mcolor(i)}"></i>${esc(short(m.id))}</span>`).join('')}</div>`;
+}
+
+$('runsel').onchange = (e) => { runIdx = +e.target.value; render(); };
+render();
+</script>
