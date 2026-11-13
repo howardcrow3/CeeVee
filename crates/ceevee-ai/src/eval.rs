@@ -264,6 +264,9 @@ pub struct CaseReport {
     pub fields: Map<String, Value>,
     pub attempts: u32,
     pub took: Duration,
+    /// Length of the model's raw output. With `took` this shows whether a slow case was a slow
+    /// machine or a model that rambles on until the token limit.
+    pub output_chars: usize,
     pub error: Option<String>,
 }
 
@@ -309,6 +312,7 @@ impl Report {
                     "fields": c.fields,
                     "attempts": c.attempts,
                     "seconds": c.took.as_secs_f64(),
+                    "output_chars": c.output_chars,
                     "error": c.error,
                 })
             })
@@ -412,6 +416,7 @@ pub async fn run_eval_within(
                     fields,
                     attempts: out.attempts,
                     took,
+                    output_chars: out.raw.chars().count(),
                     error: None,
                 }
             }
@@ -421,6 +426,7 @@ pub async fn run_eval_within(
                 fields: Map::new(),
                 attempts: 0,
                 took,
+                output_chars: 0,
                 error: Some(e.to_string()),
             },
         });
