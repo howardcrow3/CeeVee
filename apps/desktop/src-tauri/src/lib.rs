@@ -1,6 +1,7 @@
 //! CeeVee desktop shell: window, tray, single instance and the typed command
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
+mod commands;
 #[allow(dead_code)] // called by feature crates as they land
 mod notifications;
 mod scheduler;
@@ -26,7 +27,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .commands(tauri_specta::collect_commands![
             app_info,
             updater::check_for_update,
-            updater::install_update
+            updater::install_update,
+            commands::import_linkedin_connections,
+            commands::export_resume_pdf
         ])
         .typ::<ceevee_core::Event>()
 }
