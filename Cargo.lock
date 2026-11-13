@@ -628,6 +628,7 @@ name = "ceevee-apply"
 version = "0.1.0"
 dependencies = [
  "ceevee-core",
+ "url",
 ]
 
 [[package]]
