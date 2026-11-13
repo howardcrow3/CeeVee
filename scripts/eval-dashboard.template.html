@@ -220,7 +220,7 @@ function caseTable(run) {
       const k = cs[i];
       if (!k) return `<div><h4>${esc(short(m.id))}</h4><span class="sub">not scored</span></div>`;
       const fl = Object.entries(k.fields || {}).map(([a, b]) => `<div class="f"><span>${esc(a)}</span><span style="color:var(--${b >= 0.99 ? 'good' : b >= 0.5 ? 'warn' : 'bad'})">${f2(b)}</span></div>`).join('');
-      return `<div><h4>${esc(short(m.id))}${k.seconds ? ` · ${k.seconds.toFixed(0)}s` : ''}${k.attempts ? ` · ${k.attempts} attempt${k.attempts > 1 ? 's' : ''}` : ''}</h4>${fl || '<span class="sub">no field breakdown</span>'}${k.error ? `<div class="err">${esc(k.error)}</div>` : ''}</div>`;
+      return `<div><h4>${esc(short(m.id))}${k.seconds ? ` · ${k.seconds.toFixed(0)}s` : ''}${k.attempts ? ` · ${k.attempts} attempt${k.attempts > 1 ? 's' : ''}` : ''}${k.outputChars ? ` · ${k.outputChars} chars${k.seconds ? ` (${(k.outputChars / k.seconds).toFixed(0)}/s)` : ''}` : ''}</h4>${fl || '<span class="sub">no field breakdown</span>'}${k.error ? `<div class="err">${esc(k.error)}</div>` : ''}</div>`;
     }).join('');
     return `<tr class="case" data-r="${ri}" tabindex="0"><td>${esc(n)}</td>${tds}</tr><tr class="detail" id="d${ri}" hidden><td colspan="${models.length + 1}"><div class="fields">${det}</div></td></tr>`;
   }).join('');

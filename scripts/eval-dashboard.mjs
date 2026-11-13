@@ -25,7 +25,7 @@ export function buildRun(results, meta = {}) {
       seconds: r.seconds ?? null,
       cases: r.cases.map((c) => ({
         name: c.name, score: c.error ? null : (c.score ?? null), seconds: c.seconds ?? null,
-        attempts: c.attempts ?? null, error: c.error ?? null, fields: c.fields ?? null,
+        attempts: c.attempts ?? null, outputChars: c.output_chars ?? null, error: c.error ?? null, fields: c.fields ?? null,
       })),
     })),
   };
