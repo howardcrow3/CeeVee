@@ -5,6 +5,7 @@
 mod notifications;
 mod scheduler;
 mod tray;
+mod updater;
 
 use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 
@@ -22,7 +23,11 @@ async fn app_info(db: tauri::State<'_, ceevee_db::Db>) -> Result<ceevee_core::Ap
 /// TypeScript side; a test keeps the committed file in sync.
 pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
-        .commands(tauri_specta::collect_commands![app_info])
+        .commands(tauri_specta::collect_commands![
+            app_info,
+            updater::check_for_update,
+            updater::install_update
+        ])
         .typ::<ceevee_core::Event>()
 }
 
@@ -79,6 +84,7 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))

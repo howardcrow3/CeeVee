@@ -5,6 +5,10 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	appInfo: () => typedError<AppInfo, string>(__TAURI_INVOKE("app_info")),
+	/**  Ask the update server whether a newer version exists. */
+	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
+	/**  Download, verify (signature) and install the newest version, then restart. */
+	installUpdate: () => typedError<null, string>(__TAURI_INVOKE("install_update")),
 };
 
 /* Types */
@@ -23,6 +27,18 @@ export type Event =
 { type: "task_due"; task: string } | 
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
+
+export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;
+
+export type UpdateInfo_Deserialize = {
+	version: string,
+	notes?: string | null,
+};
+
+export type UpdateInfo_Serialize = {
+	version: string,
+	notes: string | null,
+};
 
 /* Tauri Specta runtime */
 async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; data: T } | { status: "error"; error: E }> {
