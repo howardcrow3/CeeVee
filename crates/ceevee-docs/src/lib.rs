@@ -3,6 +3,7 @@
 
 pub mod draft;
 pub mod fact_guard;
+pub mod render;
 pub mod store;
 
 pub use fact_guard::{check as fact_check, check_value as fact_check_value, Flag, FlagKind};
