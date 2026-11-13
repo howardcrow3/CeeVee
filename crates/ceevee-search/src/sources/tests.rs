@@ -86,3 +86,28 @@ async fn run_stores_once_and_survives_a_bad_board() {
     assert_eq!((b.new, b.duplicates), (0, 1));
     assert_eq!(postings::recent(&db, 10).await.unwrap().len(), 1);
 }
+
+#[tokio::test]
+async fn boards_round_trip_and_reject_bad_tokens() {
+    let db = Db::open_in_memory().await.unwrap();
+    assert!(load_boards(&db).await.unwrap().is_empty());
+    save_boards(&db, &[gh(), lv()]).await.unwrap();
+    assert_eq!(load_boards(&db).await.unwrap(), vec![gh(), lv()]);
+    let bad = Board {
+        token: "a/../b".into(),
+        ..gh()
+    };
+    assert!(save_boards(&db, &[bad]).await.is_err());
+    let blank = Board {
+        company: " ".into(),
+        ..gh()
+    };
+    assert!(save_boards(&db, &[blank]).await.is_err());
+}
+
+#[test]
+fn iso_dates() {
+    assert_eq!(iso_from_secs(0), "1970-01-01T00:00:00Z");
+    assert_eq!(iso_from_secs(1_784_000_000), "2026-07-14T03:33:20Z");
+    assert_eq!(iso_from_secs(951_782_400), "2000-02-29T00:00:00Z");
+}

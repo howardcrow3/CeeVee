@@ -8,18 +8,21 @@ use crate::{categories, postings};
 use ceevee_core::{Error, Result};
 use ceevee_db::Db;
 use postings::{Ingest, NewPosting};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sqlx::Row;
 use std::future::Future;
 use std::pin::Pin;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum BoardKind {
     Greenhouse,
     Lever,
 }
 
 /// One company's public board.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Board {
     pub kind: BoardKind,
     /// The board token in the board's URL, such as `acme`.
@@ -214,6 +217,78 @@ pub async fn run(
         }
     }
     Ok(s)
+}
+
+/// The current time as ISO-8601 UTC, such as `2026-11-13T09:46:00Z`.
+pub fn now_iso() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_secs());
+    iso_from_secs(secs)
+}
+
+pub(crate) fn iso_from_secs(secs: u64) -> String {
+    let (days, rem) = (secs / 86_400, secs % 86_400);
+    // Civil date from days since 1970-01-01 (Howard Hinnant's algorithm).
+    let z = days as i64 + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe + era * 400 + i64::from(m <= 2);
+    format!(
+        "{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}Z",
+        rem / 3600,
+        rem % 3600 / 60,
+        rem % 60
+    )
+}
+
+const BOARDS_KEY: &str = "search.boards";
+
+/// The boards the user chose to watch, from the settings table.
+pub async fn load_boards(db: &Db) -> Result<Vec<Board>> {
+    let row = sqlx::query("SELECT value FROM setting WHERE key = ?")
+        .bind(BOARDS_KEY)
+        .fetch_optional(db.pool())
+        .await
+        .map_err(crate::db_err)?;
+    match row {
+        None => Ok(Vec::new()),
+        Some(r) => serde_json::from_str(&r.get::<String, _>("value"))
+            .map_err(|e| Error::Invalid(format!("saved boards: {e}"))),
+    }
+}
+
+/// Save the watched boards. A board needs a token and a company name; tokens may hold only
+/// letters, digits, dashes and underscores so they cannot change the feed URL.
+pub async fn save_boards(db: &Db, boards: &[Board]) -> Result<()> {
+    for b in boards {
+        let ok = !b.token.is_empty()
+            && b.token
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_');
+        if !ok || b.company.trim().is_empty() {
+            return Err(Error::Invalid(format!(
+                "board \"{}\" needs a company name and a token of letters, digits and dashes",
+                b.company
+            )));
+        }
+    }
+    let json = serde_json::to_string(boards).map_err(|e| Error::Other(e.to_string()))?;
+    sqlx::query(
+        "INSERT INTO setting (key, value) VALUES (?, ?) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+    )
+    .bind(BOARDS_KEY)
+    .bind(json)
+    .execute(db.pool())
+    .await
+    .map_err(crate::db_err)?;
+    Ok(())
 }
 
 #[cfg(test)]

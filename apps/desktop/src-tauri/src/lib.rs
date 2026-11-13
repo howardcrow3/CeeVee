@@ -31,6 +31,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::import_linkedin_connections,
             commands::export_resume_pdf,
             commands::list_jobs,
+            commands::list_boards,
+            commands::save_boards,
+            commands::run_search,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()

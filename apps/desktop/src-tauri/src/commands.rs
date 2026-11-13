@@ -89,3 +89,88 @@ pub async fn pending_approval_count(db: tauri::State<'_, ceevee_db::Db>) -> Resu
         .map_err(|e| e.to_string())?;
     Ok(n as u32)
 }
+
+#[derive(Debug, Clone, Serialize, serde::Deserialize, Type)]
+pub struct BoardLine {
+    /// `greenhouse` or `lever`.
+    pub kind: String,
+    pub token: String,
+    pub company: String,
+}
+
+fn to_board(b: BoardLine) -> Result<ceevee_search::sources::Board, String> {
+    use ceevee_search::sources::{Board, BoardKind};
+    let kind = match b.kind.as_str() {
+        "greenhouse" => BoardKind::Greenhouse,
+        "lever" => BoardKind::Lever,
+        other => return Err(format!("unknown job board type \"{other}\"")),
+    };
+    Ok(Board {
+        kind,
+        token: b.token.trim().to_owned(),
+        company: b.company.trim().to_owned(),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_boards(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<BoardLine>, String> {
+    use ceevee_search::sources::BoardKind;
+    let boards = ceevee_search::sources::load_boards(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(boards
+        .into_iter()
+        .map(|b| BoardLine {
+            kind: match b.kind {
+                BoardKind::Greenhouse => "greenhouse".into(),
+                BoardKind::Lever => "lever".into(),
+            },
+            token: b.token,
+            company: b.company,
+        })
+        .collect())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn save_boards(
+    db: tauri::State<'_, ceevee_db::Db>,
+    boards: Vec<BoardLine>,
+) -> Result<(), String> {
+    let boards = boards
+        .into_iter()
+        .map(to_board)
+        .collect::<Result<Vec<_>, _>>()?;
+    ceevee_search::sources::save_boards(&db, &boards)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct SearchResult {
+    pub boards_ok: u32,
+    pub new: u32,
+    pub duplicates: u32,
+    pub failures: Vec<String>,
+}
+
+/// Read every watched board once and store what is new.
+#[tauri::command]
+#[specta::specta]
+pub async fn run_search(db: tauri::State<'_, ceevee_db::Db>) -> Result<SearchResult, String> {
+    let boards = ceevee_search::sources::load_boards(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let fetcher = ceevee_search::sources::HttpFetcher::new().map_err(|e| e.to_string())?;
+    let now = ceevee_search::sources::now_iso();
+    let s = ceevee_search::sources::run(&db, &fetcher, &boards, &now)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(SearchResult {
+        boards_ok: s.boards_ok,
+        new: s.new,
+        duplicates: s.duplicates,
+        failures: s.failures,
+    })
+}
