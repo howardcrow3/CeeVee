@@ -5,6 +5,7 @@ mod commands;
 #[allow(dead_code)] // called by feature crates as they land
 mod notifications;
 mod scheduler;
+mod search_task;
 mod tray;
 mod updater;
 
@@ -101,6 +102,7 @@ pub fn run() {
             let db = tauri::async_runtime::block_on(ceevee_db::Db::open(&dir.join("ceevee.db")))?;
             let bus = ceevee_core::EventBus::new(256);
             scheduler::spawn(db.clone(), bus.clone());
+            search_task::spawn(db.clone(), bus.clone());
             app.manage(bus);
             app.manage(db);
 
