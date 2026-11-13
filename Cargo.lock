@@ -661,6 +661,8 @@ dependencies = [
  "ceevee-agent",
  "ceevee-core",
  "ceevee-db",
+ "ceevee-docs",
+ "ceevee-network",
  "chrono",
  "serde",
  "serde_json",
