@@ -31,7 +31,18 @@ version = 2
 # as sqlx moves to libsqlite3-sys >= 0.39.
 # RUSTSEC-2024-0436: `paste` is unmaintained (a notice, not a vulnerability). It is a
 # compile-time proc macro pulled in by specta, with no safe upgrade available.
-ignore = ["RUSTSEC-2026-0459", "RUSTSEC-2024-0436"]
+# Typst (PDF rendering) pulls in several dependencies with advisories. Unmaintained notices:
+# RUSTSEC-2025-0141 bincode, RUSTSEC-2026-0206 rustybuzz, RUSTSEC-2026-0192 ttf-parser,
+# RUSTSEC-2024-0449 unsafe-libyaml, RUSTSEC-2024-0320 yaml-rust. RUSTSEC-2026-0194 and
+# RUSTSEC-2026-0195 are quick-xml denial-of-service issues in parsing XML; typst 0.15.1 pins
+# quick-xml 0.38. CeeVee renders only Typst source it generates itself, which never reads XML
+# or other files (the renderer denies all file access), so none of these is reachable with
+# untrusted input. Remove these ignores when typst moves to quick-xml >= 0.41.
+ignore = [
+  "RUSTSEC-2026-0459", "RUSTSEC-2024-0436",
+  "RUSTSEC-2025-0141", "RUSTSEC-2026-0206", "RUSTSEC-2026-0192", "RUSTSEC-2024-0449",
+  "RUSTSEC-2024-0320", "RUSTSEC-2026-0194", "RUSTSEC-2026-0195",
+]
 
 [sources]
 unknown-registry = "deny"
