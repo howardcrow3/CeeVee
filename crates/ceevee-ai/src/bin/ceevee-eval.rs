@@ -74,8 +74,14 @@ fn bench(model: &str) {
     let cancel = AtomicBool::new(false);
     let cases: Vec<(&str, Option<String>)> = vec![
         ("no grammar", None),
-        ("score_match grammar", builtin_task("score_match").and_then(|s| s.grammar().ok())),
-        ("extract_posting grammar", builtin_task("extract_posting").and_then(|s| s.grammar().ok())),
+        (
+            "score_match grammar",
+            builtin_task("score_match").and_then(|s| s.grammar().ok()),
+        ),
+        (
+            "extract_posting grammar",
+            builtin_task("extract_posting").and_then(|s| s.grammar().ok()),
+        ),
     ];
     for (name, grammar) in cases {
         let mut req = GenerateRequest::new(
