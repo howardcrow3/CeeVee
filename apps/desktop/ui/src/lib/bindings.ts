@@ -19,6 +19,10 @@ export const commands = {
 	saveBoards: (boards: BoardLine[]) => typedError<null, string>(__TAURI_INVOKE("save_boards", { boards })),
 	/**  Read every watched board once and store what is new. */
 	runSearch: () => typedError<SearchResult, string>(__TAURI_INVOKE("run_search")),
+	/**  Everything waiting for your approval, oldest first. */
+	listProposals: () => typedError<ProposalLine[], string>(__TAURI_INVOKE("list_proposals")),
+	/**  Skip a proposal. Approving needs the tools that carry the action out, which come later. */
+	skipProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("skip_proposal", { id })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -75,6 +79,15 @@ export type JobLine_Serialize = {
 export type LinkedInImport = {
 	added: number,
 	updated: number,
+};
+
+export type ProposalLine = {
+	id: number,
+	/**  What CeeVee wants to do, from the tool's name, such as `apply.submit`. */
+	action: string,
+	/**  CeeVee's reason, in its own words. */
+	reason: string,
+	created_at: string,
 };
 
 export type SearchResult = {
