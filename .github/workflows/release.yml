@@ -131,7 +131,7 @@ jobs:
         run: |
           if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then NOSIGN=--no-sign; fi
           # The certificate is already in our keychain; if Tauri imported the secret itself it would not see it.
-          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} ${TAURI_EXTRA_ARGS:-}
+          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
 
       - name: Collect installers
         shell: bash
