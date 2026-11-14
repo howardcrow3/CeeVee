@@ -17,6 +17,7 @@ ceevee-db.workspace = true
 ceevee-search = { path = "../../../crates/ceevee-search" }
 ceevee-network = { path = "../../../crates/ceevee-network" }
 ceevee-docs = { path = "../../../crates/ceevee-docs" }
+ceevee-ai.workspace = true
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true

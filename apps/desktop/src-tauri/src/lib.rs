@@ -2,6 +2,7 @@
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
 mod commands;
+mod models;
 #[allow(dead_code)] // called by feature crates as they land
 mod notifications;
 mod scheduler;
@@ -38,6 +39,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_proposals,
             commands::skip_proposal,
             commands::approve_proposal,
+            models::model_status,
+            models::start_model_download,
+            models::model_progress,
+            models::cancel_model_download,
             commands::list_documents,
             commands::get_document,
             commands::create_document,
@@ -115,6 +120,7 @@ pub fn run() {
             let mut registry = ceevee_agent::tools::Registry::new();
             ceevee_agent::builtin::register_all(&mut registry, &db)?;
             app.manage(registry);
+            app.manage(std::sync::Arc::new(models::DownloadState::default()));
             app.manage(bus);
             app.manage(db);
 

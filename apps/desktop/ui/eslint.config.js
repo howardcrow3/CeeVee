@@ -6,7 +6,13 @@ export default ts.config(
   js.configs.recommended,
   ...ts.configs.recommended,
   ...svelte.configs['flat/recommended'],
-  { files: ['**/*.svelte'], languageOptions: { parserOptions: { parser: ts.parser } } },
+  {
+    files: ['**/*.svelte', '**/*.ts'],
+    languageOptions: {
+      parserOptions: { parser: ts.parser },
+      globals: { window: 'readonly' }
+    }
+  },
   { files: ['**/*.mjs'], languageOptions: { globals: { process: 'readonly', console: 'readonly' } } },
   { ignores: ['src/lib/bindings.ts', 'build/', '.svelte-kit/', 'node_modules/'] }
 );
