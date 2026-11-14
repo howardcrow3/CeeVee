@@ -18,6 +18,13 @@
   }
   onMount(load);
 
+  async function approve(id: number) {
+    error = '';
+    const r = await commands.approveProposal(id);
+    if (r.status === 'ok') await load();
+    else error = r.error;
+  }
+
   async function skip(id: number) {
     const r = await commands.skipProposal(id);
     if (r.status === 'ok') await load();
@@ -35,7 +42,10 @@
         <li>
           <b>{actionWords(p.action)}</b>
           {#if p.reason}<p>{p.reason}</p>{/if}
-          <button class="ghost" onclick={() => skip(p.id)}>Skip</button>
+          <div class="row">
+            <button onclick={() => approve(p.id)}>Approve</button>
+            <button class="ghost" onclick={() => skip(p.id)}>Skip</button>
+          </div>
         </li>
       {/each}
     </ul>
@@ -50,4 +60,5 @@
   li { border: 1px solid var(--line); background: var(--surface); padding: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
   b { color: var(--ink); font-weight: 500; }
   p { margin: 0; }
+  .row { display: flex; gap: 8px; }
 </style>

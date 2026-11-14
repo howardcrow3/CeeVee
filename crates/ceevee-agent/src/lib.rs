@@ -5,6 +5,7 @@
 //! (see docs/TECHNICAL_PLAN.md, section 6).
 
 pub mod approvals;
+pub mod builtin;
 pub mod notifications;
 pub mod policy;
 pub mod power;

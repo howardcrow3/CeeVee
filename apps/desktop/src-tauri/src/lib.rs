@@ -37,6 +37,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::run_search,
             commands::list_proposals,
             commands::skip_proposal,
+            commands::approve_proposal,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()
@@ -105,6 +106,9 @@ pub fn run() {
             let bus = ceevee_core::EventBus::new(256);
             scheduler::spawn(db.clone(), bus.clone());
             search_task::spawn(db.clone(), bus.clone());
+            let mut registry = ceevee_agent::tools::Registry::new();
+            ceevee_agent::builtin::register_all(&mut registry, &db)?;
+            app.manage(registry);
             app.manage(bus);
             app.manage(db);
 

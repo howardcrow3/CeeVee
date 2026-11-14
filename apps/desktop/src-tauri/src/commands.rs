@@ -217,3 +217,17 @@ pub async fn skip_proposal(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Resu
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+/// Approve a waiting proposal and carry it out once.
+#[tauri::command]
+#[specta::specta]
+pub async fn approve_proposal(
+    db: tauri::State<'_, ceevee_db::Db>,
+    registry: tauri::State<'_, ceevee_agent::tools::Registry>,
+    id: u32,
+) -> Result<(), String> {
+    ceevee_agent::approvals::approve_and_run(&db, &registry, i64::from(id))
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
