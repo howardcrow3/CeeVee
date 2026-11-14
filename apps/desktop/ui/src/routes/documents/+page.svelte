@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type DocLine, type DocView } from '$lib/bindings';
-  import { docKinds, isResume, kindLabel, starter } from '$lib/documents';
+  import { describeEdit, docKinds, isResume, kindLabel, starter } from '$lib/documents';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let docs = $state<DocLine[]>([]);
@@ -13,6 +13,9 @@
   let newKind = $state('cover_letter');
   let newTitle = $state('');
   let loaded = $state(false);
+  let ask = $state('');
+  let asking = $state(false);
+  let held = $state<{ proposed: string; flagged: string[] } | null>(null);
 
   async function loadList() {
     try {
@@ -66,6 +69,31 @@
       message = action === 'save' ? 'Saved.' : action === 'undo' ? 'Went back one version.' : 'Went forward one version.';
     } else error = r.error;
   }
+
+  async function keepHeld() {
+    if (!held) return;
+    draft = held.proposed;
+    held = null;
+    await run('save');
+  }
+
+  async function chat() {
+    if (!open || !ask.trim()) return;
+    error = '';
+    message = '';
+    asking = true;
+    try {
+      const r = await commands.chatEditDocument(open.id, ask.trim(), false);
+      if (r.status === 'ok') {
+        show(r.data.doc);
+        message = describeEdit(r.data);
+        held = r.data.applied ? null : { proposed: r.data.proposed, flagged: r.data.flagged };
+        if (r.data.applied) ask = '';
+      } else error = r.error;
+    } finally {
+      asking = false;
+    }
+  }
 </script>
 
 <span class="label">Documents</span>
@@ -113,6 +141,15 @@
         <button class="ghost" onclick={() => run('redo')}>Redo</button>
       </div>
       {#if message}<p role="status">{message}</p>{/if}
+      <div class="chat">
+        <span class="label">Ask for a change</span>
+        <textarea aria-label="What should change" rows="3" placeholder="For example: make the opening shorter and warmer" bind:value={ask}></textarea>
+        <div class="row">
+          <button disabled={asking || !ask.trim()} onclick={() => chat()}>{asking ? 'Working…' : 'Make the change'}</button>
+          {#if held}<button class="ghost" onclick={keepHeld}>Save it anyway</button>{/if}
+        </div>
+        {#if held}<pre class="held">{held.proposed}</pre>{/if}
+      </div>
     </section>
   {/if}
 </div>
@@ -130,4 +167,6 @@
   textarea { font: 400 14px/1.6 var(--font-body, inherit); background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 16px; width: 100%; resize: vertical; }
   select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 12px 16px; }
   p { margin: 0; }
+  .chat { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-control); padding-top: 16px; }
+  .held { white-space: pre-wrap; font: 400 13px/1.5 var(--font-body, inherit); color: var(--body); border: 1px solid var(--border-control); padding: 12px; margin: 0; }
 </style>

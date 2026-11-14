@@ -42,6 +42,8 @@ export const commands = {
 	saveDocument: (id: number, content: string) => typedError<DocView, string>(__TAURI_INVOKE("save_document", { id, content })),
 	undoDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("undo_document", { id })),
 	redoDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("redo_document", { id })),
+	/**  Ask the assistant to change a document. The change becomes a new version, so undo works. */
+	chatEditDocument: (id: number, instruction: string, acceptFlagged: boolean) => typedError<ChatEdit, string>(__TAURI_INVOKE("chat_edit_document", { id, instruction, acceptFlagged })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -59,6 +61,20 @@ export type BoardLine = {
 	kind: string,
 	token: string,
 	company: string,
+};
+
+/**  The outcome of asking the assistant to change a document. */
+export type ChatEdit = {
+	/**  True when the change was saved as a new version. */
+	applied: boolean,
+	/**
+	 *  Names or numbers in the change that were in neither the document nor your request. When
+	 *  there are any, nothing is saved and you decide what to do.
+	 */
+	flagged: string[],
+	/**  The proposed text, so it can be shown when it was held back. */
+	proposed: string,
+	doc: DocView,
 };
 
 export type DocLine = {
