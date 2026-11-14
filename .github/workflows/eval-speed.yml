@@ -36,17 +36,21 @@ jobs:
       - name: Build the eval tool
         run: cargo build --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval
 
-      - name: Speed on the CPU only
+      - name: Speed on the CPU with each thread count
         env:
           CEEVEE_GPU_LAYERS: "0"
-        run: ./target/release/ceevee-eval "$PWD/model/model.gguf" bench 2>/dev/null
+        run: |
+          for t in 1 2 3 4; do
+            echo "== threads $t =="
+            CEEVEE_THREADS=$t timeout 300 ./target/release/ceevee-eval "$PWD/model/model.gguf" bench 2>/dev/null || true
+          done
 
-      - name: Speed on the default GPU path (capped at 10 minutes)
+      - name: Speed on the default GPU path, default threads (capped at 4 minutes)
         continue-on-error: true
         run: |
           ./target/release/ceevee-eval "$PWD/model/model.gguf" bench 2>/dev/null &
           pid=$!
-          ( sleep 600; echo "capped"; kill "$pid" 2>/dev/null ) &
+          ( sleep 240; echo "capped"; kill "$pid" 2>/dev/null ) &
           watcher=$!
           wait "$pid" || true
           kill "$watcher" 2>/dev/null || true
