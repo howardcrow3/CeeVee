@@ -23,6 +23,8 @@ export const commands = {
 	listProposals: () => typedError<ProposalLine[], string>(__TAURI_INVOKE("list_proposals")),
 	/**  Skip a proposal. Approving needs the tools that carry the action out, which come later. */
 	skipProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("skip_proposal", { id })),
+	/**  Approve a waiting proposal and carry it out once. */
+	approveProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("approve_proposal", { id })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
