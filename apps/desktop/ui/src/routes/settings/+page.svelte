@@ -1,14 +1,49 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { commands, type BoardLine } from '$lib/bindings';
   import { boardKinds, cleanBoards } from '$lib/boards';
+  import { percent, sizeText } from '$lib/models';
+  import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
   let boards = $state<BoardLine[]>([]);
+  let model = $state<ModelStatus | null>(null);
+  let progress = $state<DownloadProgress | null>(null);
+  let timer: number | undefined;
   let message = $state('');
   let error = $state('');
 
+  async function loadModel() {
+    const m = await commands.modelStatus();
+    if (m.status === 'ok') model = m.data;
+    else error = m.error;
+  }
+
+  async function poll() {
+    progress = await commands.modelProgress();
+    if (!progress.running) {
+      window.clearInterval(timer);
+      timer = undefined;
+      await loadModel();
+    }
+  }
+
+  async function startDownload() {
+    if (!model) return;
+    error = '';
+    const r = await commands.startModelDownload(model.id);
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
+    timer = window.setInterval(poll, 1000);
+    await poll();
+  }
+
+  onDestroy(() => window.clearInterval(timer));
+
   onMount(async () => {
     try {
+      await loadModel();
       const r = await commands.listBoards();
       if (r.status === 'ok') boards = r.data;
       else error = r.error;
@@ -36,6 +71,27 @@
 </script>
 
 <span class="label">Settings</span>
+<section>
+  <h2>Local AI</h2>
+  {#if model}
+    <p class="note">
+      This computer has {model.ram_gb} GB of memory. CeeVee recommends {model.name}
+      ({sizeText(model.size_mb)}). It runs on your computer and nothing you write leaves it.
+    </p>
+    {#if model.installed}
+      <p><span class="dot on"></span>{model.name} is installed.</p>
+    {:else if progress?.running}
+      <p role="status">
+        Downloading {sizeText(progress.downloaded_mb)} of {sizeText(progress.total_mb)}
+        ({percent(progress.downloaded_mb, progress.total_mb)}%)
+      </p>
+      <div class="row"><button class="ghost" onclick={() => commands.cancelModelDownload()}>Cancel</button></div>
+    {:else}
+      <div class="row"><button onclick={startDownload}>Download {model.name}</button></div>
+      {#if progress?.error}<p role="alert">{progress.error}</p>{/if}
+    {/if}
+  {/if}
+</section>
 <section>
   <h2>Companies to watch</h2>
   <p class="note">

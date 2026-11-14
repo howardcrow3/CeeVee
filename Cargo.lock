@@ -660,6 +660,7 @@ name = "ceevee-desktop"
 version = "0.1.0"
 dependencies = [
  "ceevee-agent",
+ "ceevee-ai",
  "ceevee-core",
  "ceevee-db",
  "ceevee-docs",

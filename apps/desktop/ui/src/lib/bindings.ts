@@ -25,6 +25,13 @@ export const commands = {
 	skipProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("skip_proposal", { id })),
 	/**  Approve a waiting proposal and carry it out once. */
 	approveProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("approve_proposal", { id })),
+	/**  The model suited to this machine, and whether it is already on disk. */
+	modelStatus: () => typedError<ModelStatus, string>(__TAURI_INVOKE("model_status")),
+	/**  Start downloading the model in the background. Progress comes from `model_progress`. */
+	startModelDownload: (id: string) => typedError<null, string>(__TAURI_INVOKE("start_model_download", { id })),
+	modelProgress: () => __TAURI_INVOKE<DownloadProgress>("model_progress"),
+	/**  Stop the download. What was fetched is kept, so starting again resumes. */
+	cancelModelDownload: () => __TAURI_INVOKE<void>("cancel_model_download"),
 	listDocuments: () => typedError<DocLine[], string>(__TAURI_INVOKE("list_documents")),
 	getDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("get_document", { id })),
 	/**  Make a new document. Resumes must be valid JSON. */
@@ -68,6 +75,13 @@ export type DocView = {
 	versions: number,
 };
 
+export type DownloadProgress = {
+	running: boolean,
+	downloaded_mb: number,
+	total_mb: number,
+	error: string,
+};
+
 /**  Events published by feature crates. Variants are added as features land. */
 export type Event = 
 /**  A job row changed state or progress (`job` table). */
@@ -105,6 +119,14 @@ export type JobLine_Serialize = {
 export type LinkedInImport = {
 	added: number,
 	updated: number,
+};
+
+export type ModelStatus = {
+	ram_gb: number,
+	id: string,
+	name: string,
+	size_mb: number,
+	installed: boolean,
 };
 
 export type ProposalLine = {
