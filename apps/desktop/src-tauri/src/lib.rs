@@ -35,6 +35,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_boards,
             commands::save_boards,
             commands::run_search,
+            commands::list_proposals,
+            commands::skip_proposal,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()

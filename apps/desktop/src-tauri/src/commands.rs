@@ -174,3 +174,46 @@ pub async fn run_search(db: tauri::State<'_, ceevee_db::Db>) -> Result<SearchRes
         failures: s.failures,
     })
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ProposalLine {
+    pub id: u32,
+    /// What CeeVee wants to do, from the tool's name, such as `apply.submit`.
+    pub action: String,
+    /// CeeVee's reason, in its own words.
+    pub reason: String,
+    pub created_at: String,
+}
+
+/// Everything waiting for your approval, oldest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_proposals(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<ProposalLine>, String> {
+    let pending = ceevee_agent::approvals::pending(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(pending
+        .into_iter()
+        .map(|p| {
+            let text = |k: &str| p.payload.get(k).and_then(|v| v.as_str()).map(str::to_owned);
+            ProposalLine {
+                id: p.id as u32,
+                action: text("tool").unwrap_or(p.kind),
+                reason: text("reason").unwrap_or_default(),
+                created_at: p.created_at,
+            }
+        })
+        .collect())
+}
+
+/// Skip a proposal. Approving needs the tools that carry the action out, which come later.
+#[tauri::command]
+#[specta::specta]
+pub async fn skip_proposal(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Result<(), String> {
+    ceevee_agent::approvals::reject(&db, i64::from(id))
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}
