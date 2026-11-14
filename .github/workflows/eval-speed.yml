@@ -1,0 +1,56 @@
+name: Eval speed check
+
+# Manual only. Measures tokens per second for the small model on a hosted macOS runner, with and
+# without a grammar, on the CPU and on the default GPU path, to find out why eval cases are slow.
+# Nothing here is a required check.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  speed:
+    runs-on: macos-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download and verify the small model
+        run: |
+          id=qwen3-0.6b-q8
+          url=$(jq -r ".models[] | select(.id==\"$id\") | .url" evals/models.json)
+          sha=$(jq -r ".models[] | select(.id==\"$id\") | .sha256" evals/models.json)
+          mkdir -p model
+          curl --fail --location --retry 5 --retry-delay 10 -o model/model.gguf "$url"
+          [ "$(shasum -a 256 model/model.gguf | cut -d' ' -f1)" = "$sha" ]
+
+      - name: Machine info
+        run: |
+          echo "cpu: $(sysctl -n machdep.cpu.brand_string)  cores: $(sysctl -n hw.ncpu)  ram bytes: $(sysctl -n hw.memsize)"
+          system_profiler SPDisplaysDataType | head -20 || true
+
+      - name: Build the eval tool
+        run: cargo build --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval
+
+      - name: Speed on the CPU with each thread count
+        env:
+          CEEVEE_GPU_LAYERS: "0"
+        run: |
+          for t in 1 2 3 4; do
+            echo "== threads $t =="
+            CEEVEE_THREADS=$t timeout 300 ./target/release/ceevee-eval "$PWD/model/model.gguf" bench 2>/dev/null || true
+          done
+
+      - name: Speed on the default GPU path, default threads (capped at 4 minutes)
+        continue-on-error: true
+        run: |
+          ./target/release/ceevee-eval "$PWD/model/model.gguf" bench 2>/dev/null &
+          pid=$!
+          ( sleep 240; echo "capped"; kill "$pid" 2>/dev/null ) &
+          watcher=$!
+          wait "$pid" || true
+          kill "$watcher" 2>/dev/null || true

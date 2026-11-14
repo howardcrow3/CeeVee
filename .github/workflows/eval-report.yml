@@ -1,0 +1,148 @@
+name: Model eval report
+
+# Scores every model listed in evals/models.json on every eval task and builds one comparison
+# report (job summary plus an eval-report artifact with markdown, HTML and an interactive dashboard). Nothing here can fail a
+# pull request or a merge: the jobs are not required checks and every step tolerates failure.
+# Pass/fail floors live in evals/thresholds.json and are null until we have enough history.
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - "crates/ceevee-ai/evals/**"
+      - "crates/ceevee-ai/prompts/**"
+      - "evals/**"
+      - "scripts/eval-report.mjs"
+      - "scripts/eval-dashboard.*"
+      - ".github/workflows/eval-report.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-report
+  cancel-in-progress: true
+
+env:
+  # Hosted macOS runners have no real GPU, so run on the CPU.
+  CEEVEE_GPU_LAYERS: "0"
+
+jobs:
+  models:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: m
+        run: |
+          echo "matrix=$(jq -c '{include: .models}' evals/models.json)" >> "$GITHUB_OUTPUT"
+
+  score:
+    name: score ${{ matrix.id }}
+    needs: models
+    runs-on: macos-latest
+    continue-on-error: true
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.models.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Restore model cache
+        id: cache
+        if: matrix.cache
+        uses: actions/cache@v4
+        with:
+          path: model/model.gguf
+          key: model-${{ matrix.url }}-${{ matrix.sha256 }}
+
+      - name: Download and verify model
+        run: |
+          mkdir -p model
+          if [ ! -f model/model.gguf ]; then
+            curl --fail --location --retry 5 --retry-delay 10 -o model/model.gguf "${{ matrix.url }}"
+          fi
+          actual=$(shasum -a 256 model/model.gguf | cut -d' ' -f1)
+          echo "sha256: $actual"
+          [ -z "${{ matrix.sha256 }}" ] || [ "$actual" = "${{ matrix.sha256 }}" ]
+
+      - name: Build the eval tool
+        run: cargo build --release --locked -q -p ceevee-ai --features llama --bin ceevee-eval
+
+      - name: Machine info
+        run: |
+          echo "cpu: $(sysctl -n machdep.cpu.brand_string)  cores: $(sysctl -n hw.ncpu)  ram bytes: $(sysctl -n hw.memsize)"
+          sw_vers
+
+      - name: Score each task
+        continue-on-error: true
+        # macOS has no `timeout` command, so each task runs in the background and is killed after
+        # its own wall-clock cap. The per-task budget only applies between cases, and a single
+        # case can take longer than any budget (docs/QUESTIONS.md item 15), so the cap is what
+        # keeps one slow task from starving the rest. A killed task shows as "not run".
+        timeout-minutes: 270
+        env:
+          CEEVEE_EVAL_MODEL: ${{ matrix.id }}
+          CEEVEE_EVAL_BUDGET_SECS: ${{ matrix.budget_secs }}
+        run: |
+          mkdir -p results
+          cap=$(( ${{ matrix.budget_secs }} + 900 ))
+          run_capped() { # task
+            CEEVEE_EVAL_JSON="results/${{ matrix.id }}-$1.json" \
+              ./target/release/ceevee-eval "$PWD/model/model.gguf" "$1" &
+            pid=$!
+            ( sleep "$cap"; echo "::warning::$1 hit its $cap second cap"; kill "$pid" 2>/dev/null ) &
+            watcher=$!
+            wait "$pid" || true
+            kill "$watcher" 2>/dev/null || true
+          }
+          # import_resume last: its grammar is the slow one.
+          for task in extract_posting score_match write_cover_letter tailor_resume import_resume; do
+            run_capped "$task"
+          done
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results-${{ matrix.id }}
+          path: results/
+          if-no-files-found: ignore
+
+  report:
+    needs: score
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          pattern: eval-results-*
+          path: results
+          merge-multiple: true
+      - name: Build report
+        run: |
+          mkdir -p results
+          node scripts/eval-report.mjs results report --thresholds evals/thresholds.json
+          cat report/eval-report.md >> "$GITHUB_STEP_SUMMARY"
+          # Also in the log, so it can be read without downloading the artifact.
+          echo "----- eval-report.md -----"; cat report/eval-report.md
+          # The interactive dashboard (needs evals/history.json from the checkout for the trends).
+          node scripts/eval-dashboard.mjs results report --history evals/history.json --thresholds evals/thresholds.json
+          # One history entry, so it can be committed to evals/history.json.
+          echo "----- eval-data.json -----"; cat report/eval-data.json | node -e 'const h=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(JSON.stringify(h.runs[h.runs.length-1]))' || true
+          echo "----- raw results -----"; cat results/*.json 2>/dev/null | head -c 20000 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: report/

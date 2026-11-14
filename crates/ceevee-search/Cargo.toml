@@ -1,0 +1,22 @@
+[package]
+name = "ceevee-search"
+description = "CeeVee: categories, job sources, dedupe, scoring, scheduler"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ceevee-core.workspace = true
+ceevee-db.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+reqwest.workspace = true
+sqlx.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

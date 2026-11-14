@@ -1,0 +1,40 @@
+[package]
+name = "ceevee-desktop"
+description = "CeeVee desktop app (Tauri 2)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[features]
+# The real local AI engine. Needs cmake and clang to build, so it is off for everyday checks.
+llama = ["ceevee-ai/llama"]
+
+[dependencies]
+ceevee-core.workspace = true
+ceevee-agent.workspace = true
+ceevee-db.workspace = true
+ceevee-search = { path = "../../../crates/ceevee-search" }
+ceevee-network = { path = "../../../crates/ceevee-network" }
+ceevee-docs = { path = "../../../crates/ceevee-docs" }
+ceevee-ai.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+specta.workspace = true
+specta-typescript.workspace = true
+tauri-specta.workspace = true
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-autostart = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-updater = "2"
+tokio.workspace = true
+tracing.workspace = true
+
+[lints]
+workspace = true

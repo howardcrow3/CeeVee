@@ -1,0 +1,142 @@
+<script lang="ts">
+  import { onDestroy, onMount } from 'svelte';
+  import { commands, type BoardLine } from '$lib/bindings';
+  import { boardKinds, cleanBoards } from '$lib/boards';
+  import { percent, sizeText } from '$lib/models';
+  import type { ModelStatus, DownloadProgress } from '$lib/bindings';
+
+  let boards = $state<BoardLine[]>([]);
+  let model = $state<ModelStatus | null>(null);
+  let progress = $state<DownloadProgress | null>(null);
+  let timer: number | undefined;
+  let ask = $state('');
+  let answer = $state('');
+  let asking = $state(false);
+  let message = $state('');
+  let error = $state('');
+
+  async function loadModel() {
+    const m = await commands.modelStatus();
+    if (m.status === 'ok') model = m.data;
+    else error = m.error;
+  }
+
+  async function poll() {
+    progress = await commands.modelProgress();
+    if (!progress.running) {
+      window.clearInterval(timer);
+      timer = undefined;
+      await loadModel();
+    }
+  }
+
+  async function startDownload() {
+    if (!model) return;
+    error = '';
+    const r = await commands.startModelDownload(model.id);
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
+    timer = window.setInterval(poll, 1000);
+    await poll();
+  }
+
+  async function tryModel() {
+    asking = true;
+    answer = '';
+    error = '';
+    const r = await commands.askModel(ask);
+    if (r.status === 'ok') answer = r.data;
+    else error = r.error;
+    asking = false;
+  }
+
+  onDestroy(() => window.clearInterval(timer));
+
+  onMount(async () => {
+    try {
+      await loadModel();
+      const r = await commands.listBoards();
+      if (r.status === 'ok') boards = r.data;
+      else error = r.error;
+    } catch (e) {
+      error = `Running outside the desktop app: ${String(e)}`;
+    }
+  });
+
+  function add() {
+    boards = [...boards, { kind: 'greenhouse', token: '', company: '' }];
+  }
+  function remove(i: number) {
+    boards = boards.filter((_, j) => j !== i);
+  }
+  async function save() {
+    message = '';
+    error = '';
+    const cleaned = cleanBoards(boards);
+    const r = await commands.saveBoards(cleaned);
+    if (r.status === 'ok') {
+      boards = cleaned;
+      message = 'Saved.';
+    } else error = r.error;
+  }
+</script>
+
+<span class="label">Settings</span>
+<section>
+  <h2>Local AI</h2>
+  {#if model}
+    <p class="note">
+      This computer has {model.ram_gb} GB of memory. CeeVee recommends {model.name}
+      ({sizeText(model.size_mb)}). It runs on your computer and nothing you write leaves it.
+    </p>
+    {#if model.installed}
+      <p><span class="dot on"></span>{model.name} is installed.</p>
+      <div class="row">
+        <input aria-label="Ask the model" placeholder="Ask it something to try it out" bind:value={ask} />
+        <button onclick={tryModel} disabled={asking || ask.trim() === ''}>{asking ? 'Thinking' : 'Ask'}</button>
+      </div>
+      {#if answer}<p role="status">{answer}</p>{/if}
+    {:else if progress?.running}
+      <p role="status">
+        Downloading {sizeText(progress.downloaded_mb)} of {sizeText(progress.total_mb)}
+        ({percent(progress.downloaded_mb, progress.total_mb)}%)
+      </p>
+      <div class="row"><button class="ghost" onclick={() => commands.cancelModelDownload()}>Cancel</button></div>
+    {:else}
+      <div class="row"><button onclick={startDownload}>Download {model.name}</button></div>
+      {#if progress?.error}<p role="alert">{progress.error}</p>{/if}
+    {/if}
+  {/if}
+</section>
+<section>
+  <h2>Companies to watch</h2>
+  <p class="note">
+    CeeVee reads the public job lists of these companies. The board name is the last part of the
+    company's job page address, for example boards.greenhouse.io/<b>acme</b>.
+  </p>
+  {#each boards as b, i (i)}
+    <div class="row">
+      <select aria-label="Job board" bind:value={b.kind}>
+        {#each boardKinds as k (k.value)}<option value={k.value}>{k.label}</option>{/each}
+      </select>
+      <input aria-label="Board name" placeholder="Board name" bind:value={b.token} />
+      <input aria-label="Company" placeholder="Company" bind:value={b.company} />
+      <button class="ghost" onclick={() => remove(i)}>Remove</button>
+    </div>
+  {/each}
+  <div class="row">
+    <button class="ghost" onclick={add}>Add a company</button>
+    <button onclick={save}>Save</button>
+  </div>
+  {#if message}<p role="status">{message}</p>{/if}
+  {#if error}<p role="alert">{error}</p>{/if}
+</section>
+
+<style>
+  section { display: flex; flex-direction: column; gap: 16px; max-width: 760px; margin-top: 24px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row input { flex: 1; min-width: 140px; }
+  select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 12px 16px; }
+</style>

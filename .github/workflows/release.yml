@@ -1,0 +1,208 @@
+name: Release
+
+# Runs when a version tag is pushed. The tag must point at a commit on main.
+#   vX.Y.Z-beta.N  -> Beta
+#   vX.Y.Z         -> Stable (publish job waits for approval in the `release` environment)
+# Signing is skipped, with a warning, when the signing secrets are not configured,
+# so the pipeline can be exercised before the Apple and Azure accounts exist.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+', 'v[0-9]+.[0-9]+.[0-9]+-beta.[0-9]+']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      channel: ${{ steps.v.outputs.channel }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - name: Tag is on main
+        run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+      - name: Version matches tag
+        id: v
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          node scripts/bump-version.mjs --check
+          grep -q "^version = \"$version\"" Cargo.toml || { echo "Cargo.toml version differs from tag $GITHUB_REF_NAME"; exit 1; }
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          case "$version" in *-beta.*) echo "channel=beta" >> "$GITHUB_OUTPUT";; *) echo "channel=stable" >> "$GITHUB_OUTPUT";; esac
+
+  build:
+    needs: check
+    name: build (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    environment: release-build # holds the signing secrets
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest, target: x86_64-pc-windows-msvc }
+          - { name: macos-arm64, os: macos-latest, target: aarch64-apple-darwin }
+    env:
+      # Update files (.sig) are signed with the updater key.
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      # macOS: same scheme as Backer. We import the certificate ourselves (step below) and Tauri notarizes
+      # with the Apple ID, an app-specific password and the team ID.
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      # Windows: Azure Trusted Signing through trusted-signing-cli.
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+      AZURE_SIGNING_ENDPOINT: ${{ vars.AZURE_SIGNING_ENDPOINT }}
+      AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+      AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: "${{ matrix.target }}" }
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+
+      - name: Signing status
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            [ -n "$AZURE_CLIENT_ID" ] && echo "Windows signing: on" || echo "::warning::AZURE_CLIENT_ID not set; the Windows installer will be unsigned"
+          else
+            if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              echo "macOS signing: on"; echo "MAC_SIGNED=1" >> "$GITHUB_ENV"
+            else
+              echo "::warning::Apple secrets incomplete (need APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID); the macOS app will be unsigned and not notarized"
+            fi
+          fi
+
+      - name: Import Developer ID certificate (macOS)
+        if: runner.os == 'macOS' && env.MAC_SIGNED == '1'
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"; KP="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          # The .p12 may only carry an older certificate for the same key. The Developer ID certificate is public,
+          # so it is kept in the repo and imported here; it pairs with the key by its public key.
+          # If the .p12 already holds it, the import reports "already exists", which is fine.
+          security import .github/signing/developer-id.cer -k "$KC" -A || echo "developer-id.cer already in the .p12; continuing"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KP" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          ID=$(security find-identity -p codesigning "$KC" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          if [ -z "$ID" ]; then
+            echo "::error::No usable Developer ID Application identity in the imported .p12"
+            security find-identity "$KC" | sed 's/"/'"'"'/g'
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
+
+      - name: Windows signing config
+        if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
+        shell: bash
+        run: |
+          cargo install trusted-signing-cli --locked
+          cat > "$RUNNER_TEMP/sign.json" <<JSON
+          {"bundle":{"windows":{"signCommand":"trusted-signing-cli -e $AZURE_SIGNING_ENDPOINT -a $AZURE_SIGNING_ACCOUNT -c $AZURE_SIGNING_PROFILE -d CeeVee %1"}}}
+          JSON
+          echo "TAURI_EXTRA_ARGS=--config $RUNNER_TEMP/sign.json" >> "$GITHUB_ENV"
+
+      - name: Build
+        working-directory: apps/desktop
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then NOSIGN=--no-sign; fi
+          # The certificate is already in our keychain; if Tauri imported the secret itself it would not see it.
+          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
+
+      - name: Collect installers
+        shell: bash
+        run: |
+          mkdir -p out
+          cp target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe out/ 2>/dev/null || true
+          cp target/${{ matrix.target }}/release/bundle/dmg/*.dmg out/ 2>/dev/null || true
+          ls out && [ -n "$(ls out)" ]
+
+      - name: Verify signatures
+        shell: bash
+        run: |
+          if [ "${{ runner.os }}" = "Windows" ] && [ -n "$AZURE_CLIENT_ID" ]; then
+            signtool=$(ls "C:/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe | tail -1)
+            for f in out/*.exe; do "$signtool" verify //pa //all "$f"; done
+          elif [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" = "1" ]; then
+            app=$(ls -d target/${{ matrix.target }}/release/bundle/macos/*.app)
+            codesign --verify --deep --strict "$app"
+            spctl -a -t exec -vv "$app"
+            xcrun stapler validate "$app"
+          else
+            echo "::warning::unsigned build; skipping signature verification"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.name }}
+          path: out/*
+          if-no-files-found: error
+
+  publish:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    # Stable waits for approval (Howard as required reviewer on `release`); Beta does not.
+    environment: ${{ needs.check.outputs.channel == 'stable' && 'release' || 'release-beta' }}
+    permissions:
+      contents: write
+      id-token: write # AWS OIDC, used only when AWS_ROLE_ARN is set
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: actions/download-artifact@v4
+        with: { path: dist, pattern: installers-*, merge-multiple: true }
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Release notes
+        run: |
+          v="${{ needs.check.outputs.version }}"
+          awk -v v="$v" '$0 ~ "^## " v "( |$)" {f=1; next} /^## / {f=0} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "No release notes written for $v." > notes.md
+      - name: Draft GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flags=""; [ "${{ needs.check.outputs.channel }}" = "beta" ] && flags="--prerelease"
+          gh release create "$GITHUB_REF_NAME" dist/* --draft $flags --title "CeeVee ${{ needs.check.outputs.version }}" --notes-file notes.md
+      - name: Upload to S3 and CloudFront
+        if: vars.AWS_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+      - name: Publish files
+        if: vars.AWS_ROLE_ARN != ''
+        run: |
+          v="${{ needs.check.outputs.version }}"
+          # Release folders are immutable: refuse to overwrite an existing version.
+          if aws s3 ls "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/releases/$v/" | grep -q .; then echo "release $v already exists"; exit 1; fi
+          aws s3 cp dist "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/releases/$v/" --recursive --cache-control "public, max-age=31536000, immutable"
+      - name: Note
+        if: vars.AWS_ROLE_ARN == ''
+        run: echo "::warning::AWS_ROLE_ARN not set; files were attached to the draft GitHub Release only. Update manifests are not published yet."
