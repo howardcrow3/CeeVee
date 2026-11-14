@@ -392,7 +392,7 @@ GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64). Each pull 
 | Platform | First install | Updater artifact | Signing |
 | --- | --- | --- | --- |
 | Windows 11 x64 | `CeeVee_x.y.z_x64-setup.exe` (NSIS, `installMode: currentUser`, WebView2 from the OS) | The same `-setup.exe` plus `.sig` | Azure Trusted Signing on the app binary and the installer, through `bundle.windows.signCommand` |
-| macOS 13+ arm64 | `CeeVee_x.y.z_aarch64.dmg` | `CeeVee.app.tar.gz` plus `.sig` | Developer ID Application certificate, hardened runtime, notarized with `notarytool` (App Store Connect API key) and stapled |
+| macOS 13+ arm64 | `CeeVee_x.y.z_aarch64.dmg` | `CeeVee.app.tar.gz` plus `.sig` | Developer ID Application certificate, hardened runtime, notarized with `notarytool` (Apple ID, app-specific password, team ID; same as Backer) and stapled |
 
 - `bundle.createUpdaterArtifacts: true` makes Tauri write the `.sig` files, signed with the Tauri updater key (minisign Ed25519) from `TAURI_SIGNING_PRIVATE_KEY`.
 - MSI is not built in v1: per-machine MSI installs need an administrator for every update. Add it later only if IT-managed customers ask.
@@ -486,7 +486,7 @@ s3://turtlebox-dl/ceevee/
 | Tauri updater key (minisign) | Signing app updates | `release` environment secret + two offline encrypted backups | Existing installs can never verify another update; users must reinstall by hand. Rotation: ship a build with the new public key, signed with the old key |
 | Content key (Ed25519) | Signing adapter and model manifests | `content` environment secret + offline backup | Rotate by shipping a release that trusts both old and new keys, then retire the old |
 | License key (Ed25519) | Signing license files and trial tokens | AWS KMS or Secrets Manager (section 14) | Same rotation pattern; never in CI |
-| Apple Developer ID cert and App Store Connect API key | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
+| Apple Developer ID cert, Apple ID app-specific password and team ID | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
 | Azure Trusted Signing | Windows signing | Azure account; CI signs in through OIDC federation where supported, otherwise a client secret in `release` | Reissue in Azure |
 
 Release and content jobs run only on tags from `main`, with environment protection rules, and the AWS role can write only under `ceevee/`.
