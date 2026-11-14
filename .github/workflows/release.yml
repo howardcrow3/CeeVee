@@ -50,13 +50,13 @@ jobs:
       # Update files (.sig) are signed with the updater key.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      # macOS: the Tauri CLI imports the certificate into a temporary keychain and notarizes.
+      # macOS: same scheme as Backer. We import the certificate ourselves (step below) and Tauri notarizes
+      # with the Apple ID, an app-specific password and the team ID.
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-      APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
-      APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
-      APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       # Windows: Azure Trusted Signing through trusted-signing-cli.
       AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
@@ -85,8 +85,34 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ]; then
             [ -n "$AZURE_CLIENT_ID" ] && echo "Windows signing: on" || echo "::warning::AZURE_CLIENT_ID not set; the Windows installer will be unsigned"
           else
-            [ -n "$APPLE_CERTIFICATE" ] && echo "macOS signing: on" || echo "::warning::APPLE_CERTIFICATE not set; the macOS app will be unsigned and not notarized"
+            if [ -n "$APPLE_CERTIFICATE" ] && [ -n "$APPLE_CERTIFICATE_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+              echo "macOS signing: on"; echo "MAC_SIGNED=1" >> "$GITHUB_ENV"
+            else
+              echo "::warning::Apple secrets incomplete (need APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID); the macOS app will be unsigned and not notarized"
+            fi
           fi
+
+      - name: Import Developer ID certificate (macOS)
+        if: runner.os == 'macOS' && env.MAC_SIGNED == '1'
+        run: |
+          KC="$RUNNER_TEMP/build.keychain-db"; KP="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          # The .p12 may only carry an older certificate for the same key. The Developer ID certificate is public,
+          # so it is kept in the repo and imported here; it pairs with the key by its public key.
+          security import .github/signing/developer-id.cer -k "$KC" -A
+          security set-key-partition-list -S apple-tool:,apple: -k "$KP" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          ID=$(security find-identity -p codesigning "$KC" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          if [ -z "$ID" ]; then
+            echo "::error::No usable Developer ID Application identity in the imported .p12"
+            security find-identity "$KC" | sed 's/"/'"'"'/g'
+            exit 1
+          fi
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
 
       - name: Windows signing config
         if: runner.os == 'Windows' && env.AZURE_CLIENT_ID != ''
@@ -102,8 +128,9 @@ jobs:
         working-directory: apps/desktop
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "macOS" ] && [ -z "$APPLE_CERTIFICATE" ]; then NOSIGN=--no-sign; fi
-          pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} ${TAURI_EXTRA_ARGS:-}
+          if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then NOSIGN=--no-sign; fi
+          # The certificate is already in our keychain; if Tauri imported the secret itself it would not see it.
+          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} ${TAURI_EXTRA_ARGS:-}
 
       - name: Collect installers
         shell: bash
@@ -119,7 +146,7 @@ jobs:
           if [ "${{ runner.os }}" = "Windows" ] && [ -n "$AZURE_CLIENT_ID" ]; then
             signtool=$(ls "C:/Program Files (x86)/Windows Kits/10/bin/"*/x64/signtool.exe | tail -1)
             for f in out/*.exe; do "$signtool" verify //pa //all "$f"; done
-          elif [ "${{ runner.os }}" = "macOS" ] && [ -n "$APPLE_CERTIFICATE" ]; then
+          elif [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" = "1" ]; then
             app=$(ls -d target/${{ matrix.target }}/release/bundle/macos/*.app)
             codesign --verify --deep --strict "$app"
             spctl -a -t exec -vv "$app"

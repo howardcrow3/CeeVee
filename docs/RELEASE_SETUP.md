@@ -20,12 +20,13 @@ Settings -> Environments -> `release-build` -> Add environment secret. Add each 
 |---|---|
 | `APPLE_CERTIFICATE` | Your "Developer ID Application" certificate exported from Keychain Access as a .p12 file, then base64-encoded. On a Mac: `base64 -i cert.p12 \| pbcopy`, then paste |
 | `APPLE_CERTIFICATE_PASSWORD` | The password you set when exporting the .p12 |
-| `APPLE_SIGNING_IDENTITY` | The certificate's full name, for example `Developer ID Application: Your Name (TEAMID)`. Find it with `security find-identity -v -p codesigning` |
-| `APPLE_API_ISSUER` | App Store Connect -> Users and Access -> Integrations -> App Store Connect API: the Issuer ID at the top |
-| `APPLE_API_KEY` | The Key ID of an API key you create there (role: Developer) |
-| `APPLE_API_KEY_CONTENT` | The full text of the downloaded `AuthKey_XXXX.p8` file (you can download it only once) |
+| `APPLE_ID` | The Apple ID email of your developer account (same one Backer uses) |
+| `APPLE_PASSWORD` | An app-specific password for that Apple ID, made at appleid.apple.com -> Sign-In and Security -> App-Specific Passwords (same one Backer uses). Not your normal Apple ID password |
+| `APPLE_TEAM_ID` | Your 10-character team ID, `X68DUV4W5M` |
 
-The certificate must be a Developer ID Application certificate (for apps outside the App Store). Notarization uses the API key.
+This is the same scheme Backer uses, so you can reuse Backer's values for all five Apple secrets. No signing-identity secret is needed: the build finds the identity in the imported certificate. Because the `.p12` may only hold an older certificate for the same key, the public Developer ID certificate is kept in the repo at `.github/signing/developer-id.cer` and imported with it.
+
+The certificate must be a Developer ID Application certificate (for apps outside the App Store). Notarization uses the Apple ID, app-specific password and team ID.
 
 ## 3. Updater signing key (add to `release-build`)
 
