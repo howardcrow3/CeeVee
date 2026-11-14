@@ -433,3 +433,43 @@ pub async fn chat_edit_document(
         doc: view(&db, i64::from(id)).await?,
     })
 }
+
+/// Save the current version of a document as a PDF in your Documents folder, under "CeeVee".
+/// Returns the full path of the file.
+#[tauri::command]
+#[specta::specta]
+pub async fn export_document_pdf(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    a4: bool,
+) -> Result<String, String> {
+    use tauri::Manager;
+    let d = ceevee_docs::store::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let cur = ceevee_docs::store::current(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let paper = if a4 {
+        ceevee_docs::render::Paper::A4
+    } else {
+        ceevee_docs::render::Paper::UsLetter
+    };
+    let bytes = tauri::async_runtime::spawn_blocking(move || {
+        ceevee_docs::export::pdf_for(d.kind, &cur.content, paper).map(|b| (b, d.title))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+    .map_err(|e| e.to_string())?;
+    let (bytes, title) = bytes;
+    let dir = app
+        .path()
+        .document_dir()
+        .map_err(|e| e.to_string())?
+        .join("CeeVee");
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}.pdf", ceevee_docs::export::file_stem(&title)));
+    std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
+    Ok(path.display().to_string())
+}
