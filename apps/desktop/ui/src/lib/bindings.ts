@@ -25,6 +25,14 @@ export const commands = {
 	skipProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("skip_proposal", { id })),
 	/**  Approve a waiting proposal and carry it out once. */
 	approveProposal: (id: number) => typedError<null, string>(__TAURI_INVOKE("approve_proposal", { id })),
+	listDocuments: () => typedError<DocLine[], string>(__TAURI_INVOKE("list_documents")),
+	getDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("get_document", { id })),
+	/**  Make a new document. Resumes must be valid JSON. */
+	createDocument: (kind: string, title: string, content: string) => typedError<number, string>(__TAURI_INVOKE("create_document", { kind, title, content })),
+	/**  Save your edit as a new version. Nothing changes if the text is the same. */
+	saveDocument: (id: number, content: string) => typedError<DocView, string>(__TAURI_INVOKE("save_document", { id, content })),
+	undoDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("undo_document", { id })),
+	redoDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("redo_document", { id })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -42,6 +50,22 @@ export type BoardLine = {
 	kind: string,
 	token: string,
 	company: string,
+};
+
+export type DocLine = {
+	id: number,
+	/**  `base_resume`, `resume_variant`, `tailored_resume`, `cover_letter` or `email`. */
+	kind: string,
+	title: string,
+};
+
+export type DocView = {
+	id: number,
+	kind: string,
+	title: string,
+	/**  Resume JSON or letter Markdown. */
+	content: string,
+	versions: number,
 };
 
 /**  Events published by feature crates. Variants are added as features land. */
