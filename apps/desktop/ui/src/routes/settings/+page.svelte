@@ -9,6 +9,9 @@
   let model = $state<ModelStatus | null>(null);
   let progress = $state<DownloadProgress | null>(null);
   let timer: number | undefined;
+  let ask = $state('');
+  let answer = $state('');
+  let asking = $state(false);
   let message = $state('');
   let error = $state('');
 
@@ -37,6 +40,16 @@
     }
     timer = window.setInterval(poll, 1000);
     await poll();
+  }
+
+  async function tryModel() {
+    asking = true;
+    answer = '';
+    error = '';
+    const r = await commands.askModel(ask);
+    if (r.status === 'ok') answer = r.data;
+    else error = r.error;
+    asking = false;
   }
 
   onDestroy(() => window.clearInterval(timer));
@@ -80,6 +93,11 @@
     </p>
     {#if model.installed}
       <p><span class="dot on"></span>{model.name} is installed.</p>
+      <div class="row">
+        <input aria-label="Ask the model" placeholder="Ask it something to try it out" bind:value={ask} />
+        <button onclick={tryModel} disabled={asking || ask.trim() === ''}>{asking ? 'Thinking' : 'Ask'}</button>
+      </div>
+      {#if answer}<p role="status">{answer}</p>{/if}
     {:else if progress?.running}
       <p role="status">
         Downloading {sizeText(progress.downloaded_mb)} of {sizeText(progress.total_mb)}

@@ -10,6 +10,10 @@ publish.workspace = true
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+# The real local AI engine. Needs cmake and clang to build, so it is off for everyday checks.
+llama = ["ceevee-ai/llama"]
+
 [dependencies]
 ceevee-core.workspace = true
 ceevee-agent.workspace = true
