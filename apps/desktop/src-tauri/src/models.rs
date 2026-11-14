@@ -154,12 +154,21 @@ pub async fn ask_model(
     engine: tauri::State<'_, Arc<Engine>>,
     prompt: String,
 ) -> Result<String, String> {
+    generate(&app, &engine, prompt).await
+}
+
+/// Run one prompt on the local model, starting the engine if needed.
+pub async fn generate(
+    app: &tauri::AppHandle,
+    engine: &Engine,
+    prompt: String,
+) -> Result<String, String> {
     let ram = ceevee_ai::hardware::total_ram_gb();
     let catalog = Catalog::builtin();
     let entry = catalog
         .recommend(Role::General, ram)
         .ok_or("This computer does not have enough memory for the built-in models.")?;
-    let path = models_dir(&app)?.join(&entry.file);
+    let path = models_dir(app)?.join(&entry.file);
     if !path.exists() {
         return Err("Download the model in Settings first.".into());
     }

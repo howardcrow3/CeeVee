@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isResume, kindLabel, starter } from './documents';
+import { describeEdit, isResume, kindLabel, starter } from './documents';
 
 describe('documents', () => {
   it('names kinds in plain words', () => {
@@ -16,5 +16,19 @@ describe('documents', () => {
   it('starts resumes with valid JSON', () => {
     expect(() => JSON.parse(starter('base_resume'))).not.toThrow();
     expect(starter('cover_letter')).toBe('');
+  });
+});
+
+describe('describeEdit', () => {
+  it('says when a change is saved cleanly', () => {
+    expect(describeEdit({ applied: true, flagged: [] })).toContain('new version');
+  });
+  it('lists what was held back', () => {
+    const t = describeEdit({ applied: false, flagged: ['40', 'Initech'] });
+    expect(t).toContain('Held back');
+    expect(t).toContain('Initech');
+  });
+  it('warns when flagged changes were accepted', () => {
+    expect(describeEdit({ applied: true, flagged: ['40'] })).toContain('Check these');
   });
 });

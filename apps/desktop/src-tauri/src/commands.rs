@@ -376,3 +376,60 @@ pub async fn redo_document(
         .map_err(|e| e.to_string())?;
     view(&db, i64::from(id)).await
 }
+
+/// The outcome of asking the assistant to change a document.
+#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+pub struct ChatEdit {
+    /// True when the change was saved as a new version.
+    pub applied: bool,
+    /// Names or numbers in the change that were in neither the document nor your request. When
+    /// there are any, nothing is saved and you decide what to do.
+    pub flagged: Vec<String>,
+    /// The proposed text, so it can be shown when it was held back.
+    pub proposed: String,
+    pub doc: DocView,
+}
+
+/// Ask the assistant to change a document. The change becomes a new version, so undo works.
+#[tauri::command]
+#[specta::specta]
+pub async fn chat_edit_document(
+    app: tauri::AppHandle,
+    db: tauri::State<'_, ceevee_db::Db>,
+    engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
+    id: u32,
+    instruction: String,
+    accept_flagged: bool,
+) -> Result<ChatEdit, String> {
+    use ceevee_docs::chat;
+    let d = ceevee_docs::store::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let cur = ceevee_docs::store::current(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let prompt = chat::edit_prompt(d.kind, &cur.content, &instruction);
+    let raw = crate::models::generate(&app, &engine, prompt).await?;
+    let proposed = chat::clean_reply(&raw);
+    if proposed.is_empty() {
+        return Err("The assistant did not return a document.".into());
+    }
+    check_content(d.kind, &proposed)?;
+    let flagged: Vec<String> = chat::check_edit(&cur.content, &instruction, &proposed)
+        .into_iter()
+        .map(|f| f.text)
+        .collect();
+    let applied = flagged.is_empty() || accept_flagged;
+    if applied {
+        let cause = format!("chat: {}", instruction.chars().take(80).collect::<String>());
+        ceevee_docs::store::add_version(&db, i64::from(id), &proposed, &cause, Some("local model"))
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(ChatEdit {
+        applied,
+        flagged,
+        proposed,
+        doc: view(&db, i64::from(id)).await?,
+    })
+}

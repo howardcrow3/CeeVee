@@ -23,3 +23,10 @@ export function isResume(kind: string): boolean {
 export function starter(kind: string): string {
   return isResume(kind) ? '{\n  "basics": { "name": "" },\n  "work": []\n}' : '';
 }
+
+/** What to tell the user after they asked the assistant for a change. */
+export function describeEdit(r: { applied: boolean; flagged: string[] }): string {
+  if (r.applied && r.flagged.length === 0) return 'Done. It is saved as a new version, so Undo brings the old text back.';
+  if (r.applied) return `Saved as a new version, as you asked. Check these, they were not in the original: ${r.flagged.join(', ')}.`;
+  return `Held back, nothing was saved. The change adds things that were not in your document or your request: ${r.flagged.join(', ')}.`;
+}
