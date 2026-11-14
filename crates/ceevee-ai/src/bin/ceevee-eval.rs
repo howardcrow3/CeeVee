@@ -22,6 +22,10 @@ fn main() {
         std::process::exit(2);
     };
     let task = args.next().unwrap_or_else(|| "extract_posting".into());
+    if task == "bench" {
+        bench(&model);
+        return;
+    }
     let Some(spec) = builtin_task(&task) else {
         eprintln!("unknown task {task}");
         std::process::exit(2);
@@ -49,6 +53,57 @@ fn main() {
             );
             std::process::exit(1);
         }
+    }
+}
+
+/// Speed check: tokens per second with no grammar and with each task's grammar. Used to find out
+/// why eval cases are slow on a runner (prompt processing, plain decoding, or grammar sampling).
+#[cfg(feature = "llama")]
+fn bench(model: &str) {
+    use std::sync::atomic::AtomicBool;
+    use std::time::Instant;
+
+    use ceevee_ai::eval::builtin_task;
+    use ceevee_ai::llama::LlamaCppBackend;
+    use ceevee_ai::{GenerateRequest, LlmBackend};
+
+    let started = Instant::now();
+    let mut backend = LlamaCppBackend::new(model);
+    backend.load().expect("load model");
+    println!("load: {:.1}s", started.elapsed().as_secs_f64());
+    let cancel = AtomicBool::new(false);
+    let cases: Vec<(&str, Option<String>)> = vec![
+        ("no grammar", None),
+        (
+            "score_match grammar",
+            builtin_task("score_match").and_then(|s| s.grammar().ok()),
+        ),
+        (
+            "extract_posting grammar",
+            builtin_task("extract_posting").and_then(|s| s.grammar().ok()),
+        ),
+    ];
+    for (name, grammar) in cases {
+        let mut req = GenerateRequest::new(
+            "Posting: Data analyst at Acme Corp, remote, $90,000 to $110,000. Answer with JSON describing it.",
+        );
+        req.grammar = grammar;
+        req.max_tokens = 48;
+        let begun = Instant::now();
+        let mut first = None;
+        let mut pieces = 0u32;
+        let out = backend.generate(&req, &cancel, &mut |_| {
+            pieces += 1;
+            first.get_or_insert_with(|| begun.elapsed());
+        });
+        let total = begun.elapsed().as_secs_f64();
+        let first = first.map_or(0.0, |d| d.as_secs_f64());
+        let rest = (total - first).max(0.0001);
+        println!(
+            "{name}: {pieces} pieces, first piece after {first:.2}s, then {:.2} pieces/s, total {total:.1}s, ok={}",
+            f64::from(pieces.saturating_sub(1)) / rest,
+            out.is_ok()
+        );
     }
 }
 
