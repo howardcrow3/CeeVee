@@ -160,6 +160,12 @@ impl LlmBackend for LlamaCppBackend {
         let mut ctx_params = LlamaContextParams::default()
             .with_n_ctx(NonZeroU32::new(n_ctx))
             .with_n_batch(BATCH as u32);
+        // llama.cpp's own default is 4 threads, which spin-wait: on a 3-core CI runner that
+        // oversubscribes the CPU and drops generation below one token per second.
+        let threads = threads();
+        ctx_params = ctx_params
+            .with_n_threads(threads)
+            .with_n_threads_batch(threads);
         if gpu_layers() == 0 {
             // CPU only means CPU only. By default llama.cpp still hands large operations (prompt
             // processing) to the GPU backend when one is compiled in, and on hosted macOS runners
@@ -229,6 +235,19 @@ impl LlmBackend for LlamaCppBackend {
         }
         Ok(out)
     }
+}
+
+/// Worker threads: `CEEVEE_THREADS`, or the number of cores the machine reports.
+fn threads() -> i32 {
+    std::env::var("CEEVEE_THREADS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or_else(|| {
+            std::thread::available_parallelism()
+                .map(|n| n.get() as i32)
+                .unwrap_or(4)
+        })
 }
 
 /// Layers to run on the GPU: `CEEVEE_GPU_LAYERS`, or all of them (999) when it is not set.
