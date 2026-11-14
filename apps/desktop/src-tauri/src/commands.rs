@@ -231,3 +231,148 @@ pub async fn approve_proposal(
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct DocLine {
+    pub id: u32,
+    /// `base_resume`, `resume_variant`, `tailored_resume`, `cover_letter` or `email`.
+    pub kind: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct DocView {
+    pub id: u32,
+    pub kind: String,
+    pub title: String,
+    /// Resume JSON or letter Markdown.
+    pub content: String,
+    pub versions: u32,
+}
+
+fn doc_kind(s: &str) -> Result<ceevee_docs::store::DocKind, String> {
+    use ceevee_docs::store::DocKind;
+    Ok(match s {
+        "base_resume" => DocKind::BaseResume,
+        "resume_variant" => DocKind::ResumeVariant,
+        "tailored_resume" => DocKind::TailoredResume,
+        "cover_letter" => DocKind::CoverLetter,
+        "email" => DocKind::Email,
+        other => return Err(format!("unknown document type \"{other}\"")),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_documents(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<DocLine>, String> {
+    let docs = ceevee_docs::store::list(&db, None, None)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(docs
+        .into_iter()
+        .map(|d| DocLine {
+            id: d.id as u32,
+            kind: d.kind.as_str().to_owned(),
+            title: d.title,
+        })
+        .collect())
+}
+
+async fn view(db: &ceevee_db::Db, id: i64) -> Result<DocView, String> {
+    let d = ceevee_docs::store::get(db, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let cur = ceevee_docs::store::current(db, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let versions = ceevee_docs::store::versions(db, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(DocView {
+        id: d.id as u32,
+        kind: d.kind.as_str().to_owned(),
+        title: d.title,
+        content: cur.content,
+        versions: versions.len() as u32,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn get_document(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Result<DocView, String> {
+    view(&db, i64::from(id)).await
+}
+
+/// Make a new document. Resumes must be valid JSON.
+#[tauri::command]
+#[specta::specta]
+pub async fn create_document(
+    db: tauri::State<'_, ceevee_db::Db>,
+    kind: String,
+    title: String,
+    content: String,
+) -> Result<u32, String> {
+    let kind = doc_kind(&kind)?;
+    if title.trim().is_empty() {
+        return Err("Give the document a title.".into());
+    }
+    check_content(kind, &content)?;
+    let id = ceevee_docs::store::create(&db, kind, title.trim(), None, None, &content, "created")
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(id as u32)
+}
+
+fn check_content(kind: ceevee_docs::store::DocKind, content: &str) -> Result<(), String> {
+    use ceevee_docs::store::DocKind;
+    if matches!(
+        kind,
+        DocKind::BaseResume | DocKind::ResumeVariant | DocKind::TailoredResume
+    ) {
+        serde_json::from_str::<serde_json::Value>(content)
+            .map_err(|e| format!("A resume has to be valid JSON: {e}"))?;
+    }
+    Ok(())
+}
+
+/// Save your edit as a new version. Nothing changes if the text is the same.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_document(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    content: String,
+) -> Result<DocView, String> {
+    let d = ceevee_docs::store::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    check_content(d.kind, &content)?;
+    ceevee_docs::store::add_version(&db, i64::from(id), &content, "edited by you", None)
+        .await
+        .map_err(|e| e.to_string())?;
+    view(&db, i64::from(id)).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn undo_document(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<DocView, String> {
+    ceevee_docs::store::undo(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    view(&db, i64::from(id)).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn redo_document(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<DocView, String> {
+    ceevee_docs::store::redo(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    view(&db, i64::from(id)).await
+}

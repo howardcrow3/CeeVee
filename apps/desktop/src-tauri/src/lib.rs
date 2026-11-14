@@ -38,6 +38,12 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_proposals,
             commands::skip_proposal,
             commands::approve_proposal,
+            commands::list_documents,
+            commands::get_document,
+            commands::create_document,
+            commands::save_document,
+            commands::undo_document,
+            commands::redo_document,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()
