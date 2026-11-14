@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { commands, type DocLine, type DocView } from '$lib/bindings';
   import { describeEdit, docKinds, isResume, kindLabel, starter } from '$lib/documents';
+  import ResumeForm from '$lib/components/ResumeForm.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let docs = $state<DocLine[]>([]);
@@ -13,6 +14,7 @@
   let newKind = $state('cover_letter');
   let newTitle = $state('');
   let loaded = $state(false);
+  let asText = $state(false);
   let ask = $state('');
   let asking = $state(false);
   let held = $state<{ proposed: string; flagged: string[] } | null>(null);
@@ -132,9 +134,17 @@
       <h2>{open.title}</h2>
       <p class="note">
         {kindLabel(open.kind)}, {open.versions === 1 ? '1 version' : `${open.versions} versions`}.
-        {#if isResume(open.kind)}Resumes are kept as JSON until the resume editor is built.{/if}
       </p>
-      <textarea aria-label="Document text" rows="18" bind:value={draft}></textarea>
+      {#if isResume(open.kind)}
+        <div class="row">
+          <button class="ghost" onclick={() => (asText = !asText)}>{asText ? 'Use the form' : 'Edit as text'}</button>
+        </div>
+      {/if}
+      {#if isResume(open.kind) && !asText}
+        <ResumeForm bind:value={draft} />
+      {:else}
+        <textarea aria-label="Document text" rows="18" bind:value={draft}></textarea>
+      {/if}
       <div class="row">
         <button onclick={() => run('save')}>Save</button>
         <button class="ghost" onclick={() => run('undo')}>Undo</button>
