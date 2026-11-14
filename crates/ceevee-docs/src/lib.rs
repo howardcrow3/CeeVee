@@ -3,6 +3,7 @@
 
 pub mod chat;
 pub mod draft;
+pub mod export;
 pub mod fact_guard;
 pub mod render;
 pub mod store;

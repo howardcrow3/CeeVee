@@ -15,6 +15,7 @@
   let newTitle = $state('');
   let loaded = $state(false);
   let asText = $state(false);
+  let a4 = $state(false);
   let ask = $state('');
   let asking = $state(false);
   let held = $state<{ proposed: string; flagged: string[] } | null>(null);
@@ -96,6 +97,15 @@
       asking = false;
     }
   }
+
+  async function exportPdf() {
+    if (!open) return;
+    error = '';
+    message = '';
+    const r = await commands.exportDocumentPdf(open.id, a4);
+    if (r.status === 'ok') message = `Saved a PDF to ${r.data}`;
+    else error = r.error;
+  }
 </script>
 
 <span class="label">Documents</span>
@@ -149,6 +159,8 @@
         <button onclick={() => run('save')}>Save</button>
         <button class="ghost" onclick={() => run('undo')}>Undo</button>
         <button class="ghost" onclick={() => run('redo')}>Redo</button>
+        <button class="ghost" onclick={exportPdf}>Save as PDF</button>
+        <label class="paper"><input type="checkbox" bind:checked={a4} /> A4 paper</label>
       </div>
       {#if message}<p role="status">{message}</p>{/if}
       <div class="chat">
@@ -177,6 +189,7 @@
   textarea { font: 400 14px/1.6 var(--font-body, inherit); background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 16px; width: 100%; resize: vertical; }
   select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 12px 16px; }
   p { margin: 0; }
+  .paper { display: flex; gap: 8px; align-items: center; font-size: 13px; }
   .chat { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-control); padding-top: 16px; }
   .held { white-space: pre-wrap; font: 400 13px/1.5 var(--font-body, inherit); color: var(--body); border: 1px solid var(--border-control); padding: 12px; margin: 0; }
 </style>

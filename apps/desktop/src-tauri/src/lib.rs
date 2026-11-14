@@ -51,6 +51,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::undo_document,
             commands::redo_document,
             commands::chat_edit_document,
+            commands::export_document_pdf,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()

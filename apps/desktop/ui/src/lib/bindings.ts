@@ -44,6 +44,11 @@ export const commands = {
 	redoDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("redo_document", { id })),
 	/**  Ask the assistant to change a document. The change becomes a new version, so undo works. */
 	chatEditDocument: (id: number, instruction: string, acceptFlagged: boolean) => typedError<ChatEdit, string>(__TAURI_INVOKE("chat_edit_document", { id, instruction, acceptFlagged })),
+	/**
+	 *  Save the current version of a document as a PDF in your Documents folder, under "CeeVee".
+	 *  Returns the full path of the file.
+	 */
+	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
