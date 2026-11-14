@@ -11,7 +11,10 @@ fn prompt_names_the_format_for_each_kind() {
 #[test]
 fn clean_reply_strips_fences_and_thinking() {
     assert_eq!(clean_reply("```json\n{\"a\":1}\n```"), "{\"a\":1}");
-    assert_eq!(clean_reply("<think>hmm</think>\nHello there"), "Hello there");
+    assert_eq!(
+        clean_reply("<think>hmm</think>\nHello there"),
+        "Hello there"
+    );
     assert_eq!(clean_reply("  plain  "), "plain");
     assert_eq!(clean_reply("```\ntext\n```"), "text");
 }
