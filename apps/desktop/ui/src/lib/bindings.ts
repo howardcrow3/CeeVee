@@ -32,6 +32,8 @@ export const commands = {
 	modelProgress: () => __TAURI_INVOKE<DownloadProgress>("model_progress"),
 	/**  Stop the download. What was fetched is kept, so starting again resumes. */
 	cancelModelDownload: () => __TAURI_INVOKE<void>("cancel_model_download"),
+	/**  Ask the local model one question and wait for the whole answer. */
+	askModel: (prompt: string) => typedError<string, string>(__TAURI_INVOKE("ask_model", { prompt })),
 	listDocuments: () => typedError<DocLine[], string>(__TAURI_INVOKE("list_documents")),
 	getDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("get_document", { id })),
 	/**  Make a new document. Resumes must be valid JSON. */

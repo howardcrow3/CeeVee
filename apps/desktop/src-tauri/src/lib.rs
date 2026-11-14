@@ -43,6 +43,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             models::start_model_download,
             models::model_progress,
             models::cancel_model_download,
+            models::ask_model,
             commands::list_documents,
             commands::get_document,
             commands::create_document,
@@ -121,6 +122,7 @@ pub fn run() {
             ceevee_agent::builtin::register_all(&mut registry, &db)?;
             app.manage(registry);
             app.manage(std::sync::Arc::new(models::DownloadState::default()));
+            app.manage(std::sync::Arc::new(models::Engine::default()));
             app.manage(bus);
             app.manage(db);
 

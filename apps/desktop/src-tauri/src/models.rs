@@ -125,3 +125,58 @@ pub fn model_progress(state: tauri::State<'_, Arc<DownloadState>>) -> DownloadPr
 pub fn cancel_model_download(state: tauri::State<'_, Arc<DownloadState>>) {
     state.cancel.store(true, Ordering::SeqCst);
 }
+
+/// The running engine, started the first time the AI is asked for something.
+#[derive(Default)]
+pub struct Engine {
+    worker: Mutex<Option<ceevee_ai::ModelWorker>>,
+}
+
+#[cfg(feature = "llama")]
+fn start_worker(path: PathBuf) -> Result<ceevee_ai::ModelWorker, String> {
+    let backend = ceevee_ai::llama::LlamaCppBackend::new(path);
+    Ok(ceevee_ai::ModelWorker::spawn(
+        backend,
+        std::time::Duration::from_secs(300),
+    ))
+}
+
+#[cfg(not(feature = "llama"))]
+fn start_worker(_path: PathBuf) -> Result<ceevee_ai::ModelWorker, String> {
+    Err("This build of CeeVee does not include the local AI engine.".into())
+}
+
+/// Ask the local model one question and wait for the whole answer.
+#[tauri::command]
+#[specta::specta]
+pub async fn ask_model(
+    app: tauri::AppHandle,
+    engine: tauri::State<'_, Arc<Engine>>,
+    prompt: String,
+) -> Result<String, String> {
+    let ram = ceevee_ai::hardware::total_ram_gb();
+    let catalog = Catalog::builtin();
+    let entry = catalog
+        .recommend(Role::General, ram)
+        .ok_or("This computer does not have enough memory for the built-in models.")?;
+    let path = models_dir(&app)?.join(&entry.file);
+    if !path.exists() {
+        return Err("Download the model in Settings first.".into());
+    }
+    let worker = {
+        let mut slot = engine.worker.lock().map_err(|e| e.to_string())?;
+        if slot.is_none() {
+            *slot = Some(start_worker(path)?);
+        }
+        slot.clone().ok_or("The model did not start.")?
+    };
+    let job = worker.submit(
+        ceevee_ai::Priority::Interactive,
+        ceevee_ai::GenerateRequest::new(prompt),
+        None,
+    );
+    job.result
+        .await
+        .map_err(|_| "The model stopped before it answered.".to_string())?
+        .map_err(|e| e.to_string())
+}
