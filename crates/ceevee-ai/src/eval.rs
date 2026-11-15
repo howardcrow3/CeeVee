@@ -447,6 +447,7 @@ pub fn builtin_cases(task_id: &str) -> Option<&'static str> {
         "score_match" => Some(include_str!("../evals/score_match.json")),
         "write_cover_letter" => Some(include_str!("../evals/write_cover_letter.json")),
         "tailor_resume" => Some(include_str!("../evals/tailor_resume.json")),
+        "label_email" => Some(include_str!("../evals/label_email.json")),
         _ => None,
     }
 }
@@ -459,6 +460,7 @@ pub fn builtin_task(task_id: &str) -> Option<&'static TaskSpec> {
         "score_match" => Some(&crate::task::SCORE_MATCH),
         "write_cover_letter" => Some(&crate::task::WRITE_COVER_LETTER),
         "tailor_resume" => Some(&crate::task::TAILOR_RESUME),
+        "label_email" => Some(&crate::task::LABEL_EMAIL),
         _ => None,
     }
 }
