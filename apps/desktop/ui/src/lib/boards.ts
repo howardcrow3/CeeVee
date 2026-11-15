@@ -23,3 +23,25 @@ export function searchSummary(r: {
   const failed = r.failures.length ? ` ${r.failures.length} could not be read.` : '';
   return `Found ${found} at ${boards}.${failed}`;
 }
+
+/** A starter list of well-known US employers on the two supported job boards. Names that no longer
+ * exist simply show up as "could not be read" after a search, and can be removed. */
+export const starterBoards: BoardLine[] = [
+  { kind: 'greenhouse', token: 'stripe', company: 'Stripe' },
+  { kind: 'greenhouse', token: 'airbnb', company: 'Airbnb' },
+  { kind: 'greenhouse', token: 'discord', company: 'Discord' },
+  { kind: 'greenhouse', token: 'figma', company: 'Figma' },
+  { kind: 'greenhouse', token: 'reddit', company: 'Reddit' },
+  { kind: 'greenhouse', token: 'databricks', company: 'Databricks' },
+  { kind: 'greenhouse', token: 'coinbase', company: 'Coinbase' },
+  { kind: 'lever', token: 'palantir', company: 'Palantir' },
+  { kind: 'lever', token: 'spotify', company: 'Spotify' },
+  { kind: 'lever', token: 'plaid', company: 'Plaid' }
+];
+
+/** Add the starter companies that are not already in the list (same board type and name). */
+export function withStarters(rows: BoardLine[]): BoardLine[] {
+  const have = new Set(rows.map((r) => `${r.kind}:${r.token.trim().toLowerCase()}`));
+  const extra = starterBoards.filter((s) => !have.has(`${s.kind}:${s.token}`));
+  return [...rows, ...extra];
+}

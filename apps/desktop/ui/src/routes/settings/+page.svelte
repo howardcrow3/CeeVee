@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { commands, type BoardLine } from '$lib/bindings';
-  import { boardKinds, cleanBoards } from '$lib/boards';
+  import { boardKinds, cleanBoards, withStarters } from '$lib/boards';
   import { percent, sizeText } from '$lib/models';
   import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
@@ -68,6 +68,9 @@
   function add() {
     boards = [...boards, { kind: 'greenhouse', token: '', company: '' }];
   }
+  function addStarters() {
+    boards = withStarters(boards);
+  }
   function remove(i: number) {
     boards = boards.filter((_, j) => j !== i);
   }
@@ -128,6 +131,7 @@
   {/each}
   <div class="row">
     <button class="ghost" onclick={add}>Add a company</button>
+    <button class="ghost" onclick={addStarters}>Add suggested companies</button>
     <button onclick={save}>Save</button>
   </div>
   {#if message}<p role="status">{message}</p>{/if}
