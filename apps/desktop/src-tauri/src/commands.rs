@@ -82,6 +82,34 @@ pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLin
         .collect())
 }
 
+/// Hide a job you are not interested in.
+#[tauri::command]
+#[specta::specta]
+pub async fn dismiss_job(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_search::postings::set_state(
+        &db,
+        i64::from(id),
+        ceevee_search::postings::State::Dismissed,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Open a job posting in your default browser. Only web addresses are opened.
+#[tauri::command]
+#[specta::specta]
+pub fn open_posting(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("That is not a web address.".into());
+    }
+    tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| e.to_string())
+}
+
 /// How many proposals are waiting for you to approve.
 #[tauri::command]
 #[specta::specta]

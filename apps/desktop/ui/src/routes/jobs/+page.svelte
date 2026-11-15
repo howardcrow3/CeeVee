@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type JobLine } from '$lib/bindings';
-  import { matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
+  import { byMatch, matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -25,6 +25,17 @@
     } finally {
       preparing = null;
     }
+  }
+
+  async function dismiss(id: number) {
+    const r = await commands.dismissJob(id);
+    if (r.status === 'ok') await load();
+    else applyError = r.error;
+  }
+
+  async function openPosting(url: string) {
+    const r = await commands.openPosting(url);
+    if (r.status !== 'ok') applyError = r.error;
   }
 
   async function load() {
@@ -69,13 +80,13 @@
         <tr><th>Role</th><th>Company</th><th>Status</th><th>Match</th><th></th></tr>
       </thead>
       <tbody>
-        {#each jobs as j (j.id)}
+        {#each byMatch(jobs) as j (j.id)}
           <tr>
             <td><b>{j.title}</b><br />{placeText(j)}</td>
             <td>{j.company ?? 'Company not listed'}</td>
             <td><span class="dot" class:on={j.state === 'saved'}></span>{statusWord(j.state)}</td>
             <td class="n">{matchText(j.score)}</td>
-            <td><button class="ghost" disabled={preparing !== null} onclick={() => prepare(j.id)}>{preparing === j.id ? 'Opening' : 'Prepare application'}</button></td>
+            <td class="actions"><button class="ghost" onclick={() => openPosting(j.url)}>Open posting</button> <button class="ghost" onclick={() => dismiss(j.id)}>Dismiss</button> <button class="ghost" disabled={preparing !== null} onclick={() => prepare(j.id)}>{preparing === j.id ? 'Opening' : 'Prepare application'}</button></td>
           </tr>
         {/each}
       </tbody>
@@ -87,4 +98,5 @@
   .plate { border: 1px solid var(--line); background: var(--surface); overflow-x: auto; }
   b { color: var(--ink); font-weight: 500; }
   .n { font-variant-numeric: tabular-nums; }
+  .actions { white-space: nowrap; }
 </style>
