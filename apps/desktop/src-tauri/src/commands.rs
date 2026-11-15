@@ -493,3 +493,43 @@ pub async fn export_document_pdf(
     std::fs::write(&path, bytes).map_err(|e| e.to_string())?;
     Ok(path.display().to_string())
 }
+
+/// What happened when CeeVee filled in an application.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct PrepareResult {
+    pub message: String,
+    pub filled: u32,
+    /// Required questions CeeVee could not answer; you finish these in the browser.
+    pub missing: Vec<String>,
+    pub resume: Option<String>,
+}
+
+/// Open a posting in your browser and fill in its application form. You review and submit.
+#[tauri::command]
+#[specta::specta]
+pub async fn prepare_application(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    registry: tauri::State<'_, ceevee_agent::tools::Registry>,
+    id: u32,
+) -> Result<PrepareResult, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let v = registry
+        .call(crate::apply_tool::ACTION, serde_json::json!({ "id": id }))
+        .await
+        .map_err(|e| e.to_string())?;
+    let list = |k: &str| {
+        v.get(k)
+            .and_then(|x| x.as_array())
+            .cloned()
+            .unwrap_or_default()
+    };
+    Ok(PrepareResult {
+        message: v["message"].as_str().unwrap_or_default().to_string(),
+        filled: list("filled").len() as u32,
+        missing: list("missing_required")
+            .iter()
+            .filter_map(|x| x.as_str().map(str::to_string))
+            .collect(),
+        resume: v["resume"].as_str().map(str::to_string),
+    })
+}

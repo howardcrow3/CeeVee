@@ -188,3 +188,36 @@ async fn refuses_a_redirect_onto_a_blocked_page() {
     };
     assert!(fill_application(&mut d, URL, &answers()).await.is_err());
 }
+
+#[test]
+fn answers_from_a_profile() {
+    let a = Answers::from_parts(
+        "Ada King Lovelace",
+        Some(" ada@example.com "),
+        None,
+        Some("London, UK"),
+        &[
+            "https://www.linkedin.com/in/ada".to_string(),
+            "https://ada.example".to_string(),
+        ],
+        &[("Authorized To Work".to_string(), "Yes".to_string())],
+    );
+    assert_eq!(
+        (a.first_name.as_str(), a.last_name.as_str()),
+        ("Ada", "King Lovelace")
+    );
+    assert_eq!(a.email, "ada@example.com");
+    assert_eq!(a.city, "London");
+    assert!(a.linkedin.contains("linkedin.com/in/ada"));
+    assert_eq!(a.website, "https://ada.example");
+    assert_eq!(
+        a.saved_for("Are you authorized to work in the US?"),
+        Some("Yes")
+    );
+}
+
+#[test]
+fn a_single_name_is_a_first_name_only() {
+    let a = Answers::from_parts("Cher", None, None, None, &[], &[]);
+    assert_eq!((a.first_name.as_str(), a.last_name.as_str()), ("Cher", ""));
+}

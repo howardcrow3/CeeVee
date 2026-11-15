@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type JobLine } from '$lib/bindings';
-  import { matchText, placeText, statusWord } from '$lib/jobs';
+  import { matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -11,6 +11,21 @@
 
   let searching = $state(false);
   let summary = $state('');
+  let preparing = $state<number | null>(null);
+  let applyError = $state('');
+
+  async function prepare(id: number) {
+    preparing = id;
+    summary = '';
+    applyError = '';
+    try {
+      const r = await commands.prepareApplication(id);
+      if (r.status === 'ok') summary = prepareSummary(r.data);
+      else applyError = r.error;
+    } finally {
+      preparing = null;
+    }
+  }
 
   async function load() {
     try {
@@ -40,6 +55,7 @@
 <span class="label">Jobs</span>
 <p><button onclick={search} disabled={searching}>{searching ? 'Searching' : 'Search now'}</button></p>
 {#if summary}<p role="status">{summary}</p>{/if}
+{#if applyError}<p role="alert">{applyError}</p>{/if}
 {#if error}
   <p role="alert">{error}</p>
 {:else if loaded && jobs.length === 0}
@@ -50,7 +66,7 @@
   <div class="plate">
     <table>
       <thead>
-        <tr><th>Role</th><th>Company</th><th>Status</th><th>Match</th></tr>
+        <tr><th>Role</th><th>Company</th><th>Status</th><th>Match</th><th></th></tr>
       </thead>
       <tbody>
         {#each jobs as j (j.id)}
@@ -59,6 +75,7 @@
             <td>{j.company ?? 'Company not listed'}</td>
             <td><span class="dot" class:on={j.state === 'saved'}></span>{statusWord(j.state)}</td>
             <td class="n">{matchText(j.score)}</td>
+            <td><button class="ghost" disabled={preparing !== null} onclick={() => prepare(j.id)}>{preparing === j.id ? 'Opening' : 'Prepare application'}</button></td>
           </tr>
         {/each}
       </tbody>

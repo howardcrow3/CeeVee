@@ -29,6 +29,9 @@ ceevee-ai = { path = "crates/ceevee-ai" }
 ceevee-agent = { path = "crates/ceevee-agent" }
 ceevee-db = { path = "crates/ceevee-db" }
 ceevee-search = { path = "crates/ceevee-search" }
+ceevee-profile = { path = "crates/ceevee-profile" }
+ceevee-docs = { path = "crates/ceevee-docs" }
+ceevee-apply = { path = "crates/ceevee-apply" }
 anyhow = "1"
 futures-util = "0.3"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream"] }

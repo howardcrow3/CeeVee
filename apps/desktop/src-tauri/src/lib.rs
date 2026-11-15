@@ -1,6 +1,7 @@
 //! CeeVee desktop shell: window, tray, single instance and the typed command
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
+mod apply_tool;
 mod commands;
 mod license_cmd;
 mod models;
@@ -57,6 +58,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::redo_document,
             commands::chat_edit_document,
             commands::export_document_pdf,
+            commands::prepare_application,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()
@@ -128,6 +130,7 @@ pub fn run() {
             search_task::spawn(app.handle().clone(), db.clone(), bus.clone());
             let mut registry = ceevee_agent::tools::Registry::new();
             ceevee_agent::builtin::register_all(&mut registry, &db)?;
+            apply_tool::register(&mut registry, app.handle(), &db)?;
             app.manage(registry);
             app.manage(std::sync::Arc::new(models::DownloadState::default()));
             app.manage(std::sync::Arc::new(models::Engine::default()));

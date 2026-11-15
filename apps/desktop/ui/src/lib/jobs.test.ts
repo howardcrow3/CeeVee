@@ -14,3 +14,17 @@ describe('jobs helpers', () => {
     expect(placeText({ location: null })).toBe('Location not listed');
   });
 });
+
+describe('prepareSummary', () => {
+  it('lists what is left for the person', async () => {
+    const { prepareSummary } = await import('./jobs');
+    const t = prepareSummary({ filled: 5, missing: ['Visa sponsorship'], resume: 'Base resume' });
+    expect(t).toContain('Filled 5 fields');
+    expect(t).toContain('Visa sponsorship');
+    expect(t).toContain('press Submit yourself');
+  });
+  it('says when there was no resume', async () => {
+    const { prepareSummary } = await import('./jobs');
+    expect(prepareSummary({ filled: 1, missing: [], resume: null })).toContain('No resume was attached');
+  });
+});
