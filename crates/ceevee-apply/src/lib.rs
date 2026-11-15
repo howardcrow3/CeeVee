@@ -4,6 +4,7 @@
 //! it uses, so they are fully testable without a browser.
 
 pub mod ats;
+pub mod engine;
 pub mod fields;
 pub mod guard;
 
