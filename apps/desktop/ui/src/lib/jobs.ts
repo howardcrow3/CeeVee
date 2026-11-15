@@ -11,7 +11,7 @@ export function matchText(score: number | null | undefined): string {
 }
 
 /** Best matches first; jobs with the same match keep their order (newest first). */
-export function byMatch<T extends { score: number | null }>(jobs: T[]): T[] {
+export function byMatch<T extends { score?: number | null }>(jobs: T[]): T[] {
   return jobs
     .map((j, i) => ({ j, i }))
     .sort((a, b) => (b.j.score ?? -1) - (a.j.score ?? -1) || a.i - b.i)
