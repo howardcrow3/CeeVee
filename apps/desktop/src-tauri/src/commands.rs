@@ -151,6 +151,80 @@ pub async fn save_boards(
         .map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Clone, Serialize, serde::Deserialize, Type)]
+pub struct CategoryLine {
+    pub id: u32,
+    pub name: String,
+    pub titles: Vec<String>,
+    pub keywords: Vec<String>,
+    pub locations: Vec<String>,
+    pub remote_ok: bool,
+    pub avoid: Vec<String>,
+    pub active: bool,
+}
+
+fn category_line(c: ceevee_search::categories::Category) -> CategoryLine {
+    CategoryLine {
+        id: c.id as u32,
+        name: c.name,
+        titles: c.criteria.titles,
+        keywords: c.criteria.keywords,
+        locations: c.criteria.locations,
+        remote_ok: c.criteria.remote_ok,
+        avoid: c.criteria.avoid,
+        active: c.active,
+    }
+}
+
+/// The kinds of job you are looking for, highest priority first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_categories(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<CategoryLine>, String> {
+    let all = ceevee_search::categories::list(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(all.into_iter().map(category_line).collect())
+}
+
+/// Add a kind of job to look for. The id in `line` is ignored.
+#[tauri::command]
+#[specta::specta]
+pub async fn create_category(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    line: CategoryLine,
+) -> Result<CategoryLine, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let criteria = ceevee_search::categories::Criteria {
+        titles: line.titles,
+        keywords: line.keywords,
+        locations: line.locations,
+        remote_ok: line.remote_ok,
+        avoid: line.avoid,
+    };
+    let c = ceevee_search::categories::create(&db, &line.name, &criteria)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(category_line(c))
+}
+
+/// Turn a category on or off. Off categories are not used to score jobs.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_category_active(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    active: bool,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_search::categories::set_active(&db, i64::from(id), active)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct SearchResult {
     pub boards_ok: u32,

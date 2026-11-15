@@ -30,6 +30,12 @@ export const commands = {
 	saveBoards: (boards: BoardLine[]) => typedError<null, string>(__TAURI_INVOKE("save_boards", { boards })),
 	/**  Read every watched board once and store what is new. */
 	runSearch: () => typedError<SearchResult, string>(__TAURI_INVOKE("run_search")),
+	/**  The kinds of job you are looking for, highest priority first. */
+	listCategories: () => typedError<CategoryLine[], string>(__TAURI_INVOKE("list_categories")),
+	/**  Add a kind of job to look for. The id in `line` is ignored. */
+	createCategory: (line: CategoryLine) => typedError<CategoryLine, string>(__TAURI_INVOKE("create_category", { line })),
+	/**  Turn a category on or off. Off categories are not used to score jobs. */
+	setCategoryActive: (id: number, active: boolean) => typedError<null, string>(__TAURI_INVOKE("set_category_active", { id, active })),
 	/**  Everything waiting for your approval, oldest first. */
 	listProposals: () => typedError<ProposalLine[], string>(__TAURI_INVOKE("list_proposals")),
 	/**  Skip a proposal. Approving needs the tools that carry the action out, which come later. */
@@ -79,6 +85,17 @@ export type BoardLine = {
 	kind: string,
 	token: string,
 	company: string,
+};
+
+export type CategoryLine = {
+	id: number,
+	name: string,
+	titles: string[],
+	keywords: string[],
+	locations: string[],
+	remote_ok: boolean,
+	avoid: string[],
+	active: boolean,
 };
 
 /**  The outcome of asking the assistant to change a document. */
