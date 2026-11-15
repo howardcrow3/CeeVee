@@ -2,6 +2,7 @@
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
 mod commands;
+mod license_cmd;
 mod models;
 #[allow(dead_code)] // called by feature crates as they land
 mod notifications;
@@ -28,6 +29,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             app_info,
+            license_cmd::license_status,
+            license_cmd::activate_license,
+            license_cmd::deactivate_license,
+            license_cmd::open_license_page,
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
@@ -110,6 +115,7 @@ pub fn run() {
             Some(vec!["--minimized"]),
         ))
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
@@ -126,6 +132,7 @@ pub fn run() {
             app.manage(std::sync::Arc::new(models::DownloadState::default()));
             app.manage(std::sync::Arc::new(models::Engine::default()));
             app.manage(bus);
+            license_cmd::setup(app, db.clone());
             app.manage(db);
 
             tray::build(app)?;
@@ -166,5 +173,11 @@ pub fn bindings_are_current() -> Result<bool, Box<dyn std::error::Error>> {
     let tmp = std::env::temp_dir().join("ceevee-bindings-check.ts");
     specta_builder().export(specta_typescript::Typescript::default(), &tmp)?;
     let norm = |s: String| s.replace("\r\n", "\n");
-    Ok(norm(std::fs::read_to_string(&tmp)?) == norm(std::fs::read_to_string(BINDINGS_PATH)?))
+    let generated = norm(std::fs::read_to_string(&tmp)?);
+    let current = generated == norm(std::fs::read_to_string(BINDINGS_PATH)?);
+    if !current {
+        // Show what the file should contain so a stale CI run can be fixed without a local build.
+        eprintln!("----- generated bindings.ts -----\n{generated}\n----- end -----");
+    }
+    Ok(current)
 }

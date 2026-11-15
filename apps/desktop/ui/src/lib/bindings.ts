@@ -5,6 +5,17 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	appInfo: () => typedError<AppInfo, string>(__TAURI_INVOKE("app_info")),
+	/**  Where the person stands: trial days left, expired (read-only) or licensed. */
+	licenseStatus: () => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("license_status")),
+	/**  Activate a license key on this computer. */
+	activateLicense: (key: string) => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("activate_license", { key })),
+	/**  Free this computer's seat and remove the license from it. */
+	deactivateLicense: () => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("deactivate_license")),
+	/**
+	 *  Open the turtlebox.studio page in the browser: `buy` or `manage`. Only these two
+	 *  fixed addresses can be opened.
+	 */
+	openLicensePage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_license_page", { which })),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
@@ -137,6 +148,37 @@ export type JobLine_Serialize = {
 	state: string,
 	score: number | null,
 	url: string,
+};
+
+/**  What the license screen and the banner need. */
+export type LicenseView = LicenseView_Serialize | LicenseView_Deserialize;
+
+/**  What the license screen and the banner need. */
+export type LicenseView_Deserialize = {
+	/**  `trial`, `expired` or `licensed`. */
+	state: string,
+	days_left?: number | null,
+	ends_at?: string | null,
+	key_hint?: string | null,
+	seats?: number | null,
+	/**  True when the app may only view and export. */
+	read_only: boolean,
+	/**  Why a stored license was not used, in plain words. */
+	note?: string | null,
+};
+
+/**  What the license screen and the banner need. */
+export type LicenseView_Serialize = {
+	/**  `trial`, `expired` or `licensed`. */
+	state: string,
+	days_left: number | null,
+	ends_at: string | null,
+	key_hint: string | null,
+	seats: number | null,
+	/**  True when the app may only view and export. */
+	read_only: boolean,
+	/**  Why a stored license was not used, in plain words. */
+	note: string | null,
 };
 
 export type LinkedInImport = {
