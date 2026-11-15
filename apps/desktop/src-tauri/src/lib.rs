@@ -3,6 +3,7 @@
 
 mod apply_tool;
 mod commands;
+mod deep_link;
 mod license_cmd;
 mod models;
 #[allow(dead_code)] // called by feature crates as they land
@@ -117,6 +118,11 @@ pub fn run() {
     }
 
     let app = tauri::Builder::default()
+        // Single instance must come first so a second launch (for example a ceevee:// link) is handed to this one.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
@@ -124,9 +130,6 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
-        }))
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             let db = tauri::async_runtime::block_on(ceevee_db::Db::open(&dir.join("ceevee.db")))?;
@@ -141,6 +144,7 @@ pub fn run() {
             app.manage(std::sync::Arc::new(models::Engine::default()));
             app.manage(bus);
             license_cmd::setup(app, db.clone());
+            deep_link::setup(app);
             app.manage(db);
 
             tray::build(app)?;
