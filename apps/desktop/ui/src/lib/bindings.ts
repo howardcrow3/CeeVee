@@ -75,6 +75,10 @@ export const commands = {
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
+	/**  Every application you are tracking, in board order. */
+	listApplications: () => typedError<ApplicationLine_Serialize[], string>(__TAURI_INVOKE("list_applications")),
+	/**  Move an application to a new status, for example after you submit it. */
+	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -85,6 +89,26 @@ export type AppInfo = {
 	name: string,
 	version: string,
 	schema_version: number,
+};
+
+export type ApplicationLine = ApplicationLine_Serialize | ApplicationLine_Deserialize;
+
+export type ApplicationLine_Deserialize = {
+	id: number,
+	title: string,
+	company?: string | null,
+	url?: string | null,
+	status: string,
+	applied_at?: string | null,
+};
+
+export type ApplicationLine_Serialize = {
+	id: number,
+	title: string,
+	company: string | null,
+	url: string | null,
+	status: string,
+	applied_at: string | null,
 };
 
 export type BoardLine = {

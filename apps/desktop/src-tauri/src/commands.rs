@@ -642,15 +642,118 @@ pub struct PrepareResult {
     pub resume: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ApplicationLine {
+    pub id: u32,
+    pub title: String,
+    pub company: Option<String>,
+    pub url: Option<String>,
+    pub status: String,
+    pub applied_at: Option<String>,
+}
+
+async fn application_line(
+    db: &ceevee_db::Db,
+    a: ceevee_search::tracking::Application,
+) -> ApplicationLine {
+    let posting = match a.posting_id {
+        Some(p) => ceevee_search::postings::get(db, p).await.ok(),
+        None => None,
+    };
+    let company = match a.company_id.or(posting.as_ref().and_then(|p| p.company_id)) {
+        Some(c) => ceevee_search::companies::get(db, c)
+            .await
+            .ok()
+            .map(|c| c.name),
+        None => None,
+    };
+    ApplicationLine {
+        id: a.id as u32,
+        title: posting
+            .as_ref()
+            .map_or_else(|| "Application".to_string(), |p| p.title.clone()),
+        company,
+        url: posting.map(|p| p.url),
+        status: a.status.as_str().to_string(),
+        applied_at: a.applied_at,
+    }
+}
+
+/// Every application you are tracking, in board order.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_applications(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<ApplicationLine>, String> {
+    let all = ceevee_search::tracking::list(&db, &ceevee_search::tracking::Filter::default())
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for a in all {
+        out.push(application_line(&db, a).await);
+    }
+    Ok(out)
+}
+
+/// Move an application to a new status, for example after you submit it.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_application_status(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    status: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let to = ceevee_search::tracking::Status::parse(&status).map_err(|e| e.to_string())?;
+    ceevee_search::tracking::set_status(
+        &db,
+        i64::from(id),
+        to,
+        ceevee_search::tracking::Cause::Manual,
+        &ceevee_search::sources::now_iso(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+/// Start tracking a posting as a draft application, unless it is tracked already.
+async fn track_posting(db: &ceevee_db::Db, posting_id: i64) -> Result<(), String> {
+    let all = ceevee_search::tracking::list(db, &ceevee_search::tracking::Filter::default())
+        .await
+        .map_err(|e| e.to_string())?;
+    if all.iter().any(|a| a.posting_id == Some(posting_id)) {
+        return Ok(());
+    }
+    let posting = ceevee_search::postings::get(db, posting_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    ceevee_search::tracking::create(
+        db,
+        &ceevee_search::tracking::NewApplication {
+            posting_id: Some(posting_id),
+            company_id: posting.company_id,
+            category_id: None,
+        },
+        &ceevee_search::sources::now_iso(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Open a posting in your browser and fill in its application form. You review and submit.
 #[tauri::command]
 #[specta::specta]
 pub async fn prepare_application(
     lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
     registry: tauri::State<'_, ceevee_agent::tools::Registry>,
     id: u32,
 ) -> Result<PrepareResult, String> {
     crate::license_cmd::require_write(&lic).await?;
+    track_posting(&db, i64::from(id)).await?;
     let v = registry
         .call(crate::apply_tool::ACTION, serde_json::json!({ "id": id }))
         .await
