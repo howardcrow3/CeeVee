@@ -173,5 +173,11 @@ pub fn bindings_are_current() -> Result<bool, Box<dyn std::error::Error>> {
     let tmp = std::env::temp_dir().join("ceevee-bindings-check.ts");
     specta_builder().export(specta_typescript::Typescript::default(), &tmp)?;
     let norm = |s: String| s.replace("\r\n", "\n");
-    Ok(norm(std::fs::read_to_string(&tmp)?) == norm(std::fs::read_to_string(BINDINGS_PATH)?))
+    let generated = norm(std::fs::read_to_string(&tmp)?);
+    let current = generated == norm(std::fs::read_to_string(BINDINGS_PATH)?);
+    if !current {
+        // Show what the file should contain so a stale CI run can be fixed without a local build.
+        eprintln!("----- generated bindings.ts -----\n{generated}\n----- end -----");
+    }
+    Ok(current)
 }
