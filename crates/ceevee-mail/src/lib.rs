@@ -1,8 +1,18 @@
-//! Mail: decoding messages, the no-model candidate filter, and (later) IMAP/SMTP, OAuth,
-//! labelling, linking and alert-email parsing (see docs/TECHNICAL_PLAN.md section 11).
+//! Mail: decoding messages, the no-model candidate filter, labelling, linking to applications,
+//! status changes and reply drafts. Fetching (IMAP, Gmail) feeds [`pipeline::process`]
+//! (see docs/TECHNICAL_PLAN.md section 11).
 
 pub mod filter;
+pub mod label;
+pub mod link;
 pub mod parse;
+pub mod pipeline;
+pub mod reply;
+pub mod status;
+pub mod store;
 
 pub use filter::{classify, Candidate, Rules};
 pub use parse::{parse, ParsedMail};
+
+#[cfg(test)]
+mod tests;
