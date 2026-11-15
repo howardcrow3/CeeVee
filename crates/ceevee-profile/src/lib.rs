@@ -9,4 +9,4 @@ pub mod import;
 pub mod repo;
 
 pub use import::{plan_import, ResumeDraft};
-pub use repo::{Basics, Change, Entry, EntryKind, Fact};
+pub use repo::{describe, Basics, Change, Entry, EntryKind, Fact};

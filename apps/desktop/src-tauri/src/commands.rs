@@ -226,6 +226,70 @@ pub async fn set_category_active(
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
+pub struct ProfileChange {
+    /// The change itself, to hand back to `apply_profile_changes` if accepted.
+    pub change: String,
+    /// What it does, in one sentence.
+    pub text: String,
+}
+
+/// Read resume text with the local model and list what it would change in your profile. Nothing is
+/// saved until you accept.
+#[tauri::command]
+#[specta::specta]
+pub async fn preview_resume_import(
+    app: tauri::AppHandle,
+    engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    text: String,
+) -> Result<Vec<ProfileChange>, String> {
+    if text.trim().is_empty() {
+        return Err("Paste the text of your resume first.".into());
+    }
+    let worker = crate::models::worker_for(&app, &engine)?;
+    let out: ceevee_ai::task::TaskOutput<ceevee_profile::ResumeDraft> = ceevee_ai::task::run(
+        &worker,
+        &ceevee_ai::task::IMPORT_RESUME,
+        &[("resume", text.as_str())],
+        ceevee_ai::Priority::Interactive,
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    let plan = ceevee_profile::plan_import(&db, &out.value)
+        .await
+        .map_err(|e| e.to_string())?;
+    plan.iter()
+        .map(|c| {
+            Ok(ProfileChange {
+                change: serde_json::to_string(c).map_err(|e| e.to_string())?,
+                text: ceevee_profile::describe(c),
+            })
+        })
+        .collect()
+}
+
+/// Save the changes you accepted. Returns how many were applied.
+#[tauri::command]
+#[specta::specta]
+pub async fn apply_profile_changes(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    changes: Vec<String>,
+) -> Result<u32, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let mut n = 0;
+    for raw in changes {
+        let c: ceevee_profile::Change =
+            serde_json::from_str(&raw).map_err(|e| format!("Could not read a change: {e}"))?;
+        ceevee_profile::repo::apply(&db, &c)
+            .await
+            .map_err(|e| e.to_string())?;
+        n += 1;
+    }
+    Ok(n)
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
 pub struct SearchResult {
     pub boards_ok: u32,
     pub new: u32,

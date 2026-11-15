@@ -292,6 +292,35 @@ pub async fn get_fact(db: &Db, key: &str) -> Result<Option<Fact>> {
     }))
 }
 
+/// One plain sentence for the review screen.
+pub fn describe(change: &Change) -> String {
+    match change {
+        Change::SetBasic { field, old, new } => {
+            let label = match field.as_str() {
+                "full_name" => "Name",
+                "email" => "Email",
+                "phone" => "Phone",
+                "location" => "Location",
+                "summary" => "Summary",
+                other => other,
+            };
+            match old {
+                Some(o) if !o.trim().is_empty() => format!("{label}: change \"{o}\" to \"{new}\""),
+                _ => format!("{label}: set to \"{new}\""),
+            }
+        }
+        Change::AddEntry { entry } => {
+            let at = entry
+                .organization
+                .as_deref()
+                .map(|o| format!(" at {o}"))
+                .unwrap_or_default();
+            format!("Add {}{at}", entry.title)
+        }
+        Change::AddSkill { name } => format!("Add skill: {name}"),
+    }
+}
+
 /// Apply one accepted change. Adding something that already exists is a no-op, so applying the same
 /// change twice is safe.
 pub async fn apply(db: &Db, change: &Change) -> Result<()> {

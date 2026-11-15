@@ -691,6 +691,7 @@ dependencies = [
  "ceevee-docs",
  "ceevee-license",
  "ceevee-network",
+ "ceevee-profile",
  "ceevee-search",
  "chrono",
  "serde",
