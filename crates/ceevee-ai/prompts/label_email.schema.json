@@ -1,0 +1,11 @@
+{
+  "type": "object",
+  "required": ["kind", "summary", "needs_reply", "interview_at", "mentions_company"],
+  "properties": {
+    "kind": {"type": "string", "enum": ["interview", "assessment", "offer", "rejection", "question", "acknowledgement", "other"]},
+    "summary": {"type": "string", "maxLength": 240},
+    "needs_reply": {"type": "boolean"},
+    "interview_at": {"type": "string", "maxLength": 60},
+    "mentions_company": {"type": "string", "maxLength": 80}
+  }
+}
