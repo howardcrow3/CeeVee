@@ -83,6 +83,8 @@ export const commands = {
 	 *  Returns the full path of the file.
 	 */
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
+	/**  Show a file you saved in your computer's file manager. Only files, never programs, are shown. */
+	showInFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("show_in_folder", { path })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
 	/**  Every application you are tracking, in board order. */

@@ -632,6 +632,17 @@ pub async fn export_document_pdf(
     Ok(path.display().to_string())
 }
 
+/// Show a file you saved in your computer's file manager. Only files, never programs, are shown.
+#[tauri::command]
+#[specta::specta]
+pub fn show_in_folder(path: String) -> Result<(), String> {
+    let p = std::path::PathBuf::from(&path);
+    if !p.is_file() {
+        return Err("That file is not there any more.".into());
+    }
+    tauri_plugin_opener::reveal_item_in_dir(&p).map_err(|e| e.to_string())
+}
+
 /// What happened when CeeVee filled in an application.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct PrepareResult {
