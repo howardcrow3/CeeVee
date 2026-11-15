@@ -5,9 +5,17 @@ export function statusWord(state: string): string {
   return state === 'saved' ? 'Saved' : 'New';
 }
 
-/** Match as a whole-number percent, or an em-free dash when the job has not been scored. */
+/** Match as a whole-number percent. Scores run from 0 to 100. */
 export function matchText(score: number | null | undefined): string {
-  return score == null ? 'Not scored' : `${Math.round(score * 100)}%`;
+  return score == null ? 'Not scored' : `${Math.max(0, Math.min(100, Math.round(score)))}%`;
+}
+
+/** Best matches first; jobs with the same match keep their order (newest first). */
+export function byMatch<T extends { score?: number | null }>(jobs: T[]): T[] {
+  return jobs
+    .map((j, i) => ({ j, i }))
+    .sort((a, b) => (b.j.score ?? -1) - (a.j.score ?? -1) || a.i - b.i)
+    .map((x) => x.j);
 }
 
 export function placeText(j: Pick<JobLine, 'location'>): string {

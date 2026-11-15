@@ -36,6 +36,10 @@ export const commands = {
 	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
 	/**  Jobs found by searches that you have not dismissed, newest first. */
 	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
+	/**  Hide a job you are not interested in. */
+	dismissJob: (id: number) => typedError<null, string>(__TAURI_INVOKE("dismiss_job", { id })),
+	/**  Open a job posting in your default browser. Only web addresses are opened. */
+	openPosting: (url: string) => typedError<null, string>(__TAURI_INVOKE("open_posting", { url })),
 	listBoards: () => typedError<BoardLine[], string>(__TAURI_INVOKE("list_boards")),
 	saveBoards: (boards: BoardLine[]) => typedError<null, string>(__TAURI_INVOKE("save_boards", { boards })),
 	/**  Read every watched board once and store what is new. */
