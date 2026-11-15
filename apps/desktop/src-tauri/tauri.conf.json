@@ -19,8 +19,14 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": ["nsis", "dmg", "app"],
+    "publisher": "Turtlebox",
+    "copyright": "Copyright (c) 2026 Turtlebox. All rights reserved.",
+    "category": "Productivity",
+    "shortDescription": "A local AI app that helps you manage your job search.",
+    "longDescription": "CeeVee finds jobs, drafts your resume and cover letters, and tracks your applications. It runs on your computer and your data stays there.",
     "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"],
-    "windows": { "nsis": { "installMode": "currentUser" } }
+    "windows": { "nsis": { "installMode": "currentUser" } },
+    "macOS": { "minimumSystemVersion": "13.0" }
   },
   "plugins": {
     "deep-link": { "desktop": { "schemes": ["ceevee"] } },

@@ -180,3 +180,31 @@ fn drafting_and_scoring_tasks_are_well_formed() {
     let letter = WRITE_COVER_LETTER.schema_value().unwrap();
     assert!(parse_output::<Value>(&letter, r#"{"letter":"short"}"#).is_err());
 }
+
+#[test]
+fn email_tasks_are_well_formed_and_cannot_name_an_action() {
+    for spec in [&LABEL_EMAIL, &DRAFT_REPLY] {
+        assert!(spec.grammar().unwrap().contains("root ::="), "{}", spec.id);
+    }
+    let vars = [
+        ("from", "a@b.c"),
+        ("subject", "S"),
+        ("body", "B"),
+        ("profile", "P"),
+        ("posting", "J"),
+        ("instructions", ""),
+    ];
+    for spec in [&LABEL_EMAIL, &DRAFT_REPLY] {
+        assert!(
+            !render(spec.prompt, &vars).unwrap().contains("{{"),
+            "{}",
+            spec.id
+        );
+    }
+    let label = LABEL_EMAIL.schema_value().unwrap();
+    let ok = r#"{"kind":"interview","summary":"Asks for a call","needs_reply":true,"interview_at":"","mentions_company":"Acme"}"#;
+    assert!(parse_output::<Value>(&label, ok).is_ok());
+    // A model tricked by an email cannot invent a kind such as "send_resume".
+    let bad = ok.replace("interview\"", "send_resume\"");
+    assert!(parse_output::<Value>(&label, &bad).is_err());
+}

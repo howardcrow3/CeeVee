@@ -172,6 +172,27 @@ pub const WRITE_COVER_LETTER: TaskSpec = TaskSpec {
     temperature: 0.3,
 };
 
+/// Say what kind of message an employer email is, whether it needs a reply, and any interview
+/// time. The answer can only choose a label; it cannot trigger an action.
+pub const LABEL_EMAIL: TaskSpec = TaskSpec {
+    id: "label_email",
+    version: 1,
+    prompt: include_str!("../prompts/label_email.md"),
+    schema: include_str!("../prompts/label_email.schema.json"),
+    max_tokens: 300,
+    temperature: 0.0,
+};
+
+/// Write a short reply to an employer email. The caller runs the fact guard on the result.
+pub const DRAFT_REPLY: TaskSpec = TaskSpec {
+    id: "draft_reply",
+    version: 1,
+    prompt: include_str!("../prompts/draft_reply.md"),
+    schema: include_str!("../prompts/draft_reply.schema.json"),
+    max_tokens: 400,
+    temperature: 0.3,
+};
+
 /// Select and order the content of a resume for a posting, without adding anything. The answer
 /// has the same shape as `import_resume`'s. The caller runs the fact guard on the result.
 pub const TAILOR_RESUME: TaskSpec = TaskSpec {

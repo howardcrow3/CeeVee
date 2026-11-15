@@ -39,6 +39,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             diagnostics::diagnostics,
             diagnostics::dismiss_crash,
             diagnostics::open_log_folder,
+            license_cmd::open_info_page,
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
@@ -69,6 +70,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::chat_edit_document,
             commands::export_document_pdf,
             commands::prepare_application,
+            commands::list_applications,
+            commands::set_application_status,
             commands::pending_approval_count
         ])
         .typ::<ceevee_core::Event>()

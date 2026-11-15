@@ -21,6 +21,11 @@ export const commands = {
 	dismissCrash: () => typedError<null, string>(__TAURI_INVOKE("dismiss_crash")),
 	/**  Show the log folder in Explorer or Finder. */
 	openLogFolder: () => typedError<null, string>(__TAURI_INVOKE("open_log_folder")),
+	/**
+	 *  Open one of CeeVee's public pages in the browser: `privacy`, `terms` or `help`. Only these
+	 *  fixed addresses can be opened.
+	 */
+	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
@@ -80,6 +85,10 @@ export const commands = {
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
+	/**  Every application you are tracking, in board order. */
+	listApplications: () => typedError<ApplicationLine_Serialize[], string>(__TAURI_INVOKE("list_applications")),
+	/**  Move an application to a new status, for example after you submit it. */
+	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -90,6 +99,26 @@ export type AppInfo = {
 	name: string,
 	version: string,
 	schema_version: number,
+};
+
+export type ApplicationLine = ApplicationLine_Serialize | ApplicationLine_Deserialize;
+
+export type ApplicationLine_Deserialize = {
+	id: number,
+	title: string,
+	company?: string | null,
+	url?: string | null,
+	status: string,
+	applied_at?: string | null,
+};
+
+export type ApplicationLine_Serialize = {
+	id: number,
+	title: string,
+	company: string | null,
+	url: string | null,
+	status: string,
+	applied_at: string | null,
 };
 
 export type BoardLine = {

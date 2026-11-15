@@ -12,6 +12,11 @@ pub const PURCHASE_URL: &str = "https://turtlebox.studio/ceevee/buy?from=app";
 /// Where people free a seat or find their key again.
 pub const MY_LICENSE_URL: &str = "https://turtlebox.studio/ceevee/license";
 
+/// Public pages linked from the app (text in docs/customer/).
+pub const PRIVACY_URL: &str = "https://turtlebox.studio/ceevee/privacy";
+pub const TERMS_URL: &str = "https://turtlebox.studio/ceevee/terms";
+pub const HELP_URL: &str = "https://turtlebox.studio/ceevee/help";
+
 #[allow(async_fn_in_trait)]
 pub trait Api: Send + Sync {
     /// First contact: a signed trial token for this machine.

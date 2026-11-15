@@ -36,6 +36,11 @@
     busy = false;
   }
 
+  async function openPage(which: 'help' | 'privacy' | 'terms') {
+    const r = await commands.openInfoPage(which);
+    if (r.status !== 'ok') error = r.error;
+  }
+
   async function openLogs() {
     const r = await commands.openLogFolder();
     if (r.status !== 'ok') error = r.error;
@@ -61,6 +66,11 @@
       <button class="ghost" onclick={check} disabled={busy}>{busy ? 'Checking' : 'Check for updates'}</button>
     {/if}
     <button class="ghost" onclick={openLogs}>Open log folder</button>
+  </div>
+  <div class="row">
+    <button class="ghost" onclick={() => openPage('help')}>Help</button>
+    <button class="ghost" onclick={() => openPage('privacy')}>Privacy notice</button>
+    <button class="ghost" onclick={() => openPage('terms')}>Terms of use</button>
   </div>
   <p class="note">
     CeeVee keeps a small log on this computer to help fix problems. It holds no resume, job or email
