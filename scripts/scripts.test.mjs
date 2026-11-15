@@ -102,3 +102,14 @@ test('committed history matches the models and tasks the dashboard expects', () 
   const ids = JSON.parse(readFileSync(new URL('../evals/models.json', import.meta.url), 'utf8')).models.map((m) => m.id);
   for (const run of h.runs) for (const x of run.results) assert.ok(ids.includes(x.model), x.model);
 });
+
+import { render as renderMd, page } from './customer-pages.mjs';
+
+test('customer pages: headings, lists, tables and escaping', () => {
+  const html = renderMd('# Title\n\nA **bold** <b>\n\n- one\n- two\n\n| a | b |\n|---|---|\n| 1 | `x` |\n');
+  assert.match(html, /<h1>Title<\/h1>/);
+  assert.match(html, /<strong>bold<\/strong> &lt;b&gt;/);
+  assert.match(html, /<ul><li>one<\/li><li>two<\/li><\/ul>/);
+  assert.match(html, /<td><code>x<\/code><\/td>/);
+  assert.match(page('T', html), /^<!doctype html>/);
+});
