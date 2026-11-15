@@ -45,6 +45,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::import_linkedin_connections,
             commands::export_resume_pdf,
             commands::list_jobs,
+            commands::people_at_job,
             commands::dismiss_job,
             commands::open_posting,
             commands::list_boards,

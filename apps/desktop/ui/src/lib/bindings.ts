@@ -36,6 +36,8 @@ export const commands = {
 	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
 	/**  Jobs found by searches that you have not dismissed, newest first. */
 	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
+	/**  People you know at the company that posted a job. */
+	peopleAtJob: (id: number) => typedError<KnownLine_Serialize[], string>(__TAURI_INVOKE("people_at_job", { id })),
 	/**  Hide a job you are not interested in. */
 	dismissJob: (id: number) => typedError<null, string>(__TAURI_INVOKE("dismiss_job", { id })),
 	/**  Open a job posting in your default browser. Only web addresses are opened. */
@@ -221,6 +223,8 @@ export type JobLine_Deserialize = {
 	state: string,
 	score?: number | null,
 	url: string,
+	/**  How many of your LinkedIn connections currently work at this company. */
+	known: number,
 };
 
 /**  One line of the jobs list. */
@@ -232,6 +236,22 @@ export type JobLine_Serialize = {
 	state: string,
 	score: number | null,
 	url: string,
+	/**  How many of your LinkedIn connections currently work at this company. */
+	known: number,
+};
+
+export type KnownLine = KnownLine_Serialize | KnownLine_Deserialize;
+
+export type KnownLine_Deserialize = {
+	name: string,
+	title?: string | null,
+	profile_url?: string | null,
+};
+
+export type KnownLine_Serialize = {
+	name: string,
+	title: string | null,
+	profile_url: string | null,
 };
 
 /**  What the license screen and the banner need. */
