@@ -5,6 +5,7 @@ mod apply_tool;
 mod commands;
 mod deep_link;
 mod license_cmd;
+mod mail_cmd;
 mod models;
 #[allow(dead_code)] // called by feature crates as they land
 mod notifications;
@@ -67,7 +68,18 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::prepare_application,
             commands::list_applications,
             commands::set_application_status,
-            commands::pending_approval_count
+            commands::pending_approval_count,
+            mail_cmd::imap_preset,
+            mail_cmd::list_mail_accounts,
+            mail_cmd::connect_imap,
+            mail_cmd::disconnect_mail_account,
+            mail_cmd::sync_mail,
+            mail_cmd::list_inbox,
+            mail_cmd::unread_mail_count,
+            mail_cmd::open_message,
+            mail_cmd::link_message,
+            mail_cmd::draft_mail_reply,
+            mail_cmd::list_application_choices
         ])
         .typ::<ceevee_core::Event>()
 }
@@ -138,6 +150,7 @@ pub fn run() {
             let bus = ceevee_core::EventBus::new(256);
             scheduler::spawn(db.clone(), bus.clone());
             search_task::spawn(app.handle().clone(), db.clone(), bus.clone());
+            mail_cmd::spawn(app.handle().clone(), db.clone(), bus.clone());
             let mut registry = ceevee_agent::tools::Registry::new();
             ceevee_agent::builtin::register_all(&mut registry, &db)?;
             apply_tool::register(&mut registry, app.handle(), &db)?;

@@ -81,6 +81,25 @@ export const commands = {
 	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
+	imapPreset: (address: string) => __TAURI_INVOKE<ImapPreset | null>("imap_preset", { address }),
+	listMailAccounts: () => typedError<MailAccountLine_Serialize[], string>(__TAURI_INVOKE("list_mail_accounts")),
+	/**
+	 *  Check the password with the mail server, then save the account. The password goes to the
+	 *  operating system's keychain, never to the database.
+	 */
+	connectImap: (address: string, host: string, port: number, password: string) => typedError<MailAccountLine_Serialize, string>(__TAURI_INVOKE("connect_imap", { address, host, port, password })),
+	/**  Disconnect an account and remove the mail CeeVee kept from it. */
+	disconnectMailAccount: (id: number) => typedError<null, string>(__TAURI_INVOKE("disconnect_mail_account", { id })),
+	syncMail: () => typedError<SyncLine, string>(__TAURI_INVOKE("sync_mail")),
+	listInbox: () => typedError<InboxLine_Serialize[], string>(__TAURI_INVOKE("list_inbox")),
+	unreadMailCount: () => typedError<number, string>(__TAURI_INVOKE("unread_mail_count")),
+	/**  Open one message; this marks it read. */
+	openMessage: (id: number) => typedError<MessageView_Serialize, string>(__TAURI_INVOKE("open_message", { id })),
+	/**  Tie a message to an application the user chose (or `None` to untie it). */
+	linkMessage: (id: number, applicationId: number | null) => typedError<null, string>(__TAURI_INVOKE("link_message", { id, applicationId })),
+	/**  Write (or rewrite) a reply draft. Changing it afterwards goes through the document chat. */
+	draftMailReply: (id: number, instructions: string, again: boolean) => typedError<ReplyResult, string>(__TAURI_INVOKE("draft_mail_reply", { id, instructions, again })),
+	listApplicationChoices: () => typedError<ApplicationChoice[], string>(__TAURI_INVOKE("list_application_choices")),
 };
 
 /* Types */
@@ -89,6 +108,12 @@ export type AppInfo = {
 	name: string,
 	version: string,
 	schema_version: number,
+};
+
+/**  Applications the user can pick from when linking a message. */
+export type ApplicationChoice = {
+	id: number,
+	name: string,
 };
 
 export type ApplicationLine = ApplicationLine_Serialize | ApplicationLine_Deserialize;
@@ -175,6 +200,46 @@ export type Event =
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
 
+/**  Server settings CeeVee knows for an address, so the form can fill them in. */
+export type ImapPreset = {
+	host: string,
+	port: number,
+};
+
+export type InboxLine = InboxLine_Serialize | InboxLine_Deserialize;
+
+export type InboxLine_Deserialize = {
+	id: number,
+	from: string,
+	subject: string,
+	summary: string,
+	received_at?: string | null,
+	/**  `interview`, `assessment`, `offer`, `rejection`, `question`, `acknowledgement`, `other`. */
+	label?: string | null,
+	needs_reply: boolean,
+	unread: boolean,
+	has_draft: boolean,
+	application_id?: number | null,
+	/**  `Company, Job title` of the linked application. */
+	application?: string | null,
+};
+
+export type InboxLine_Serialize = {
+	id: number,
+	from: string,
+	subject: string,
+	summary: string,
+	received_at: string | null,
+	/**  `interview`, `assessment`, `offer`, `rejection`, `question`, `acknowledgement`, `other`. */
+	label: string | null,
+	needs_reply: boolean,
+	unread: boolean,
+	has_draft: boolean,
+	application_id: number | null,
+	/**  `Company, Job title` of the linked application. */
+	application: string | null,
+};
+
 /**  One line of the jobs list. */
 export type JobLine = JobLine_Serialize | JobLine_Deserialize;
 
@@ -236,6 +301,50 @@ export type LinkedInImport = {
 	updated: number,
 };
 
+export type MailAccountLine = MailAccountLine_Serialize | MailAccountLine_Deserialize;
+
+export type MailAccountLine_Deserialize = {
+	id: number,
+	/**  `imap` or `gmail`. */
+	provider: string,
+	address: string,
+	last_synced_at?: string | null,
+};
+
+export type MailAccountLine_Serialize = {
+	id: number,
+	/**  `imap` or `gmail`. */
+	provider: string,
+	address: string,
+	last_synced_at: string | null,
+};
+
+export type MessageView = MessageView_Serialize | MessageView_Deserialize;
+
+export type MessageView_Deserialize = {
+	line: InboxLine_Deserialize,
+	from_address: string,
+	body: string,
+	interview_at?: string | null,
+	suggested_status?: string | null,
+	/**  Document id of the drafted reply, if there is one. */
+	draft_id?: number | null,
+	/**  What the draft says now. */
+	draft?: string | null,
+};
+
+export type MessageView_Serialize = {
+	line: InboxLine_Serialize,
+	from_address: string,
+	body: string,
+	interview_at: string | null,
+	suggested_status: string | null,
+	/**  Document id of the drafted reply, if there is one. */
+	draft_id: number | null,
+	/**  What the draft says now. */
+	draft: string | null,
+};
+
 export type ModelStatus = {
 	ram_gb: number,
 	id: string,
@@ -281,11 +390,24 @@ export type ProposalLine = {
 	created_at: string,
 };
 
+export type ReplyResult = {
+	document_id: number,
+	/**  Names, numbers or acronyms in the draft that the profile, posting and email do not contain. */
+	unverified: string[],
+};
+
 export type SearchResult = {
 	boards_ok: number,
 	new: number,
 	duplicates: number,
 	failures: string[],
+};
+
+export type SyncLine = {
+	employer: number,
+	status_changes: number,
+	waiting_for_you: number,
+	drafts: number,
 };
 
 export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;

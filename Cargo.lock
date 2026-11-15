@@ -736,6 +736,7 @@ dependencies = [
  "ceevee-db",
  "ceevee-docs",
  "ceevee-license",
+ "ceevee-mail",
  "ceevee-network",
  "ceevee-profile",
  "ceevee-search",

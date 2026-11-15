@@ -54,6 +54,20 @@ pub struct Fetched {
     pub seen: usize,
 }
 
+/// Server settings for the big providers, from the part of the address after the `@`.
+pub fn preset_for(address: &str) -> Option<(&'static str, u16)> {
+    let domain = crate::parse::domain_of(address)?;
+    Some(match domain.as_str() {
+        "gmail.com" | "googlemail.com" => ("imap.gmail.com", 993),
+        "outlook.com" | "hotmail.com" | "live.com" | "msn.com" => ("outlook.office365.com", 993),
+        "yahoo.com" | "ymail.com" => ("imap.mail.yahoo.com", 993),
+        "icloud.com" | "me.com" | "mac.com" => ("imap.mail.me.com", 993),
+        "aol.com" => ("imap.aol.com", 993),
+        "fastmail.com" => ("imap.fastmail.com", 993),
+        _ => return None,
+    })
+}
+
 fn imap_err(e: impl std::fmt::Display) -> Error {
     Error::Other(format!("mail server: {e}"))
 }

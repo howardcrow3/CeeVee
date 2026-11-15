@@ -183,7 +183,7 @@ async fn a_sync_downloads_only_employer_mail_and_does_not_repeat() {
         &db,
         acct.id,
         "app-password",
-        None,
+        || None,
         1_794_564_000,
         "2026-11-13T10:00:00Z",
     )
@@ -218,7 +218,7 @@ async fn a_sync_downloads_only_employer_mail_and_does_not_repeat() {
         &db,
         acct.id,
         "app-password",
-        None,
+        || None,
         1_794_564_100,
         "2026-11-13T10:01:40Z",
     )
@@ -256,4 +256,15 @@ async fn an_unreachable_server_is_explained() {
         crate::imap::explain(&err).contains("could not reach"),
         "{err}"
     );
+}
+
+#[test]
+fn presets_cover_the_common_providers() {
+    use crate::imap::preset_for;
+    assert_eq!(preset_for("a@gmail.com"), Some(("imap.gmail.com", 993)));
+    assert_eq!(
+        preset_for("a@Outlook.com"),
+        Some(("outlook.office365.com", 993))
+    );
+    assert_eq!(preset_for("a@example.org"), None);
 }

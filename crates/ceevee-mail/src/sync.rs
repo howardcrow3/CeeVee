@@ -37,12 +37,13 @@ impl Summary {
     }
 }
 
-/// Sync an IMAP account. `now_secs` is Unix time; `now` the same instant as ISO-8601.
+/// Sync an IMAP account. `now_secs` is Unix time; `now` the same instant as ISO-8601. `worker` is
+/// asked for only when there is mail to read, so a quiet inbox never wakes the model.
 pub async fn sync_imap(
     db: &Db,
     account_id: i64,
     password: &str,
-    worker: Option<&ModelWorker>,
+    worker: impl FnOnce() -> Option<ModelWorker>,
     now_secs: i64,
     now: &str,
 ) -> Result<Summary> {
@@ -61,8 +62,13 @@ pub async fn sync_imap(
         seen: fetched.seen,
         ..Default::default()
     };
+    let worker = if fetched.messages.is_empty() {
+        None
+    } else {
+        worker()
+    };
     for raw in &fetched.messages {
-        if let Some(p) = process(db, &mut ctx, worker, account_id, raw, now).await? {
+        if let Some(p) = process(db, &mut ctx, worker.as_ref(), account_id, raw, now).await? {
             summary.add(&p);
         }
     }
