@@ -47,6 +47,9 @@ jobs:
           - { name: windows-x64, os: windows-latest, target: x86_64-pc-windows-msvc }
           - { name: macos-arm64, os: macos-latest, target: aarch64-apple-darwin }
     env:
+      # Public half of the license signing key (highturtle_license). Public, so it is safe in the repo;
+      # a variable of the same name in the release-build environment overrides it (key rotation).
+      CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
       # Update files (.sig) are signed with the updater key.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
