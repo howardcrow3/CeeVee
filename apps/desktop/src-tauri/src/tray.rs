@@ -33,10 +33,48 @@ fn pause_until(id: &str) -> Option<Option<chrono::DateTime<Local>>> {
     }
 }
 
+/// Midnight today in local time, as ISO-8601 UTC, for counting today's postings.
+fn start_of_today_iso() -> String {
+    let midnight = Local::now().date_naive().and_time(NaiveTime::MIN);
+    Local
+        .from_local_datetime(&midnight)
+        .earliest()
+        .unwrap_or_else(Local::now)
+        .with_timezone(&chrono::Utc)
+        .format("%Y-%m-%dT%H:%M:%SZ")
+        .to_string()
+}
+
+fn new_jobs_label(count: i64) -> String {
+    format!("New jobs today: {count}")
+}
+
+/// Keep the "New jobs today" line current: a short timer plus a refresh right after each search.
+fn keep_counts_fresh(app: &tauri::App, item: MenuItem<tauri::Wry>) {
+    let db = app.state::<Db>().inner().clone();
+    let mut rx = app.state::<EventBus>().subscribe();
+    tauri::async_runtime::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(60));
+        loop {
+            tokio::select! {
+                _ = tick.tick() => {}
+                ev = rx.recv() => match ev {
+                    Ok(Event::JobUpdated { .. }) | Ok(Event::SettingChanged { .. }) => {}
+                    Ok(_) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                },
+            }
+            if let Ok(n) = ceevee_search::alerts::count_since(&db, &start_of_today_iso()).await {
+                let _ = item.set_text(new_jobs_label(n));
+            }
+        }
+    });
+}
+
 pub fn build(app: &tauri::App) -> tauri::Result<()> {
-    // Counts are placeholders until search and approvals exist (shown disabled).
+    // "New jobs today" is live; "Approvals waiting" stays a placeholder until approvals exist.
     let open = MenuItem::with_id(app, "open", "Open CeeVee", true, None::<&str>)?;
-    let new_jobs = MenuItem::with_id(app, "new_jobs", "New jobs today: 0", false, None::<&str>)?;
+    let new_jobs = MenuItem::with_id(app, "new_jobs", new_jobs_label(0), true, None::<&str>)?;
     let approvals = MenuItem::with_id(
         app,
         "approvals",
@@ -65,12 +103,13 @@ pub fn build(app: &tauri::App) -> tauri::Result<()> {
         ],
     )?;
 
+    keep_counts_fresh(app, new_jobs.clone());
     let mut tray = TrayIconBuilder::new()
         .menu(&menu)
         .on_menu_event(|app: &AppHandle, event| {
             let id = event.id.as_ref();
             match id {
-                "open" => show_main_window(app),
+                "open" | "new_jobs" => show_main_window(app),
                 "quit" => app.exit(0),
                 "run_searches" => {
                     if let Some(bus) = app.try_state::<EventBus>() {

@@ -2,6 +2,7 @@
 //! scoring against the user's job categories. Sources and the scheduler come in later milestones
 //! (see docs/TECHNICAL_PLAN.md).
 
+pub mod alerts;
 pub mod categories;
 pub mod companies;
 pub mod postings;
