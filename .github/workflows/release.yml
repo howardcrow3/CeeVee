@@ -139,7 +139,16 @@ jobs:
           mkdir -p out
           cp target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe out/ 2>/dev/null || true
           cp target/${{ matrix.target }}/release/bundle/dmg/*.dmg out/ 2>/dev/null || true
+          # Update files and their signatures (made with the updater key). The manifest step needs them.
+          cp target/${{ matrix.target }}/release/bundle/nsis/*-setup.exe.sig out/ 2>/dev/null || true
+          cp target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz out/ 2>/dev/null || true
+          cp target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz.sig out/ 2>/dev/null || true
           ls out && [ -n "$(ls out)" ]
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            ls out | grep -q '\.sig$' || { echo "::error::updater key is set but no .sig files were produced"; exit 1; }
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY not set; this build has no update signatures and cannot be offered as an update"
+          fi
 
       - name: Verify signatures
         shell: bash
@@ -179,6 +188,16 @@ jobs:
       - name: Checksums
         working-directory: dist
         run: sha256sum * > SHA256SUMS && cat SHA256SUMS
+      - name: Update manifest
+        run: |
+          v="${{ needs.check.outputs.version }}"
+          base="https://dl.turtlebox.studio/ceevee/releases"
+          if ls dist/*.sig >/dev/null 2>&1; then
+            node scripts/make-manifest.mjs --version "$v" --dir dist --base "$base" --percent 100 > "dist-manifest-${{ needs.check.outputs.channel }}.json"
+            cat "dist-manifest-${{ needs.check.outputs.channel }}.json"
+          else
+            echo "::warning::no update signatures; no update manifest made"
+          fi
       - name: Release notes
         run: |
           v="${{ needs.check.outputs.version }}"
@@ -203,6 +222,18 @@ jobs:
           # Release folders are immutable: refuse to overwrite an existing version.
           if aws s3 ls "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/releases/$v/" | grep -q .; then echo "release $v already exists"; exit 1; fi
           aws s3 cp dist "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/releases/$v/" --recursive --cache-control "public, max-age=31536000, immutable"
+          channel="${{ needs.check.outputs.channel }}"
+          # Installers last: the manifest is what tells installed apps a new version exists, so it goes up after the files it points to.
+          if [ -f "dist-manifest-$channel.json" ]; then
+            aws s3 cp "dist-manifest-$channel.json" "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/updates/v1/$channel.json" --cache-control "public, max-age=300" --content-type application/json
+          fi
+          # Stable download links the website can point at without knowing the version.
+          if [ "$channel" = "stable" ]; then
+            for f in dist/*-setup.exe dist/*.dmg; do
+              case "$f" in *.exe) name=CeeVee-setup.exe;; *) name=CeeVee.dmg;; esac
+              aws s3 cp "$f" "s3://${{ vars.DOWNLOAD_BUCKET }}/ceevee/latest/$name" --cache-control "public, max-age=300"
+            done
+          fi
       - name: Note
         if: vars.AWS_ROLE_ARN == ''
-        run: echo "::warning::AWS_ROLE_ARN not set; files were attached to the draft GitHub Release only. Update manifests are not published yet."
+        run: echo "::warning::AWS_ROLE_ARN not set; files were attached to the draft GitHub Release only. The update manifest was not published."
