@@ -63,6 +63,45 @@ pub struct Answers {
 }
 
 impl Answers {
+    /// Build the answers from a saved profile. `links` are the profile's web addresses; the
+    /// LinkedIn one and the first other one are picked by their address. `facts` are the saved
+    /// question answers; only the ones the person saved are ever used for sensitive questions.
+    pub fn from_parts(
+        full_name: &str,
+        email: Option<&str>,
+        phone: Option<&str>,
+        location: Option<&str>,
+        links: &[String],
+        facts: &[(String, String)],
+    ) -> Self {
+        let full_name = full_name.trim();
+        let (first, last) = match full_name.split_once(char::is_whitespace) {
+            Some((f, l)) => (f.trim(), l.trim()),
+            None => (full_name, ""),
+        };
+        let linkedin = links.iter().find(|l| l.contains("linkedin.com"));
+        let website = links.iter().find(|l| !l.contains("linkedin.com"));
+        // "Boston, MA" fills a city field with "Boston".
+        let city = location
+            .map(|l| l.split(',').next().unwrap_or(l).trim())
+            .unwrap_or("");
+        Self {
+            first_name: first.to_string(),
+            last_name: last.to_string(),
+            email: email.unwrap_or("").trim().to_string(),
+            phone: phone.unwrap_or("").trim().to_string(),
+            city: city.to_string(),
+            linkedin: linkedin.cloned().unwrap_or_default(),
+            website: website.cloned().unwrap_or_default(),
+            resume_pdf: None,
+            cover_letter_pdf: None,
+            saved: facts
+                .iter()
+                .map(|(k, v)| (k.trim().to_ascii_lowercase(), v.clone()))
+                .collect(),
+        }
+    }
+
     fn full_name(&self) -> String {
         format!("{} {}", self.first_name, self.last_name)
             .trim()
@@ -70,7 +109,7 @@ impl Answers {
     }
 
     /// A saved answer whose key appears in the question.
-    fn saved_for(&self, label: &str) -> Option<&str> {
+    pub fn saved_for(&self, label: &str) -> Option<&str> {
         let l = label.to_ascii_lowercase();
         self.saved
             .iter()

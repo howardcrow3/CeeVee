@@ -122,6 +122,17 @@ pub async fn get_basics(db: &Db) -> Result<Basics> {
     }))
 }
 
+/// The web addresses saved on the profile (LinkedIn, a portfolio, GitHub).
+pub async fn get_links(db: &Db) -> Result<Vec<String>> {
+    let text: Option<String> = sqlx::query_scalar("SELECT links FROM profile WHERE id = 1")
+        .fetch_optional(db.pool())
+        .await
+        .map_err(db_err)?;
+    Ok(text
+        .and_then(|t| serde_json::from_str::<Vec<String>>(&t).ok())
+        .unwrap_or_default())
+}
+
 pub async fn set_basics(db: &Db, b: &Basics) -> Result<()> {
     sqlx::query(
         "INSERT INTO profile(id, full_name, email, phone, location, summary) VALUES (1, ?, ?, ?, ?, ?) \
@@ -248,6 +259,23 @@ pub async fn set_fact(db: &Db, f: &Fact) -> Result<()> {
     .await
     .map_err(db_err)?;
     Ok(())
+}
+
+/// Every saved question answer.
+pub async fn list_facts(db: &Db) -> Result<Vec<Fact>> {
+    let rows =
+        sqlx::query("SELECT question_key, answer, sensitive FROM fact ORDER BY question_key")
+            .fetch_all(db.pool())
+            .await
+            .map_err(db_err)?;
+    Ok(rows
+        .into_iter()
+        .map(|r| Fact {
+            question_key: r.get("question_key"),
+            answer: r.get("answer"),
+            sensitive: r.get::<i64, _>("sensitive") != 0,
+        })
+        .collect())
 }
 
 pub async fn get_fact(db: &Db, key: &str) -> Result<Option<Fact>> {

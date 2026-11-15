@@ -4,6 +4,7 @@
 //! The loop, approvals queue and memory land in the following PRs
 //! (see docs/TECHNICAL_PLAN.md, section 6).
 
+pub mod apply_prep;
 pub mod approvals;
 pub mod builtin;
 pub mod notifications;

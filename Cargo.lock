@@ -612,8 +612,11 @@ name = "ceevee-agent"
 version = "0.1.0"
 dependencies = [
  "ceevee-ai",
+ "ceevee-apply",
  "ceevee-core",
  "ceevee-db",
+ "ceevee-docs",
+ "ceevee-profile",
  "ceevee-search",
  "chrono",
  "serde",
@@ -682,6 +685,7 @@ version = "0.1.0"
 dependencies = [
  "ceevee-agent",
  "ceevee-ai",
+ "ceevee-apply",
  "ceevee-core",
  "ceevee-db",
  "ceevee-docs",

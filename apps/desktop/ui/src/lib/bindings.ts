@@ -60,6 +60,8 @@ export const commands = {
 	 *  Returns the full path of the file.
 	 */
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
+	/**  Open a posting in your browser and fill in its application form. You review and submit. */
+	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),
 };
@@ -192,6 +194,27 @@ export type ModelStatus = {
 	name: string,
 	size_mb: number,
 	installed: boolean,
+};
+
+/**  What happened when CeeVee filled in an application. */
+export type PrepareResult = PrepareResult_Serialize | PrepareResult_Deserialize;
+
+/**  What happened when CeeVee filled in an application. */
+export type PrepareResult_Deserialize = {
+	message: string,
+	filled: number,
+	/**  Required questions CeeVee could not answer; you finish these in the browser. */
+	missing: string[],
+	resume?: string | null,
+};
+
+/**  What happened when CeeVee filled in an application. */
+export type PrepareResult_Serialize = {
+	message: string,
+	filled: number,
+	/**  Required questions CeeVee could not answer; you finish these in the browser. */
+	missing: string[],
+	resume: string | null,
 };
 
 export type ProposalLine = {

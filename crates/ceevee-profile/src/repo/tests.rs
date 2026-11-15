@@ -111,6 +111,13 @@ async fn facts_upsert_and_keep_the_sensitive_flag() {
         "no"
     );
     assert!(get_fact(&db, "salary").await.unwrap().unwrap().sensitive);
+    let all = list_facts(&db).await.unwrap();
+    assert_eq!(
+        all.iter()
+            .map(|f| f.question_key.as_str())
+            .collect::<Vec<_>>(),
+        vec!["salary", "work_auth"]
+    );
 }
 
 #[tokio::test]

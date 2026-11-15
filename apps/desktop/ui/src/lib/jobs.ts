@@ -13,3 +13,13 @@ export function matchText(score: number | null | undefined): string {
 export function placeText(j: Pick<JobLine, 'location'>): string {
   return j.location ?? 'Location not listed';
 }
+
+/** What to tell the person after CeeVee filled in an application form. */
+export function prepareSummary(r: { filled: number; missing: string[]; resume: string | null }): string {
+  const fields = r.filled === 1 ? '1 field' : `${r.filled} fields`;
+  const resume = r.resume ? ` Resume attached: ${r.resume}.` : ' No resume was attached, add one in Documents.';
+  const missing = r.missing.length
+    ? ` Still for you to answer: ${r.missing.join(', ')}.`
+    : '';
+  return `Filled ${fields}.${resume}${missing} Check the form in your browser and press Submit yourself.`;
+}
