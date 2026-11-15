@@ -10,6 +10,14 @@ publish.workspace = true
 [dependencies]
 ceevee-core.workspace = true
 url = "2"
+chromiumoxide = { version = "0.9", default-features = false, optional = true }
+tokio = { workspace = true, optional = true }
+futures = { version = "0.3", optional = true }
+serde_json.workspace = true
+
+[features]
+# The real Chrome / Edge driver. Off by default so the engine builds without a browser stack.
+chrome = ["dep:chromiumoxide", "dep:tokio", "dep:futures"]
 
 [lints]
 workspace = true
