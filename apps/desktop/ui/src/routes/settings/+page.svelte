@@ -5,6 +5,7 @@
   import { percent, sizeText } from '$lib/models';
   import LicensePanel from '$lib/components/LicensePanel.svelte';
   import CategoriesPanel from '$lib/components/CategoriesPanel.svelte';
+  import MailAccountPanel from '$lib/components/MailAccountPanel.svelte';
   import AboutPanel from '$lib/components/AboutPanel.svelte';
   import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
@@ -118,6 +119,7 @@
   {/if}
 </section>
 <CategoriesPanel />
+<MailAccountPanel />
 <AboutPanel />
 <section>
   <h2>Companies to watch</h2>

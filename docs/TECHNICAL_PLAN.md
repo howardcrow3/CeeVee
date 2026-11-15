@@ -330,6 +330,7 @@ How the option is built:
 - **Candidate filter** (no model): sender or reply-to domain matches a company's domains, known ATS sender domains, replies in threads the user started from CeeVee, and known job-alert senders.
 - **Labelling.** `label-email` assigns kind, application, suggested status and interview time. Alert emails go to the job-alert parsers instead.
 - **Sending.** `lettre` over SMTP with the same credentials; every send is a user click.
+- **Built (v1, ceevee-mail and ceevee-google).** Gmail reads through the Gmail API with `gmail.readonly` (headers first, whole message only for candidates), not IMAP XOAUTH2, because that route needs the broader `mail.google.com` scope. IMAP uses `async-imap` over rustls with polling every 10 minutes (IDLE is not used yet). The pipeline stores, labels (model, with keyword rules as the fallback), links (thread, then company domain or name, then job title; ambiguous mail stays unlinked), changes status by the `application.status` policy (offers and rejections wait for a click unless the policy says otherwise), sets `next_interview_at` from an ISO time in the mail, and drafts a reply for mail that needs one. Replies are drafts only: the Inbox copies text out, nothing is sent. Not built yet: Microsoft OAuth, SMTP sending, `.ics` files, job-alert parsing.
 - **Calendar.** Interview times from email produce `.ics` files with the `ics` crate; calendar sync is v2.
 
 ## 12. Network (connections)

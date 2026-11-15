@@ -38,7 +38,11 @@ version = 2
 # quick-xml 0.38. CeeVee renders only Typst source it generates itself, which never reads XML
 # or other files (the renderer denies all file access), so none of these is reachable with
 # untrusted input. Remove these ignores when typst moves to quick-xml >= 0.41.
+# RUSTSEC-2026-0441: `pin-utils` is unmaintained (a notice, not a vulnerability); async-imap, our
+# IMAP client, depends on it, and its macros are only compile-time helpers. Accepted by Howard
+# 2026-11-15. Remove this ignore when async-imap drops it.
 ignore = [
+  "RUSTSEC-2026-0441",
   "RUSTSEC-2026-0459", "RUSTSEC-2024-0436",
   "RUSTSEC-2025-0141", "RUSTSEC-2026-0206", "RUSTSEC-2026-0192", "RUSTSEC-2024-0449",
   "RUSTSEC-2024-0320", "RUSTSEC-2026-0194", "RUSTSEC-2026-0195",

@@ -416,9 +416,14 @@ pub async fn list_proposals(
         .into_iter()
         .map(|p| {
             let text = |k: &str| p.payload.get(k).and_then(|v| v.as_str()).map(str::to_owned);
+            let action = if p.kind == "mail_status" {
+                format!("Mark application as {}", text("to").unwrap_or_default())
+            } else {
+                text("tool").unwrap_or(p.kind.clone())
+            };
             ProposalLine {
                 id: p.id as u32,
-                action: text("tool").unwrap_or(p.kind),
+                action,
                 reason: text("reason").unwrap_or_default(),
                 created_at: p.created_at,
             }
@@ -446,6 +451,18 @@ pub async fn approve_proposal(
     id: u32,
 ) -> Result<(), String> {
     crate::license_cmd::require_write(&lic).await?;
+    let p = ceevee_agent::approvals::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    if p.kind == "mail_status" {
+        let p = ceevee_agent::approvals::approve_only(&db, i64::from(id))
+            .await
+            .map_err(|e| e.to_string())?;
+        let now = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        return ceevee_mail::status::apply_proposal(&db, &p.payload, &now)
+            .await
+            .map_err(|e| e.to_string());
+    }
     ceevee_agent::approvals::approve_and_run(&db, &registry, i64::from(id))
         .await
         .map(|_| ())

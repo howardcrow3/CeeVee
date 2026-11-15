@@ -350,3 +350,30 @@ pub async fn sent_message_ids(db: &Db) -> Result<std::collections::HashSet<Strin
             .map_err(db_err)?;
     Ok(ids.into_iter().collect())
 }
+
+/// `Company, Job title` for every application, for lists and pickers.
+pub async fn application_names(db: &Db) -> Result<std::collections::HashMap<i64, String>> {
+    let rows = sqlx::query(
+        "SELECT a.id, c.name AS company, p.title FROM application a \
+         LEFT JOIN company c ON c.id = a.company_id LEFT JOIN posting p ON p.id = a.posting_id",
+    )
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    Ok(rows
+        .iter()
+        .map(|r| {
+            let c: Option<String> = r.get("company");
+            let t: Option<String> = r.get("title");
+            let name = [c, t].into_iter().flatten().collect::<Vec<_>>().join(", ");
+            (
+                r.get::<i64, _>("id"),
+                if name.is_empty() {
+                    "Application".into()
+                } else {
+                    name
+                },
+            )
+        })
+        .collect())
+}

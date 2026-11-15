@@ -104,7 +104,7 @@ jobs:
             kill "$watcher" 2>/dev/null || true
           }
           # import_resume last: its grammar is the slow one.
-          for task in extract_posting score_match write_cover_letter tailor_resume import_resume; do
+          for task in extract_posting score_match write_cover_letter tailor_resume import_resume label_email; do
             run_capped "$task"
           done
 
