@@ -45,3 +45,15 @@ Variables in `release-beta` and `release`: `AWS_ROLE_ARN`, `AWS_REGION`, `DOWNLO
 ## 6. Check it
 
 Run the Release workflow on a test tag (for example `v0.0.1-beta.1`) and read the first lines of each build job: they print "Windows signing: on" and "macOS signing: on" when the secrets are found.
+
+## 7. Google sign-in (email tracking)
+
+CeeVee can read recruiter replies in Gmail after a Google sign-in. It asks only for `gmail.readonly` (plus `openid`, `email`, `profile`). Without this setup the "Sign in with Google" button is hidden and people connect any mailbox with an app password instead.
+
+1. Go to console.cloud.google.com, create a project (for example "CeeVee"), and enable the **Gmail API**.
+2. **OAuth consent screen** (Google Auth Platform): user type **External**, app name CeeVee, support email, your privacy policy URL, authorized domain `turtlebox.studio`. Add the scopes `openid`, `email`, `profile` and `https://www.googleapis.com/auth/gmail.readonly`.
+3. While the app is in **Testing**, add up to 100 **test users** (their Gmail addresses). Only they can sign in. Refresh tokens for Testing apps expire after 7 days, so testers will have to sign in again weekly until the app is verified.
+4. **Credentials** -> Create credentials -> OAuth client ID -> **Desktop app**. Copy the client ID and client secret (for installed apps the secret is not confidential).
+5. In GitHub, `release-build` environment, add secrets `CEEVEE_GOOGLE_CLIENT_ID` and `CEEVEE_GOOGLE_CLIENT_SECRET`. The workflow does not read them yet; a later change passes them to the build as environment variables. For local testing, export the same two variables before `cargo run`.
+6. **Before public release:** click Publish app on the consent screen and submit it for verification. Because Gmail read access is a restricted scope, Google also requires a security assessment (CASA) by an approved assessor each year. Expect weeks to months and a fee. Prepare: a public privacy policy that says what CeeVee reads and that it stays on the computer, a short demo video of the sign-in and of what the app does with mail, and a written justification for `gmail.readonly` ("read replies from employers to update job application status").
+
