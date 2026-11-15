@@ -22,3 +22,18 @@ describe('searchSummary', () => {
     );
   });
 });
+
+describe('starter companies', () => {
+  it('are all valid board names', async () => {
+    const { starterBoards } = await import('./boards');
+    for (const b of starterBoards) expect(b.token).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(new Set(starterBoards.map((b) => `${b.kind}:${b.token}`)).size).toBe(starterBoards.length);
+  });
+  it('are added without duplicating what is there', async () => {
+    const { withStarters, starterBoards } = await import('./boards');
+    const once = withStarters([{ kind: 'greenhouse', token: 'Stripe', company: 'Stripe Inc' }]);
+    expect(once).toHaveLength(starterBoards.length);
+    expect(once[0].company).toBe('Stripe Inc');
+    expect(withStarters(once)).toHaveLength(once.length);
+  });
+});
