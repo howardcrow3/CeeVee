@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { commands, type JobLine } from '$lib/bindings';
-  import { byMatch, matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
+  import { commands, type JobLine, type KnownLine } from '$lib/bindings';
+  import { byMatch, knownText, matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -25,6 +25,13 @@
     } finally {
       preparing = null;
     }
+  }
+
+  let who = $state<{ job: number; people: KnownLine[] } | null>(null);
+  async function showPeople(id: number) {
+    const r = await commands.peopleAtJob(id);
+    if (r.status === 'ok') who = { job: id, people: r.data };
+    else applyError = r.error;
   }
 
   async function dismiss(id: number) {
@@ -83,7 +90,10 @@
         {#each byMatch(jobs) as j (j.id)}
           <tr>
             <td><b>{j.title}</b><br />{placeText(j)}</td>
-            <td>{j.company ?? 'Company not listed'}</td>
+            <td>{j.company ?? 'Company not listed'}{#if j.known > 0}<br /><button class="link" onclick={() => showPeople(j.id)}>{knownText(j.known)}</button>{/if}
+              {#if who && who.job === j.id}
+                <ul class="people">{#each who.people as p (p.name)}<li>{p.name}{p.title ? `, ${p.title}` : ''}</li>{/each}</ul>
+              {/if}</td>
             <td><span class="dot" class:on={j.state === 'saved'}></span>{statusWord(j.state)}</td>
             <td class="n">{matchText(j.score)}</td>
             <td class="actions"><button class="ghost" onclick={() => openPosting(j.url)}>Open posting</button> <button class="ghost" onclick={() => dismiss(j.id)}>Dismiss</button> <button class="ghost" disabled={preparing !== null} onclick={() => prepare(j.id)}>{preparing === j.id ? 'Opening' : 'Prepare application'}</button></td>
@@ -99,4 +109,6 @@
   b { color: var(--ink); font-weight: 500; }
   .n { font-variant-numeric: tabular-nums; }
   .actions { white-space: nowrap; }
+  .link { background: none; border: none; padding: 0; color: var(--ink); text-decoration: underline; cursor: pointer; font: inherit; }
+  .people { margin: 4px 0 0; padding-left: 16px; }
 </style>

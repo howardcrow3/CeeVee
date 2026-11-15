@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byMatch, matchText, placeText, statusWord } from './jobs';
+import { byMatch, knownText, matchText, placeText, statusWord } from './jobs';
 
 describe('jobs helpers', () => {
   it('words the status', () => {
@@ -41,5 +41,13 @@ describe('byMatch', () => {
   });
   it('clamps odd scores', () => {
     expect(matchText(250)).toBe('100%');
+  });
+});
+
+describe('knownText', () => {
+  it('says how many people you know', () => {
+    expect(knownText(0)).toBe('');
+    expect(knownText(1)).toBe('You know 1 person');
+    expect(knownText(4)).toBe('You know 4 people');
   });
 });

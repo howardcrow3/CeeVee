@@ -201,12 +201,13 @@ pub struct JobRow {
     pub score: Option<f64>,
     pub url: String,
     pub first_seen: String,
+    pub company_id: Option<i64>,
 }
 
 /// Postings you have not dismissed, newest first.
 pub async fn recent(db: &Db, limit: i64) -> Result<Vec<JobRow>> {
     let rows = sqlx::query(
-        "SELECT p.id, p.title, c.name AS company, p.location, p.state, p.score, p.url, p.first_seen \
+        "SELECT p.id, p.title, c.name AS company, p.location, p.state, p.score, p.url, p.first_seen, p.company_id \
          FROM posting p LEFT JOIN company c ON c.id = p.company_id \
          WHERE p.state != 'dismissed' ORDER BY p.first_seen DESC, p.id DESC LIMIT ?",
     )
@@ -225,6 +226,7 @@ pub async fn recent(db: &Db, limit: i64) -> Result<Vec<JobRow>> {
             score: r.get("score"),
             url: r.get("url"),
             first_seen: r.get("first_seen"),
+            company_id: r.get("company_id"),
         })
         .collect())
 }

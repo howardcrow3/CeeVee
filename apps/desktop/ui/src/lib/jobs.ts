@@ -31,3 +31,9 @@ export function prepareSummary(r: { filled: number; missing: string[]; resume: s
     : '';
   return `Filled ${fields}.${resume}${missing} Check the form in your browser and press Submit yourself.`;
 }
+
+/** "Know 3 people" next to a company, or nothing when you know no one there. */
+export function knownText(n: number): string {
+  if (n <= 0) return '';
+  return n === 1 ? 'You know 1 person' : `You know ${n} people`;
+}
