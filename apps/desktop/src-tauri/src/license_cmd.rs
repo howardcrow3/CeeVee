@@ -132,6 +132,23 @@ pub fn open_license_page(app: tauri::AppHandle, which: String) -> Result<(), Str
         .map_err(|e| e.to_string())
 }
 
+/// Open one of CeeVee's public pages in the browser: `privacy`, `terms` or `help`. Only these
+/// fixed addresses can be opened.
+#[tauri::command]
+#[specta::specta]
+pub fn open_info_page(app: tauri::AppHandle, which: String) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let url = match which.as_str() {
+        "privacy" => api::PRIVACY_URL,
+        "terms" => api::TERMS_URL,
+        "help" => api::HELP_URL,
+        _ => return Err("unknown page".into()),
+    };
+    app.opener()
+        .open_url(url, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// Refuse a write while the app is read-only (trial over, no license).
 pub async fn require_write(svc: &Service) -> Result<(), String> {
     svc.require_write(Utc::now()).await.map_err(err)

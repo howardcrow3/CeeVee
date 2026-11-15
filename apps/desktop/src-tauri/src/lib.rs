@@ -36,6 +36,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             license_cmd::activate_license,
             license_cmd::deactivate_license,
             license_cmd::open_license_page,
+            license_cmd::open_info_page,
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,

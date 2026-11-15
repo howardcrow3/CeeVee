@@ -1,6 +1,10 @@
 # CeeVee
 
-A local AI app that helps you manage your job search. See [docs/PLAN.md](docs/PLAN.md) and [docs/TECHNICAL_PLAN.md](docs/TECHNICAL_PLAN.md).
+A local AI app that helps you manage your job search. It runs on your computer: your resume, jobs and documents stay there.
+
+**Download:** turtlebox.studio/ceevee (Windows 11, Apple silicon Mac). 14-day free trial, then $19.99 once for 2 computers.
+
+Customer docs: [help](docs/customer/HELP.md), [privacy notice](docs/customer/PRIVACY.md), [terms](docs/customer/TERMS.md). Release steps: [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md). Plans: [docs/PLAN.md](docs/PLAN.md), [docs/TECHNICAL_PLAN.md](docs/TECHNICAL_PLAN.md).
 
 ## Develop
 
