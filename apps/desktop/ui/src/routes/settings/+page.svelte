@@ -3,6 +3,7 @@
   import { commands, type BoardLine } from '$lib/bindings';
   import { boardKinds, cleanBoards } from '$lib/boards';
   import { percent, sizeText } from '$lib/models';
+  import LicensePanel from '$lib/components/LicensePanel.svelte';
   import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
   let boards = $state<BoardLine[]>([]);
@@ -84,6 +85,7 @@
 </script>
 
 <span class="label">Settings</span>
+<LicensePanel />
 <section>
   <h2>Local AI</h2>
   {#if model}
