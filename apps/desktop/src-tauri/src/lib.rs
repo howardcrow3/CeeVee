@@ -4,6 +4,7 @@
 mod apply_tool;
 mod commands;
 mod deep_link;
+mod diagnostics;
 mod license_cmd;
 mod mail_cmd;
 mod models;
@@ -36,6 +37,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             license_cmd::activate_license,
             license_cmd::deactivate_license,
             license_cmd::open_license_page,
+            diagnostics::diagnostics,
+            diagnostics::dismiss_crash,
+            diagnostics::open_log_folder,
             license_cmd::open_info_page,
             updater::check_for_update,
             updater::install_update,
@@ -66,6 +70,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::redo_document,
             commands::chat_edit_document,
             commands::export_document_pdf,
+            commands::show_in_folder,
             commands::prepare_application,
             commands::list_applications,
             commands::set_application_status,
@@ -148,6 +153,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
+            diagnostics::setup(app);
             let dir = app.path().app_data_dir()?;
             let db = tauri::async_runtime::block_on(ceevee_db::Db::open(&dir.join("ceevee.db")))?;
             let bus = ceevee_core::EventBus::new(256);

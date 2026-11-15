@@ -6,6 +6,7 @@
   import LicensePanel from '$lib/components/LicensePanel.svelte';
   import CategoriesPanel from '$lib/components/CategoriesPanel.svelte';
   import MailAccountPanel from '$lib/components/MailAccountPanel.svelte';
+  import AboutPanel from '$lib/components/AboutPanel.svelte';
   import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
   let boards = $state<BoardLine[]>([]);
@@ -119,6 +120,7 @@
 </section>
 <CategoriesPanel />
 <MailAccountPanel />
+<AboutPanel />
 <section>
   <h2>Companies to watch</h2>
   <p class="note">

@@ -10,6 +10,7 @@
   let draft = $state('');
   let error = $state('');
   let message = $state('');
+  let savedPath = $state('');
   let creating = $state(false);
   let newKind = $state('cover_letter');
   let newTitle = $state('');
@@ -102,9 +103,12 @@
     if (!open) return;
     error = '';
     message = '';
+    savedPath = '';
     const r = await commands.exportDocumentPdf(open.id, a4);
-    if (r.status === 'ok') message = `Saved a PDF to ${r.data}`;
-    else error = r.error;
+    if (r.status === 'ok') {
+      message = `Saved a PDF to ${r.data}`;
+      savedPath = r.data;
+    } else error = r.error;
   }
 </script>
 
@@ -163,6 +167,7 @@
         <label class="paper"><input type="checkbox" bind:checked={a4} /> A4 paper</label>
       </div>
       {#if message}<p role="status">{message}</p>{/if}
+      {#if savedPath}<button class="ghost" onclick={() => commands.showInFolder(savedPath)}>Show in folder</button>{/if}
       <div class="chat">
         <span class="label">Ask for a change</span>
         <textarea aria-label="What should change" rows="3" placeholder="For example: make the opening shorter and warmer" bind:value={ask}></textarea>

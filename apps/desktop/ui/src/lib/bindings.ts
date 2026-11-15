@@ -16,6 +16,11 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openLicensePage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_license_page", { which })),
+	diagnostics: () => typedError<Diagnostics_Serialize, string>(__TAURI_INVOKE("diagnostics")),
+	/**  The person has read the crash notice. */
+	dismissCrash: () => typedError<null, string>(__TAURI_INVOKE("dismiss_crash")),
+	/**  Show the log folder in Explorer or Finder. */
+	openLogFolder: () => typedError<null, string>(__TAURI_INVOKE("open_log_folder")),
 	/**
 	 *  Open one of CeeVee's public pages in the browser: `privacy`, `terms` or `help`. Only these
 	 *  fixed addresses can be opened.
@@ -78,6 +83,8 @@ export const commands = {
 	 *  Returns the full path of the file.
 	 */
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
+	/**  Show a file you saved in your computer's file manager. Only files, never programs, are shown. */
+	showInFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("show_in_folder", { path })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
 	/**  Every application you are tracking, in board order. */
@@ -178,6 +185,24 @@ export type ChatEdit = {
 	/**  The proposed text, so it can be shown when it was held back. */
 	proposed: string,
 	doc: DocView,
+};
+
+export type Diagnostics = Diagnostics_Serialize | Diagnostics_Deserialize;
+
+export type Diagnostics_Deserialize = {
+	version: string,
+	system: string,
+	log_dir: string,
+	/**  What went wrong last time, when CeeVee closed unexpectedly and the person was not told yet. */
+	last_crash?: string | null,
+};
+
+export type Diagnostics_Serialize = {
+	version: string,
+	system: string,
+	log_dir: string,
+	/**  What went wrong last time, when CeeVee closed unexpectedly and the person was not told yet. */
+	last_crash: string | null,
 };
 
 export type DocLine = {
