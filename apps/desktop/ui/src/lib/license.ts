@@ -1,6 +1,6 @@
-import type { LicenseView } from './bindings';
+import type { LicenseView_Serialize } from './bindings';
 
-export type { LicenseView };
+export type LicenseView = LicenseView_Serialize;
 
 /** One line for the banner, or null when nothing needs saying. */
 export function bannerText(v: LicenseView): string | null {

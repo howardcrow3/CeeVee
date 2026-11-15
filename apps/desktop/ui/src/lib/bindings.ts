@@ -6,11 +6,11 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 export const commands = {
 	appInfo: () => typedError<AppInfo, string>(__TAURI_INVOKE("app_info")),
 	/**  Where the person stands: trial days left, expired (read-only) or licensed. */
-	licenseStatus: () => typedError<LicenseView, string>(__TAURI_INVOKE("license_status")),
+	licenseStatus: () => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("license_status")),
 	/**  Activate a license key on this computer. */
-	activateLicense: (key: string) => typedError<LicenseView, string>(__TAURI_INVOKE("activate_license", { key })),
+	activateLicense: (key: string) => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("activate_license", { key })),
 	/**  Free this computer's seat and remove the license from it. */
-	deactivateLicense: () => typedError<LicenseView, string>(__TAURI_INVOKE("deactivate_license")),
+	deactivateLicense: () => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("deactivate_license")),
 	/**
 	 *  Open the turtlebox.studio page in the browser: `buy` or `manage`. Only these two
 	 *  fixed addresses can be opened.
@@ -151,7 +151,24 @@ export type JobLine_Serialize = {
 };
 
 /**  What the license screen and the banner need. */
-export type LicenseView = {
+export type LicenseView = LicenseView_Serialize | LicenseView_Deserialize;
+
+/**  What the license screen and the banner need. */
+export type LicenseView_Deserialize = {
+	/**  `trial`, `expired` or `licensed`. */
+	state: string,
+	days_left?: number | null,
+	ends_at?: string | null,
+	key_hint?: string | null,
+	seats?: number | null,
+	/**  True when the app may only view and export. */
+	read_only: boolean,
+	/**  Why a stored license was not used, in plain words. */
+	note?: string | null,
+};
+
+/**  What the license screen and the banner need. */
+export type LicenseView_Serialize = {
 	/**  `trial`, `expired` or `licensed`. */
 	state: string,
 	days_left: number | null,
