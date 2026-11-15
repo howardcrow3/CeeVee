@@ -363,3 +363,18 @@ mod gmail {
         );
     }
 }
+
+/// Needs the internet: a real TLS handshake with a real provider, ending at the sign-in refusal.
+/// Run with `cargo test -p ceevee-mail -- --ignored`.
+#[tokio::test]
+#[ignore]
+async fn a_real_provider_over_tls_refuses_a_bad_password_in_plain_words() {
+    let cfg = ImapConfig {
+        host: "imap.gmail.com".into(),
+        port: 993,
+        username: "nobody-ceevee-test@gmail.com".into(),
+        tls: true,
+    };
+    let err = crate::imap::test_login(&cfg, "not-a-password").await.unwrap_err();
+    assert!(crate::imap::explain(&err).contains("app password"), "{err}");
+}
