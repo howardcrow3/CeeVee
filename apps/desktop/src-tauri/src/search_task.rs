@@ -5,7 +5,7 @@ use ceevee_core::{Event, EventBus};
 use ceevee_db::Db;
 use ceevee_search::alerts;
 use ceevee_search::sources::{self, HttpFetcher};
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 
 use crate::notifications::notify;
 
@@ -16,6 +16,14 @@ pub fn spawn(app: AppHandle, db: Db, bus: EventBus) {
         loop {
             match rx.recv().await {
                 Ok(Event::TaskDue { task }) if task == "search.daily" => {
+                    if let Some(lic) =
+                        app.try_state::<std::sync::Arc<crate::license_cmd::Service>>()
+                    {
+                        if crate::license_cmd::require_write(&lic).await.is_err() {
+                            tracing::info!("daily search skipped: trial ended, read-only");
+                            continue;
+                        }
+                    }
                     let started = sources::now_iso();
                     match run_once(&db).await {
                         Ok(s) => {

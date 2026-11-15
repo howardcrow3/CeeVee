@@ -44,6 +44,8 @@ pub enum LicenseError {
     Network,
     #[error("turtlebox.studio said no: {0}")]
     Rejected(String),
+    #[error("Your 14-day trial has ended, so CeeVee is read-only. You can still view and export everything. Activate a license in Settings to keep going.")]
+    ReadOnly,
     #[error("License checks are not available in this build.")]
     NoPublicKey,
     #[error(transparent)]

@@ -13,9 +13,11 @@ pub struct LinkedInImport {
 #[tauri::command]
 #[specta::specta]
 pub async fn import_linkedin_connections(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     csv_text: String,
 ) -> Result<LinkedInImport, String> {
+    crate::license_cmd::require_write(&lic).await?;
     let connections =
         ceevee_network::linkedin::parse_connections(&csv_text).map_err(|e| e.to_string())?;
     let s = ceevee_network::linkedin::import(&db, &connections)
@@ -135,9 +137,11 @@ pub async fn list_boards(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<Boar
 #[tauri::command]
 #[specta::specta]
 pub async fn save_boards(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     boards: Vec<BoardLine>,
 ) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
     let boards = boards
         .into_iter()
         .map(to_board)
@@ -158,7 +162,11 @@ pub struct SearchResult {
 /// Read every watched board once and store what is new.
 #[tauri::command]
 #[specta::specta]
-pub async fn run_search(db: tauri::State<'_, ceevee_db::Db>) -> Result<SearchResult, String> {
+pub async fn run_search(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<SearchResult, String> {
+    crate::license_cmd::require_write(&lic).await?;
     let boards = ceevee_search::sources::load_boards(&db)
         .await
         .map_err(|e| e.to_string())?;
@@ -222,10 +230,12 @@ pub async fn skip_proposal(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Resu
 #[tauri::command]
 #[specta::specta]
 pub async fn approve_proposal(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     registry: tauri::State<'_, ceevee_agent::tools::Registry>,
     id: u32,
 ) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
     ceevee_agent::approvals::approve_and_run(&db, &registry, i64::from(id))
         .await
         .map(|_| ())
@@ -307,11 +317,13 @@ pub async fn get_document(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Resul
 #[tauri::command]
 #[specta::specta]
 pub async fn create_document(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     kind: String,
     title: String,
     content: String,
 ) -> Result<u32, String> {
+    crate::license_cmd::require_write(&lic).await?;
     let kind = doc_kind(&kind)?;
     if title.trim().is_empty() {
         return Err("Give the document a title.".into());
@@ -339,10 +351,12 @@ fn check_content(kind: ceevee_docs::store::DocKind, content: &str) -> Result<(),
 #[tauri::command]
 #[specta::specta]
 pub async fn save_document(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     id: u32,
     content: String,
 ) -> Result<DocView, String> {
+    crate::license_cmd::require_write(&lic).await?;
     let d = ceevee_docs::store::get(&db, i64::from(id))
         .await
         .map_err(|e| e.to_string())?;
@@ -356,9 +370,11 @@ pub async fn save_document(
 #[tauri::command]
 #[specta::specta]
 pub async fn undo_document(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     id: u32,
 ) -> Result<DocView, String> {
+    crate::license_cmd::require_write(&lic).await?;
     ceevee_docs::store::undo(&db, i64::from(id))
         .await
         .map_err(|e| e.to_string())?;
@@ -368,9 +384,11 @@ pub async fn undo_document(
 #[tauri::command]
 #[specta::specta]
 pub async fn redo_document(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
     id: u32,
 ) -> Result<DocView, String> {
+    crate::license_cmd::require_write(&lic).await?;
     ceevee_docs::store::redo(&db, i64::from(id))
         .await
         .map_err(|e| e.to_string())?;
@@ -394,6 +412,7 @@ pub struct ChatEdit {
 #[tauri::command]
 #[specta::specta]
 pub async fn chat_edit_document(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     app: tauri::AppHandle,
     db: tauri::State<'_, ceevee_db::Db>,
     engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
@@ -401,6 +420,7 @@ pub async fn chat_edit_document(
     instruction: String,
     accept_flagged: bool,
 ) -> Result<ChatEdit, String> {
+    crate::license_cmd::require_write(&lic).await?;
     use ceevee_docs::chat;
     let d = ceevee_docs::store::get(&db, i64::from(id))
         .await
