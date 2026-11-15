@@ -35,6 +35,13 @@ export const commands = {
 	saveBoards: (boards: BoardLine[]) => typedError<null, string>(__TAURI_INVOKE("save_boards", { boards })),
 	/**  Read every watched board once and store what is new. */
 	runSearch: () => typedError<SearchResult, string>(__TAURI_INVOKE("run_search")),
+	/**
+	 *  Read resume text with the local model and list what it would change in your profile. Nothing is
+	 *  saved until you accept.
+	 */
+	previewResumeImport: (text: string) => typedError<ProfileChange[], string>(__TAURI_INVOKE("preview_resume_import", { text })),
+	/**  Save the changes you accepted. Returns how many were applied. */
+	applyProfileChanges: (changes: string[]) => typedError<number, string>(__TAURI_INVOKE("apply_profile_changes", { changes })),
 	/**  The kinds of job you are looking for, highest priority first. */
 	listCategories: () => typedError<CategoryLine[], string>(__TAURI_INVOKE("list_categories")),
 	/**  Add a kind of job to look for. The id in `line` is ignored. */
@@ -255,6 +262,13 @@ export type PrepareResult_Serialize = {
 	/**  Required questions CeeVee could not answer; you finish these in the browser. */
 	missing: string[],
 	resume: string | null,
+};
+
+export type ProfileChange = {
+	/**  The change itself, to hand back to `apply_profile_changes` if accepted. */
+	change: string,
+	/**  What it does, in one sentence. */
+	text: string,
 };
 
 export type ProposalLine = {

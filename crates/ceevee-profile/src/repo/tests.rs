@@ -172,3 +172,26 @@ fn changes_round_trip_through_json_for_proposals() {
     assert!(j.contains("\"change\":\"add_skill\""));
     assert_eq!(serde_json::from_str::<Change>(&j).unwrap(), c);
 }
+
+#[test]
+fn changes_read_as_plain_sentences() {
+    let c = Change::SetBasic {
+        field: "location".into(),
+        old: Some("Dayton, OH".into()),
+        new: "Columbus, OH".into(),
+    };
+    assert_eq!(
+        describe(&c),
+        "Location: change \"Dayton, OH\" to \"Columbus, OH\""
+    );
+    let c = Change::SetBasic {
+        field: "email".into(),
+        old: None,
+        new: "a@b.co".into(),
+    };
+    assert_eq!(describe(&c), "Email: set to \"a@b.co\"");
+    assert_eq!(
+        describe(&Change::AddSkill { name: "SQL".into() }),
+        "Add skill: SQL"
+    );
+}

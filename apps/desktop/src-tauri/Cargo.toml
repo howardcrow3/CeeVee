@@ -22,6 +22,7 @@ ceevee-search = { path = "../../../crates/ceevee-search" }
 ceevee-network = { path = "../../../crates/ceevee-network" }
 ceevee-docs = { path = "../../../crates/ceevee-docs" }
 ceevee-ai.workspace = true
+ceevee-profile.workspace = true
 ceevee-apply = { path = "../../../crates/ceevee-apply", features = ["chrome"] }
 ceevee-license = { path = "../../../crates/ceevee-license" }
 chrono.workspace = true
@@ -34,7 +35,8 @@ tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-notification = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 tauri-plugin-updater = "2"
 tokio.workspace = true
 tracing.workspace = true

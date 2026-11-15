@@ -157,12 +157,11 @@ pub async fn ask_model(
     generate(&app, &engine, prompt).await
 }
 
-/// Run one prompt on the local model, starting the engine if needed.
-pub async fn generate(
+/// The model worker, starting the engine if needed.
+pub fn worker_for(
     app: &tauri::AppHandle,
     engine: &Engine,
-    prompt: String,
-) -> Result<String, String> {
+) -> Result<ceevee_ai::ModelWorker, String> {
     let ram = ceevee_ai::hardware::total_ram_gb();
     let catalog = Catalog::builtin();
     let entry = catalog
@@ -172,13 +171,21 @@ pub async fn generate(
     if !path.exists() {
         return Err("Download the model in Settings first.".into());
     }
-    let worker = {
-        let mut slot = engine.worker.lock().map_err(|e| e.to_string())?;
-        if slot.is_none() {
-            *slot = Some(start_worker(path)?);
-        }
-        slot.clone().ok_or("The model did not start.")?
-    };
+    let mut slot = engine.worker.lock().map_err(|e| e.to_string())?;
+    if slot.is_none() {
+        *slot = Some(start_worker(path)?);
+    }
+    slot.clone()
+        .ok_or_else(|| "The model did not start.".into())
+}
+
+/// Run one prompt on the local model, starting the engine if needed.
+pub async fn generate(
+    app: &tauri::AppHandle,
+    engine: &Engine,
+    prompt: String,
+) -> Result<String, String> {
+    let worker = worker_for(app, engine)?;
     let job = worker.submit(
         ceevee_ai::Priority::Interactive,
         ceevee_ai::GenerateRequest::new(prompt),

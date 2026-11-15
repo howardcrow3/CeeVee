@@ -30,7 +30,7 @@ The certificate must be a Developer ID Application certificate (for apps outside
 
 ## 3. Updater signing key (add to `release-build`)
 
-`TAURI_SIGNING_PRIVATE_KEY`: the full contents of the private key that pairs with `backer-updater.key.pub`. `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password (if it has one). Note: the workflow does not read these yet; a later PR wires them in together with the updater client.
+`TAURI_SIGNING_PRIVATE_KEY`: the full contents of the private key that pairs with `backer-updater.key.pub`. `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: its password (if it has one). The release build passes them to Tauri, which signs the update files with them; the build fails if the key is set but no signatures come out.
 
 ## 4. Azure Trusted Signing (when your account is approved)
 

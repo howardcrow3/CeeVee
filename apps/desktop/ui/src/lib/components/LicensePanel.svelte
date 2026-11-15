@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onMount, onDestroy } from 'svelte';
+  import { listen, type UnlistenFn } from '@tauri-apps/api/event';
   import { commands } from '$lib/bindings';
   import { canActivate, keyFromInput, statusText, type LicenseView } from '$lib/license';
 
@@ -45,8 +46,17 @@
     if (r.status !== 'ok') error = r.error;
   }
 
+  let unlisten: UnlistenFn | undefined;
+  onDestroy(() => unlisten?.());
+
   onMount(async () => {
     try {
+      // A ceevee://activate link from the purchase email was opened.
+      unlisten = await listen<{ ok: boolean; message: string }>('license-link', async (e) => {
+        message = e.payload.ok ? e.payload.message : '';
+        error = e.payload.ok ? '' : e.payload.message;
+        await refresh();
+      });
       await refresh();
     } catch (e) {
       error = `Running outside the desktop app: ${String(e)}`;

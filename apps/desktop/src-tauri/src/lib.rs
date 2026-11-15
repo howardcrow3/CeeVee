@@ -3,6 +3,7 @@
 
 mod apply_tool;
 mod commands;
+mod deep_link;
 mod diagnostics;
 mod license_cmd;
 mod models;
@@ -46,6 +47,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_boards,
             commands::save_boards,
             commands::run_search,
+            commands::preview_resume_import,
+            commands::apply_profile_changes,
             commands::list_categories,
             commands::create_category,
             commands::set_category_active,
@@ -119,6 +122,11 @@ pub fn run() {
     }
 
     let app = tauri::Builder::default()
+        // Single instance must come first so a second launch (for example a ceevee:// link) is handed to this one.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            show_main_window(app);
+        }))
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             Some(vec!["--minimized"]),
@@ -126,9 +134,6 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
-        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            show_main_window(app);
-        }))
         .setup(|app| {
             diagnostics::setup(app);
             let dir = app.path().app_data_dir()?;
@@ -144,6 +149,7 @@ pub fn run() {
             app.manage(std::sync::Arc::new(models::Engine::default()));
             app.manage(bus);
             license_cmd::setup(app, db.clone());
+            deep_link::setup(app);
             app.manage(db);
 
             tray::build(app)?;
