@@ -16,6 +16,11 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openLicensePage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_license_page", { which })),
+	diagnostics: () => typedError<Diagnostics_Serialize, string>(__TAURI_INVOKE("diagnostics")),
+	/**  The person has read the crash notice. */
+	dismissCrash: () => typedError<null, string>(__TAURI_INVOKE("dismiss_crash")),
+	/**  Show the log folder in Explorer or Finder. */
+	openLogFolder: () => typedError<null, string>(__TAURI_INVOKE("open_log_folder")),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
@@ -110,6 +115,24 @@ export type ChatEdit = {
 	/**  The proposed text, so it can be shown when it was held back. */
 	proposed: string,
 	doc: DocView,
+};
+
+export type Diagnostics = Diagnostics_Serialize | Diagnostics_Deserialize;
+
+export type Diagnostics_Deserialize = {
+	version: string,
+	system: string,
+	log_dir: string,
+	/**  What went wrong last time, when CeeVee closed unexpectedly and the person was not told yet. */
+	last_crash?: string | null,
+};
+
+export type Diagnostics_Serialize = {
+	version: string,
+	system: string,
+	log_dir: string,
+	/**  What went wrong last time, when CeeVee closed unexpectedly and the person was not told yet. */
+	last_crash: string | null,
 };
 
 export type DocLine = {

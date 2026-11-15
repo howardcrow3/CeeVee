@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import { sections, isCurrent } from '$lib/nav';
   import LicenseBanner from './LicenseBanner.svelte';
+  import CrashNotice from './CrashNotice.svelte';
   let { children } = $props();
 </script>
 
@@ -13,7 +14,7 @@
       <a href={resolve(s.href)} class:cur={isCurrent(s.href, page.url.pathname)} aria-current={isCurrent(s.href, page.url.pathname) ? 'page' : undefined}>{s.label}</a>
     {/each}
   </nav>
-  <main class="content"><LicenseBanner />{@render children()}</main>
+  <main class="content"><CrashNotice /><LicenseBanner />{@render children()}</main>
 </div>
 
 <style>

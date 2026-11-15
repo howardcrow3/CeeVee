@@ -4,6 +4,7 @@
 //! [`EventBus`] (docs/TECHNICAL_PLAN.md, section 2).
 
 mod bus;
+pub mod crash;
 mod error;
 pub mod schedule;
 
