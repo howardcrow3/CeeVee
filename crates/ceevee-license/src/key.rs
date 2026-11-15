@@ -50,6 +50,11 @@ pub fn parse_activation_link(url: &str) -> Option<String> {
         .and_then(|v| normalize(&percent_decode(v)).ok())
 }
 
+/// The first activation link in `urls` (the operating system may pass several arguments), as a key.
+pub fn key_from_links<I: IntoIterator<Item = String>>(urls: I) -> Option<String> {
+    urls.into_iter().find_map(|u| parse_activation_link(&u))
+}
+
 fn percent_decode(s: &str) -> String {
     let b = s.as_bytes();
     let mut out = Vec::with_capacity(b.len());
@@ -125,5 +130,16 @@ mod tests {
     #[test]
     fn hint_hides_most_of_the_key() {
         assert_eq!(hint(K), "CEEV-…-H3NZ8");
+    }
+
+    #[test]
+    fn picks_the_activation_link_out_of_several_arguments() {
+        let urls = vec![
+            "--minimized".to_string(),
+            format!("ceevee://activate?key={K}"),
+        ];
+        assert_eq!(key_from_links(urls).as_deref(), Some(K));
+        assert_eq!(key_from_links(vec!["ceevee://open".to_string()]), None);
+        assert_eq!(key_from_links(Vec::new()), None);
     }
 }
