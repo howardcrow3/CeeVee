@@ -4,6 +4,7 @@
   import { boardKinds, cleanBoards, withStarters } from '$lib/boards';
   import { percent, sizeText } from '$lib/models';
   import LicensePanel from '$lib/components/LicensePanel.svelte';
+  import CategoriesPanel from '$lib/components/CategoriesPanel.svelte';
   import type { ModelStatus, DownloadProgress } from '$lib/bindings';
 
   let boards = $state<BoardLine[]>([]);
@@ -115,6 +116,7 @@
     {/if}
   {/if}
 </section>
+<CategoriesPanel />
 <section>
   <h2>Companies to watch</h2>
   <p class="note">
