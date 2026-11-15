@@ -134,6 +134,19 @@ impl<A: Api, K: Anchor> LicenseService<A, K> {
         })
     }
 
+    /// Gate for anything that changes data or runs searches: fails once the trial
+    /// is over with no license. A failure to read the license state never blocks.
+    pub async fn require_write(&self, now: DateTime<Utc>) -> Result<()> {
+        match self.status(now).await {
+            Ok(r) if r.status.read_only() => Err(LicenseError::ReadOnly),
+            Ok(_) => Ok(()),
+            Err(e) => {
+                tracing::warn!("license state unreadable, not blocking: {e}");
+                Ok(())
+            }
+        }
+    }
+
     /// Ask turtlebox.studio for a signed trial token once. Offline is fine: this is
     /// retried on a later launch. Returns whether a token is now stored.
     pub async fn fetch_trial_token(&self) -> bool {
@@ -341,6 +354,19 @@ mod tests {
         // The server saw this computer on Dec 1, earlier than the local start.
         let r = s.status(t("2026-12-20T09:00:00Z")).await.unwrap();
         assert!(r.status.read_only());
+    }
+
+    #[tokio::test]
+    async fn writes_are_allowed_in_the_trial_and_blocked_after_it_unless_licensed() {
+        let s = svc("m").await;
+        assert!(s.require_write(t("2026-12-01T09:00:00Z")).await.is_ok());
+        assert!(s.require_write(t("2026-12-14T09:00:00Z")).await.is_ok());
+        assert!(matches!(
+            s.require_write(t("2026-12-15T09:00:00Z")).await,
+            Err(LicenseError::ReadOnly)
+        ));
+        s.activate(KEY, t("2026-12-16T09:00:00Z")).await.unwrap();
+        assert!(s.require_write(t("2027-01-16T09:00:00Z")).await.is_ok());
     }
 
     #[tokio::test]

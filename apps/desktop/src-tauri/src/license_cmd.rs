@@ -131,3 +131,8 @@ pub fn open_license_page(app: tauri::AppHandle, which: String) -> Result<(), Str
         .open_url(url, None::<&str>)
         .map_err(|e| e.to_string())
 }
+
+/// Refuse a write while the app is read-only (trial over, no license).
+pub async fn require_write(svc: &Service) -> Result<(), String> {
+    svc.require_write(Utc::now()).await.map_err(err)
+}
