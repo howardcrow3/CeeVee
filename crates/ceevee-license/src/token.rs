@@ -151,7 +151,10 @@ mod tests {
         let hex = "425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a";
         assert!(Verifier::from_hex(hex).is_some());
         let workflow = include_str!("../../../.github/workflows/release.yml");
-        assert!(workflow.contains(hex), "release.yml must carry the same public key");
+        assert!(
+            workflow.contains(hex),
+            "release.yml must carry the same public key"
+        );
     }
 
     #[test]
