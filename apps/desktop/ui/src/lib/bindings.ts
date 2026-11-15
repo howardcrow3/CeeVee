@@ -16,6 +16,11 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openLicensePage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_license_page", { which })),
+	/**
+	 *  Open one of CeeVee's public pages in the browser: `privacy`, `terms` or `help`. Only these
+	 *  fixed addresses can be opened.
+	 */
+	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
