@@ -59,6 +59,8 @@ pub struct JobLine {
     pub state: String,
     pub score: Option<f64>,
     pub url: String,
+    /// How many of your LinkedIn connections currently work at this company.
+    pub known: u32,
 }
 
 /// Jobs found by searches that you have not dismissed, newest first.
@@ -68,9 +70,16 @@ pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLin
     let rows = ceevee_search::postings::recent(&db, 200)
         .await
         .map_err(|e| e.to_string())?;
-    Ok(rows
-        .into_iter()
-        .map(|r| JobLine {
+    let mut out = Vec::new();
+    for r in rows {
+        let known = match r.company_id {
+            Some(c) => ceevee_network::linkedin::connections_at(&db, c)
+                .await
+                .map(|p| p.len() as u32)
+                .unwrap_or(0),
+            None => 0,
+        };
+        out.push(JobLine {
             id: r.id as u32,
             title: r.title,
             company: r.company,
@@ -78,8 +87,71 @@ pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLin
             state: r.state,
             score: r.score,
             url: r.url,
+            known,
+        });
+    }
+    Ok(out)
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct KnownLine {
+    pub name: String,
+    pub title: Option<String>,
+    pub profile_url: Option<String>,
+}
+
+/// People you know at the company that posted a job.
+#[tauri::command]
+#[specta::specta]
+pub async fn people_at_job(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<Vec<KnownLine>, String> {
+    let p = ceevee_search::postings::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(c) = p.company_id else {
+        return Ok(Vec::new());
+    };
+    let people = ceevee_network::linkedin::connections_at(&db, c)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(people
+        .into_iter()
+        .map(|k| KnownLine {
+            name: k.full_name,
+            title: k.title,
+            profile_url: k.profile_url,
         })
         .collect())
+}
+
+/// Hide a job you are not interested in.
+#[tauri::command]
+#[specta::specta]
+pub async fn dismiss_job(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_search::postings::set_state(
+        &db,
+        i64::from(id),
+        ceevee_search::postings::State::Dismissed,
+    )
+    .await
+    .map_err(|e| e.to_string())
+}
+
+/// Open a job posting in your default browser. Only web addresses are opened.
+#[tauri::command]
+#[specta::specta]
+pub fn open_posting(url: String) -> Result<(), String> {
+    if !(url.starts_with("https://") || url.starts_with("http://")) {
+        return Err("That is not a web address.".into());
+    }
+    tauri_plugin_opener::open_url(&url, None::<&str>).map_err(|e| e.to_string())
 }
 
 /// How many proposals are waiting for you to approve.

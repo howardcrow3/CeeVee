@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchText, placeText, statusWord } from './jobs';
+import { byMatch, knownText, matchText, placeText, statusWord } from './jobs';
 
 describe('jobs helpers', () => {
   it('words the status', () => {
@@ -7,7 +7,7 @@ describe('jobs helpers', () => {
     expect(statusWord('new')).toBe('New');
   });
   it('formats the match', () => {
-    expect(matchText(0.924)).toBe('92%');
+    expect(matchText(92.4)).toBe('92%');
     expect(matchText(null)).toBe('Not scored');
   });
   it('handles a missing location', () => {
@@ -26,5 +26,28 @@ describe('prepareSummary', () => {
   it('says when there was no resume', async () => {
     const { prepareSummary } = await import('./jobs');
     expect(prepareSummary({ filled: 1, missing: [], resume: null })).toContain('No resume was attached');
+  });
+});
+
+describe('byMatch', () => {
+  it('puts the best matches first and keeps ties in order', () => {
+    const jobs = [
+      { id: 1, score: 40 },
+      { id: 2, score: null },
+      { id: 3, score: 90 },
+      { id: 4, score: 40 }
+    ];
+    expect(byMatch(jobs).map((j) => j.id)).toEqual([3, 1, 4, 2]);
+  });
+  it('clamps odd scores', () => {
+    expect(matchText(250)).toBe('100%');
+  });
+});
+
+describe('knownText', () => {
+  it('says how many people you know', () => {
+    expect(knownText(0)).toBe('');
+    expect(knownText(1)).toBe('You know 1 person');
+    expect(knownText(4)).toBe('You know 4 people');
   });
 });
