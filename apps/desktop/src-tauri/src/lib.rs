@@ -72,6 +72,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             mail_cmd::imap_preset,
             mail_cmd::list_mail_accounts,
             mail_cmd::connect_imap,
+            mail_cmd::google_available,
+            mail_cmd::connect_google,
             mail_cmd::disconnect_mail_account,
             mail_cmd::sync_mail,
             mail_cmd::list_inbox,

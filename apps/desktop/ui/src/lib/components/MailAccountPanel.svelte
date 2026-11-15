@@ -9,6 +9,7 @@
   let port = $state(993);
   let password = $state('');
   let busy = $state(false);
+  let google = $state(false);
   let message = $state('');
   let error = $state('');
 
@@ -19,6 +20,7 @@
   }
   onMount(() => {
     load().catch((e) => (error = `Running outside the desktop app: ${String(e)}`));
+    commands.googleAvailable().then((g) => (google = g)).catch(() => {});
   });
 
   async function fillServer() {
@@ -41,6 +43,19 @@
     }
     password = '';
     address = host = '';
+    message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
+    await load();
+  }
+
+  async function signInWithGoogle() {
+    busy = true;
+    error = message = '';
+    const r = await commands.connectGoogle();
+    busy = false;
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
     message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
     await load();
   }
@@ -81,6 +96,17 @@
   {/each}
   {#if accounts.length > 0}
     <div class="row"><button onclick={syncNow} disabled={busy}>{busy ? 'Checking' : 'Check mail now'}</button></div>
+  {/if}
+  {#if google}
+    <div class="form">
+      <p class="note">
+        Sign in with Google and CeeVee can read replies from recruiters in your Gmail and keep your
+        applications up to date. CeeVee asks for read-only access: it cannot send, change or delete
+        anything. You can remove access at any time in your Google account.
+      </p>
+      <div class="row"><button onclick={signInWithGoogle} disabled={busy}>{busy ? 'Waiting for Google' : 'Sign in with Google'}</button></div>
+    </div>
+    <p class="note">Or connect any email account with an app password:</p>
   {/if}
   <div class="form">
     <input aria-label="Email address" placeholder="Email address" bind:value={address} onblur={fillServer} />

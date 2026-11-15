@@ -22,6 +22,7 @@ ceevee-search = { path = "../../../crates/ceevee-search" }
 ceevee-network = { path = "../../../crates/ceevee-network" }
 ceevee-docs = { path = "../../../crates/ceevee-docs" }
 ceevee-mail = { path = "../../../crates/ceevee-mail" }
+ceevee-google = { path = "../../../crates/ceevee-google" }
 ceevee-ai.workspace = true
 ceevee-profile.workspace = true
 ceevee-apply = { path = "../../../crates/ceevee-apply", features = ["chrome"] }

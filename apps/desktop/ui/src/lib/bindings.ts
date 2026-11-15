@@ -88,6 +88,13 @@ export const commands = {
 	 *  operating system's keychain, never to the database.
 	 */
 	connectImap: (address: string, host: string, port: number, password: string) => typedError<MailAccountLine_Serialize, string>(__TAURI_INVOKE("connect_imap", { address, host, port, password })),
+	/**  Whether Google sign-in is available in this build. */
+	googleAvailable: () => __TAURI_INVOKE<boolean>("google_available"),
+	/**
+	 *  Sign in with Google in the browser, then save the account. CeeVee asks for read-only access to
+	 *  Gmail; the refresh token goes to the keychain.
+	 */
+	connectGoogle: () => typedError<MailAccountLine_Serialize, string>(__TAURI_INVOKE("connect_google")),
 	/**  Disconnect an account and remove the mail CeeVee kept from it. */
 	disconnectMailAccount: (id: number) => typedError<null, string>(__TAURI_INVOKE("disconnect_mail_account", { id })),
 	syncMail: () => typedError<SyncLine, string>(__TAURI_INVOKE("sync_mail")),

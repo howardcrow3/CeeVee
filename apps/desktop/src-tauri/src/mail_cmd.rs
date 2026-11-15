@@ -110,8 +110,10 @@ pub async fn connect_imap(
 #[tauri::command]
 #[specta::specta]
 pub async fn disconnect_mail_account(db: tauri::State<'_, Db>, id: u32) -> Result<(), String> {
-    let account = store::get_account(&db, i64::from(id)).await.map_err(e)?;
-    Keychain.delete(&account_key(&account.address));
+    let key = store::secret_ref(&db, i64::from(id)).await.map_err(e)?;
+    if let Some(key) = key {
+        Keychain.delete(&key);
+    }
     store::remove_account(&db, i64::from(id)).await.map_err(e)
 }
 
@@ -127,28 +129,39 @@ pub struct SyncLine {
 pub async fn sync_all(app: &AppHandle, db: &Db) -> Result<SyncLine, String> {
     let mut total = SyncLine::default();
     for account in store::list_accounts(db).await.map_err(e)? {
-        if account.provider != "imap" {
-            continue;
-        }
-        let Some(password) = Keychain.get(&account_key(&account.address)) else {
+        let key = store::secret_ref(db, account.id)
+            .await
+            .map_err(e)?
+            .unwrap_or_else(|| account_key(&account.address));
+        let Some(secret) = Keychain.get(&key) else {
             return Err(format!(
-                "The password for {} is missing from the keychain. Connect the account again.",
+                "The saved sign-in for {} is missing from the keychain. Connect the account again.",
                 account.address
             ));
         };
         let engine = app.state::<Arc<Engine>>().inner().clone();
         let handle = app.clone();
+        let worker = move || worker_for(&handle, &engine).ok();
         let now = Utc::now();
-        let s = ceevee_mail::sync::sync_imap(
-            db,
-            account.id,
-            &password,
-            move || worker_for(&handle, &engine).ok(),
-            now.timestamp(),
-            &now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
-        )
-        .await
-        .map_err(|err| ceevee_mail::imap::explain(&err))?;
+        let iso = now.to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let s = match account.provider.as_str() {
+            "gmail" => {
+                let client = google_client().ok_or(NOT_SET_UP)?;
+                let token = client
+                    .refresh(&secret)
+                    .await
+                    .map_err(|err| format!("{err}. Connect Google again in Settings."))?;
+                let api = ceevee_google::Gmail::new(&token);
+                ceevee_mail::sync::sync_gmail(db, account.id, &api, worker, now.timestamp(), &iso)
+                    .await
+                    .map_err(|err| err.to_string())?
+            }
+            _ => {
+                ceevee_mail::sync::sync_imap(db, account.id, &secret, worker, now.timestamp(), &iso)
+                    .await
+                    .map_err(|err| ceevee_mail::imap::explain(&err))?
+            }
+        };
         total.employer += s.employer as u32;
         total.status_changes += s.status_changes as u32;
         total.waiting_for_you += s.waiting_for_you as u32;
@@ -377,4 +390,76 @@ pub async fn list_application_choices(
         .collect();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(v)
+}
+
+const NOT_SET_UP: &str =
+    "Google sign-in is not set up in this build of CeeVee. Use an app password instead.";
+
+/// CeeVee's Google OAuth client, set when the release is built (or in the environment while
+/// developing). Without it the Google button stays hidden.
+fn google_client() -> Option<ceevee_google::OAuthClient> {
+    let id = option_env!("CEEVEE_GOOGLE_CLIENT_ID")
+        .map(str::to_string)
+        .or_else(|| std::env::var("CEEVEE_GOOGLE_CLIENT_ID").ok())
+        .filter(|v| !v.is_empty())?;
+    let secret = option_env!("CEEVEE_GOOGLE_CLIENT_SECRET")
+        .map(str::to_string)
+        .or_else(|| std::env::var("CEEVEE_GOOGLE_CLIENT_SECRET").ok())
+        .filter(|v| !v.is_empty());
+    Some(ceevee_google::OAuthClient::google(&id, secret.as_deref()))
+}
+
+/// Whether Google sign-in is available in this build.
+#[tauri::command]
+#[specta::specta]
+pub fn google_available() -> bool {
+    google_client().is_some()
+}
+
+/// Sign in with Google in the browser, then save the account. CeeVee asks for read-only access to
+/// Gmail; the refresh token goes to the keychain.
+#[tauri::command]
+#[specta::specta]
+pub async fn connect_google(
+    lic: tauri::State<'_, Arc<Service>>,
+    app: AppHandle,
+    db: tauri::State<'_, Db>,
+) -> Result<MailAccountLine, String> {
+    use tauri_plugin_opener::OpenerExt;
+    require_write(&lic).await?;
+    let client = google_client().ok_or(NOT_SET_UP)?;
+    let mut scopes = ceevee_google::oauth::SIGN_IN_SCOPES.to_vec();
+    scopes.push(ceevee_google::oauth::GMAIL_READONLY);
+    let opener = app.clone();
+    let tokens = client
+        .sign_in(&scopes, move |url| {
+            if let Err(err) = opener.opener().open_url(url, None::<&str>) {
+                tracing::warn!("could not open the browser: {err}");
+            }
+        })
+        .await
+        .map_err(|err| err.to_string())?;
+    if !tokens
+        .scopes
+        .iter()
+        .any(|s| s == ceevee_google::oauth::GMAIL_READONLY)
+    {
+        return Err("Google did not give CeeVee permission to read your mail. Try again and leave the Gmail box ticked.".into());
+    }
+    let refresh = tokens
+        .refresh_token
+        .ok_or("Google did not return a long-lasting sign-in. Remove CeeVee at myaccount.google.com/permissions and try again.")?;
+    let address = match tokens.email {
+        Some(a) => a,
+        None => ceevee_google::Gmail::new(&tokens.access_token)
+            .address()
+            .await
+            .map_err(|err| err.to_string())?,
+    };
+    let key = format!("google:{address}");
+    Keychain.set(&key, &refresh)?;
+    let account = store::add_account(&db, "gmail", &address, &serde_json::json!({}), &key)
+        .await
+        .map_err(e)?;
+    Ok(account_line(account))
 }

@@ -268,3 +268,98 @@ fn presets_cover_the_common_providers() {
     );
     assert_eq!(preset_for("a@example.org"), None);
 }
+
+mod gmail {
+
+    use ceevee_core::Result;
+    use ceevee_db::Db;
+    use ceevee_google::MailApi;
+    use serde_json::json;
+
+    use super::mail;
+    use crate::{store, sync};
+
+    #[derive(Default)]
+    struct Fake {
+        mails: Vec<(String, Vec<u8>)>,
+        queries: std::sync::Mutex<Vec<String>>,
+        raw_calls: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl MailApi for Fake {
+        async fn list_ids(&self, q: &str, _max: usize) -> Result<Vec<String>> {
+            self.queries.lock().unwrap().push(q.into());
+            Ok(self.mails.iter().map(|m| m.0.clone()).collect())
+        }
+        async fn headers(&self, id: &str) -> Result<Vec<u8>> {
+            let raw = &self.mails.iter().find(|m| m.0 == id).unwrap().1;
+            let at = raw.windows(4).position(|w| w == b"\r\n\r\n").unwrap() + 4;
+            Ok(raw[..at].to_vec())
+        }
+        async fn raw(&self, id: &str) -> Result<Vec<u8>> {
+            self.raw_calls.lock().unwrap().push(id.into());
+            Ok(self.mails.iter().find(|m| m.0 == id).unwrap().1.clone())
+        }
+    }
+
+    #[tokio::test]
+    async fn gmail_sync_reads_bodies_only_for_employer_mail_and_remembers_where_it_stopped() {
+        let api = Fake {
+            mails: vec![
+                (
+                    "a".into(),
+                    mail(
+                        "dana@acme.com",
+                        "Interview",
+                        "Can we schedule an interview?",
+                        "g1@acme",
+                    ),
+                ),
+                ("b".into(), mail("mom@gmail.com", "Hi", "Call me", "g2@x")),
+            ],
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO company(name, email_domains) VALUES ('Acme', '[\"acme.com\"]')")
+            .execute(db.pool())
+            .await
+            .unwrap();
+        let s = sync::sync_gmail(
+            &db,
+            acct.id,
+            &api,
+            || None,
+            1_794_564_000,
+            "2026-11-13T10:00:00Z",
+        )
+        .await
+        .unwrap();
+        assert_eq!((s.seen, s.employer), (2, 1));
+        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a"]);
+        assert!(api.queries.lock().unwrap()[0].contains("newer_than:90d"));
+        sync::sync_gmail(
+            &db,
+            acct.id,
+            &api,
+            || None,
+            1_794_564_100,
+            "2026-11-13T10:01:40Z",
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            api.queries.lock().unwrap()[1],
+            format!("in:inbox after:{}", 1_794_564_000 - 86_400)
+        );
+        assert_eq!(
+            store::list_messages(&db, &Default::default())
+                .await
+                .unwrap()
+                .len(),
+            1
+        );
+    }
+}

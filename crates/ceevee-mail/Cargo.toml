@@ -14,6 +14,7 @@ ceevee-db.workspace = true
 ceevee-search.workspace = true
 ceevee-docs.workspace = true
 ceevee-profile.workspace = true
+ceevee-google = { path = "../ceevee-google" }
 serde.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
