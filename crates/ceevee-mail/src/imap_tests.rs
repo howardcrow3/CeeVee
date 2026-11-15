@@ -375,6 +375,8 @@ async fn a_real_provider_over_tls_refuses_a_bad_password_in_plain_words() {
         username: "nobody-ceevee-test@gmail.com".into(),
         tls: true,
     };
-    let err = crate::imap::test_login(&cfg, "not-a-password").await.unwrap_err();
+    let err = crate::imap::test_login(&cfg, "not-a-password")
+        .await
+        .unwrap_err();
     assert!(crate::imap::explain(&err).contains("app password"), "{err}");
 }
