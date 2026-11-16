@@ -37,3 +37,13 @@ export function knownText(n: number): string {
   if (n <= 0) return '';
   return n === 1 ? 'You know 1 person' : `You know ${n} people`;
 }
+
+/** What to say about a fresh draft: either clean, or listing what the person should check. */
+export function draftNote(flagged: string[]): string {
+  if (flagged.length === 0) return 'Everything in this draft matches your profile and the posting.';
+  return `Check these, they are not in your profile or the posting: ${flagged.join(', ')}.`;
+}
+
+export function draftLabel(kind: string): string {
+  return kind === 'cover_letter' ? 'cover letter' : 'tailored resume';
+}

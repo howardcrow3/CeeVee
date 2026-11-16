@@ -721,6 +721,124 @@ pub async fn export_document_pdf(
     Ok(path.display().to_string())
 }
 
+/// A cover letter or tailored resume written for one job, not saved yet.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct JobDraft {
+    /// `cover_letter` or `tailored_resume`.
+    pub kind: String,
+    /// Letter Markdown or resume JSON.
+    pub content: String,
+    /// Things the draft says that your profile and the posting do not. Review these before saving.
+    pub flagged: Vec<String>,
+}
+
+async fn posting_text(db: &ceevee_db::Db, id: i64) -> Result<(String, String), String> {
+    let p = ceevee_search::postings::get(db, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    let company = match p.company_id {
+        Some(c) => ceevee_search::companies::get(db, c)
+            .await
+            .ok()
+            .map(|c| c.name),
+        None => None,
+    };
+    let mut text = format!("{}\n", p.title);
+    if let Some(c) = &company {
+        text.push_str(&format!("Company: {c}\n"));
+    }
+    if let Some(l) = &p.location {
+        text.push_str(&format!("Location: {l}\n"));
+    }
+    if let Some(b) = &p.body {
+        text.push_str(b);
+    }
+    let name = match company {
+        Some(c) => format!("{} at {c}", p.title),
+        None => p.title,
+    };
+    Ok((text, name))
+}
+
+/// Write a cover letter or tailored resume for a job with the local model. Nothing is saved until
+/// you call `save_job_draft`.
+#[tauri::command]
+#[specta::specta]
+pub async fn draft_for_job(
+    app: tauri::AppHandle,
+    engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    kind: String,
+    instructions: String,
+) -> Result<JobDraft, String> {
+    let (posting, _) = posting_text(&db, i64::from(id)).await?;
+    let worker = crate::models::worker_for(&app, &engine)?;
+    let draft = match kind.as_str() {
+        "cover_letter" => {
+            let profile = ceevee_mail::reply::profile_text(&db)
+                .await
+                .map_err(|e| e.to_string())?;
+            ceevee_docs::draft::draft_cover_letter(&worker, &profile, &posting, &instructions).await
+        }
+        "tailored_resume" => {
+            let base =
+                ceevee_docs::store::list(&db, Some(ceevee_docs::store::DocKind::BaseResume), None)
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .next()
+                    .ok_or("Add a base resume in Documents first.")?;
+            let cur = ceevee_docs::store::current(&db, base.id)
+                .await
+                .map_err(|e| e.to_string())?;
+            let json: serde_json::Value = serde_json::from_str(&cur.content)
+                .map_err(|e| format!("Your base resume is not valid JSON: {e}"))?;
+            ceevee_docs::draft::draft_tailored_resume(&worker, &json, &posting).await
+        }
+        other => return Err(format!("Cannot draft a \"{other}\".")),
+    }
+    .map_err(|e| e.to_string())?;
+    Ok(JobDraft {
+        kind,
+        content: draft.content,
+        flagged: draft.flags.iter().map(|f| f.text.clone()).collect(),
+    })
+}
+
+/// Save a draft you reviewed as a new document. Returns the document id.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_job_draft(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    kind: String,
+    content: String,
+) -> Result<u32, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let k = doc_kind(&kind)?;
+    check_content(k, &content)?;
+    let (_, name) = posting_text(&db, i64::from(id)).await?;
+    let label = if kind == "cover_letter" {
+        "Cover letter"
+    } else {
+        "Resume"
+    };
+    let doc = ceevee_docs::store::create(
+        &db,
+        k,
+        &format!("{label}: {name}"),
+        None,
+        None,
+        &content,
+        "drafted",
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(doc as u32)
+}
+
 /// Show a file you saved in your computer's file manager. Only files, never programs, are shown.
 #[tauri::command]
 #[specta::specta]

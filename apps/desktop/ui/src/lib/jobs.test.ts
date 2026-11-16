@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byMatch, knownText, matchText, placeText, statusWord } from './jobs';
+import { byMatch, draftLabel, draftNote, knownText, matchText, placeText, statusWord } from './jobs';
 
 describe('jobs helpers', () => {
   it('words the status', () => {
@@ -49,5 +49,16 @@ describe('knownText', () => {
     expect(knownText(0)).toBe('');
     expect(knownText(1)).toBe('You know 1 person');
     expect(knownText(4)).toBe('You know 4 people');
+  });
+});
+
+describe('drafts', () => {
+  it('notes what to check', () => {
+    expect(draftNote([])).toContain('matches');
+    expect(draftNote(['Google', '40%'])).toBe(
+      'Check these, they are not in your profile or the posting: Google, 40%.'
+    );
+    expect(draftLabel('cover_letter')).toBe('cover letter');
+    expect(draftLabel('tailored_resume')).toBe('tailored resume');
   });
 });

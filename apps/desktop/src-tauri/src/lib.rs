@@ -74,6 +74,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::chat_edit_document,
             commands::export_document_pdf,
             commands::show_in_folder,
+            commands::draft_for_job,
+            commands::save_job_draft,
             commands::prepare_application,
             commands::list_applications,
             commands::set_application_status,
