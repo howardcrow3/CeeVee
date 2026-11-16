@@ -91,6 +91,13 @@ export const commands = {
 	exportDocumentPdf: (id: number, a4: boolean) => typedError<string, string>(__TAURI_INVOKE("export_document_pdf", { id, a4 })),
 	/**  Show a file you saved in your computer's file manager. Only files, never programs, are shown. */
 	showInFolder: (path: string) => typedError<null, string>(__TAURI_INVOKE("show_in_folder", { path })),
+	/**
+	 *  Write a cover letter or tailored resume for a job with the local model. Nothing is saved until
+	 *  you call `save_job_draft`.
+	 */
+	draftForJob: (id: number, kind: string, instructions: string) => typedError<JobDraft, string>(__TAURI_INVOKE("draft_for_job", { id, kind, instructions })),
+	/**  Save a draft you reviewed as a new document. Returns the document id. */
+	saveJobDraft: (id: number, kind: string, content: string) => typedError<number, string>(__TAURI_INVOKE("save_job_draft", { id, kind, content })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
 	/**  Every application you are tracking, in board order. */
@@ -281,6 +288,16 @@ export type InboxLine_Serialize = {
 	application_id: number | null,
 	/**  `Company, Job title` of the linked application. */
 	application: string | null,
+};
+
+/**  A cover letter or tailored resume written for one job, not saved yet. */
+export type JobDraft = {
+	/**  `cover_letter` or `tailored_resume`. */
+	kind: string,
+	/**  Letter Markdown or resume JSON. */
+	content: string,
+	/**  Things the draft says that your profile and the posting do not. Review these before saving. */
+	flagged: string[],
 };
 
 /**  One line of the jobs list. */
