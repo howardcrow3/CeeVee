@@ -50,6 +50,10 @@ jobs:
       # Public half of the license signing key (highturtle_license). Public, so it is safe in the repo;
       # a variable of the same name in the release-build environment overrides it (key rotation).
       CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
+      # Google sign-in for Gmail. Both are optional: when unset the Google button is hidden and IMAP still works.
+      # The client ID is not secret; the "secret" of a desktop client is not confidential either, but is kept out of the repo.
+      CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
+      CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
       # Update files (.sig) are signed with the updater key.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -127,6 +131,11 @@ jobs:
           {"bundle":{"windows":{"signCommand":"trusted-signing-cli -e $AZURE_SIGNING_ENDPOINT -a $AZURE_SIGNING_ACCOUNT -c $AZURE_SIGNING_PROFILE -d CeeVee %1"}}}
           JSON
           echo "TAURI_EXTRA_ARGS=--config $RUNNER_TEMP/sign.json" >> "$GITHUB_ENV"
+
+      - name: Google sign-in status
+        shell: bash
+        run: |
+          if [ -n "$CEEVEE_GOOGLE_CLIENT_ID" ] && [ -n "$CEEVEE_GOOGLE_CLIENT_SECRET" ]; then echo "Google sign-in: on"; else echo "::warning::CEEVEE_GOOGLE_CLIENT_ID / CEEVEE_GOOGLE_CLIENT_SECRET not set in release-build; this build has no Google sign-in button"; fi
 
       - name: Build
         working-directory: apps/desktop
