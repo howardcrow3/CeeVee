@@ -1,0 +1,72 @@
+name: Signed Mac build
+
+# A Developer ID signed and notarized, stapled .dmg from main for hands-on testing. No release is
+# made and nothing is published: the download is the "CeeVee-signed-macos" artifact of the run.
+# Uses the same secrets and steps as release.yml (environment release-build, which only allows main).
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    environment: release-build
+    env:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: aarch64-apple-darwin }
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+      - name: Import Developer ID certificate
+        run: |
+          for n in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!n}" ] || { echo "::error::missing secret $n"; exit 1; }
+          done
+          KC="$RUNNER_TEMP/build.keychain-db"; KP="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security import .github/signing/developer-id.cer -k "$KC" -A || echo "developer-id.cer already in the .p12; continuing"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KP" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          ID=$(security find-identity -p codesigning "$KC" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          [ -n "$ID" ] || { echo "::error::No usable Developer ID Application identity"; exit 1; }
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
+      - name: Build, sign and notarize
+        working-directory: apps/desktop
+        run: env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci --bundles app,dmg --target aarch64-apple-darwin --features llama
+      - name: Verify
+        run: |
+          app=$(ls -d target/aarch64-apple-darwin/release/bundle/macos/*.app)
+          codesign --verify --deep --strict "$app"
+          spctl -a -t exec -vv "$app"
+          xcrun stapler validate "$app"
+          mkdir -p out && cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg out/
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CeeVee-signed-macos
+          path: out/*.dmg
+          if-no-files-found: error
+          retention-days: 14
