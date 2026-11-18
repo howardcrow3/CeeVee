@@ -56,17 +56,11 @@ pub fn setup(app: &tauri::App) {
             .map(|d| d.as_secs())
             .unwrap_or(0);
         let os = format!("{} {}", std::env::consts::OS, std::env::consts::ARCH);
-        let text = ceevee_core::crash::format_report(
-            env!("CARGO_PKG_VERSION"),
-            &os,
-            now,
-            &message,
-            &location,
-        );
+        let text = ceevee_core::crash::format_report(&build_label(), &os, now, &message, &location);
         let _ = ceevee_core::crash::write_report(&hook_dir, now, &text);
         previous(info);
     }));
-    tracing::info!("CeeVee {} started", env!("CARGO_PKG_VERSION"));
+    tracing::info!("CeeVee {} started", build_label());
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -83,7 +77,7 @@ pub struct Diagnostics {
 pub fn diagnostics(app: tauri::AppHandle) -> Result<Diagnostics, String> {
     let dir = log_dir(&app)?;
     Ok(Diagnostics {
-        version: env!("CARGO_PKG_VERSION").into(),
+        version: build_label(),
         system: format!("{} {}", std::env::consts::OS, std::env::consts::ARCH),
         last_crash: ceevee_core::crash::latest_unseen(&dir).map(|c| c.summary),
         log_dir: dir.display().to_string(),
@@ -108,4 +102,17 @@ pub fn open_log_folder(app: tauri::AppHandle) -> Result<(), String> {
     app.opener()
         .open_path(dir.display().to_string(), None::<&str>)
         .map_err(|e| e.to_string())
+}
+
+/// "0.1.0" for a tagged release, "0.1.0 build 57 (abc1234)" for a CI test build, so builds can be told apart.
+pub fn build_label() -> String {
+    match (
+        option_env!("CEEVEE_BUILD_NUMBER"),
+        option_env!("CEEVEE_BUILD_SHA"),
+    ) {
+        (Some(n), Some(sha)) if !n.is_empty() => {
+            format!("{} build {n} ({sha})", env!("CARGO_PKG_VERSION"))
+        }
+        _ => env!("CARGO_PKG_VERSION").into(),
+    }
 }

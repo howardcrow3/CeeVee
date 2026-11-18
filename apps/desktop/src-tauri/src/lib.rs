@@ -22,7 +22,7 @@ use tauri::{AppHandle, Manager, RunEvent, WindowEvent};
 async fn app_info(db: tauri::State<'_, ceevee_db::Db>) -> Result<ceevee_core::AppInfo, String> {
     Ok(ceevee_core::AppInfo {
         name: "CeeVee".into(),
-        version: env!("CARGO_PKG_VERSION").into(),
+        version: diagnostics::build_label(),
         schema_version: db.schema_version().await.map_err(|e| e.to_string())? as u32,
     })
 }

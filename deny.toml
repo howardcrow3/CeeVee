@@ -41,7 +41,11 @@ version = 2
 # RUSTSEC-2026-0441: `pin-utils` is unmaintained (a notice, not a vulnerability); async-imap, our
 # IMAP client, depends on it, and its macros are only compile-time helpers. Accepted by Howard
 # 2026-11-15. Remove this ignore when async-imap drops it.
+# RUSTSEC-2026-0543: `chrono` is unmaintained (a notice, not a vulnerability; all versions, no safe
+# upgrade). We use it for dates and async-imap, tauri and others depend on it. Added 2026-11-18;
+# revisit when a maintained fork or the ecosystem moves to jiff or time.
 ignore = [
+  "RUSTSEC-2026-0543",
   "RUSTSEC-2026-0441",
   "RUSTSEC-2026-0459", "RUSTSEC-2024-0436",
   "RUSTSEC-2025-0141", "RUSTSEC-2026-0206", "RUSTSEC-2026-0192", "RUSTSEC-2024-0449",
