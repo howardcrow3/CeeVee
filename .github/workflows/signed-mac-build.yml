@@ -15,6 +15,10 @@ jobs:
     runs-on: macos-latest
     environment: release-build
     env:
+      # Public half of the license signing key. Without it the app cannot activate a key.
+      CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
+      CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
+      CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
@@ -24,6 +28,13 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Build number
+        run: |
+          # Counts every commit on this branch, so it only ever goes up between builds.
+          n=$(git rev-list --count HEAD)
+          echo "CEEVEE_BUILD_NUMBER=$n" >> "$GITHUB_ENV"
+          echo "CEEVEE_BUILD_SHA=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@stable
         with: { targets: aarch64-apple-darwin }
       - uses: Swatinem/rust-cache@v2
@@ -62,11 +73,13 @@ jobs:
           codesign --verify --deep --strict "$app"
           spctl -a -t exec -vv "$app"
           xcrun stapler validate "$app"
-          mkdir -p out && cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg out/
+          mkdir -p out
+          v=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/.*"(.*)"/\1/')
+          cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg "out/CeeVee_${v}_build${CEEVEE_BUILD_NUMBER}_${CEEVEE_BUILD_SHA}_aarch64.dmg"
           ls -la out
       - uses: actions/upload-artifact@v4
         with:
-          name: CeeVee-signed-macos
+          name: CeeVee-signed-macos-build${{ env.CEEVEE_BUILD_NUMBER }}
           path: out/*.dmg
           if-no-files-found: error
           retention-days: 14

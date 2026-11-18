@@ -23,3 +23,9 @@ CeeVee downloads its model itself from Hugging Face (about 2.5 GB for 8 GB Macs,
 8. Note anything confusing or broken, with what you clicked.
 
 Data lives in `~/Library/Application Support/studio.turtlebox.ceevee`. Delete that folder to start fresh.
+
+## Telling builds apart
+
+Test builds (`test-build.yml`, `signed-mac-build.yml`) number themselves by the count of commits on the branch, so the number only goes up. The number and short commit appear in the download name (`CeeVee_0.1.0_build57_abc1234_aarch64.dmg`), the artifact name, Settings > About, and crash reports. Tagged releases show just the version. The same commit built twice gets the same number, because it is the same code.
+
+Both workflows compile in the license public key (`CEEVEE_LICENSE_PUBKEY`). A build without it says "License checks are not available in this build" and cannot activate a key.
