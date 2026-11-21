@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use ceevee_analytics::{Analytics, Consent, Context, Event, Feature, Target};
+use ceevee_analytics::{Analytics, Consent, Context, Event, Target};
 use serde::Serialize;
 use specta::Type;
 use tauri::Manager;
@@ -51,13 +51,6 @@ pub fn setup(app: &tauri::App, db: ceevee_db::Db) {
             }
         }
     });
-}
-
-/// Count that a feature was used. Safe to call anywhere; does nothing without consent.
-pub async fn feature(app: &tauri::AppHandle, f: Feature) {
-    if let Some(a) = app.try_state::<Handle>() {
-        a.track(Event::FeatureUsed(f)).await;
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
