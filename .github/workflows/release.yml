@@ -174,6 +174,7 @@ jobs:
             codesign --verify --deep --strict "$app"
             spctl -a -t exec -vv "$app"
             xcrun stapler validate "$app"
+            scripts/verify-mac-dmg.sh target/${{ matrix.target }}/release/bundle/dmg/*.dmg --require-notarized
           elif [ "${{ runner.os }}" = "macOS" ]; then
             app=$(ls -d target/${{ matrix.target }}/release/bundle/macos/*.app)
             codesign --verify --deep --strict "$app"
