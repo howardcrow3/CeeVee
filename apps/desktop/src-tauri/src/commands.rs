@@ -375,8 +375,14 @@ pub struct SearchResult {
 pub async fn run_search(
     lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
     db: tauri::State<'_, ceevee_db::Db>,
+    analytics: tauri::State<'_, crate::analytics_cmd::Handle>,
 ) -> Result<SearchResult, String> {
     crate::license_cmd::require_write(&lic).await?;
+    analytics
+        .track(ceevee_analytics::Event::FeatureUsed(
+            ceevee_analytics::Feature::JobSearchRun,
+        ))
+        .await;
     let boards = ceevee_search::sources::load_boards(&db)
         .await
         .map_err(|e| e.to_string())?;

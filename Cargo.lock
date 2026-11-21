@@ -691,6 +691,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ceevee-analytics"
+version = "0.1.0"
+dependencies = [
+ "ceevee-core",
+ "ceevee-db",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ceevee-apply"
 version = "0.1.0"
 dependencies = [
@@ -731,6 +745,7 @@ version = "0.1.0"
 dependencies = [
  "ceevee-agent",
  "ceevee-ai",
+ "ceevee-analytics",
  "ceevee-apply",
  "ceevee-core",
  "ceevee-db",

@@ -27,6 +27,7 @@ ceevee-ai.workspace = true
 ceevee-profile.workspace = true
 ceevee-apply = { path = "../../../crates/ceevee-apply", features = ["chrome"] }
 ceevee-license = { path = "../../../crates/ceevee-license" }
+ceevee-analytics = { path = "../../../crates/ceevee-analytics" }
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true

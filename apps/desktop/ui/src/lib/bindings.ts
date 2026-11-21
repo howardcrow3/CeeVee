@@ -5,6 +5,8 @@ import { invoke as __TAURI_INVOKE } from "@tauri-apps/api/core";
 /** Commands */
 export const commands = {
 	appInfo: () => typedError<AppInfo, string>(__TAURI_INVOKE("app_info")),
+	analyticsStatus: () => typedError<AnalyticsView, string>(__TAURI_INVOKE("analytics_status")),
+	setAnalyticsConsent: (share: boolean) => typedError<null, string>(__TAURI_INVOKE("set_analytics_consent", { share })),
 	/**  Where the person stands: trial days left, expired (read-only) or licensed. */
 	licenseStatus: () => typedError<LicenseView_Serialize, string>(__TAURI_INVOKE("license_status")),
 	/**  Activate a license key on this computer. */
@@ -140,6 +142,13 @@ export const commands = {
 };
 
 /* Types */
+export type AnalyticsView = {
+	/**  `unset` (not asked yet), `granted` or `denied`. */
+	consent: string,
+	/**  False in builds without Google credentials: the choice is saved but nothing is sent. */
+	available: boolean,
+};
+
 /**  Basic facts about the running app, returned to the UI at start-up. */
 export type AppInfo = {
 	name: string,

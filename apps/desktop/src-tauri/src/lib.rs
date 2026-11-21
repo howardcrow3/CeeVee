@@ -1,6 +1,7 @@
 //! CeeVee desktop shell: window, tray, single instance and the typed command
 //! surface the UI calls. Domain logic lives in the `ceevee-*` crates.
 
+mod analytics_cmd;
 mod apply_tool;
 mod commands;
 mod deep_link;
@@ -33,6 +34,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
     tauri_specta::Builder::<tauri::Wry>::new()
         .commands(tauri_specta::collect_commands![
             app_info,
+            analytics_cmd::analytics_status,
+            analytics_cmd::set_analytics_consent,
             license_cmd::license_status,
             license_cmd::activate_license,
             license_cmd::deactivate_license,
@@ -175,6 +178,7 @@ pub fn run() {
             app.manage(bus);
             app.manage(mail_cmd::GoogleSignIn::default());
             license_cmd::setup(app, db.clone());
+            analytics_cmd::setup(app, db.clone());
             deep_link::setup(app);
             app.manage(db);
 
