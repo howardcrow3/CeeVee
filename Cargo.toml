@@ -14,6 +14,7 @@ members = [
   "crates/ceevee-mail",
   "crates/ceevee-network",
   "crates/ceevee-license",
+  "crates/ceevee-analytics",
 ]
 
 [workspace.package]
