@@ -51,3 +51,8 @@ export function syncSummary(s: {
 export function looksLikeAddress(a: string): boolean {
   return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a.trim());
 }
+
+/** The connected Google (Gmail) account, if any, for the "Signed in" line in Settings. */
+export function googleAccount<T extends { provider: string }>(accounts: T[]): T | undefined {
+  return accounts.find((a) => a.provider === 'gmail');
+}

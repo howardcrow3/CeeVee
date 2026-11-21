@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { InboxLine } from './bindings';
-import { dateWord, filterInbox, labelWord, looksLikeAddress, syncSummary } from './inbox';
+import { dateWord, filterInbox, labelWord, looksLikeAddress, syncSummary, googleAccount } from './inbox';
 
 const line = (o: Partial<InboxLine>): InboxLine => ({
   id: 1,
@@ -46,5 +46,15 @@ describe('inbox helpers', () => {
   it('checks an address', () => {
     expect(looksLikeAddress('me@example.org')).toBe(true);
     expect(looksLikeAddress('me@')).toBe(false);
+  });
+});
+
+describe('googleAccount', () => {
+  it('finds the Gmail account so Settings can say signed in', () => {
+    const imap = { provider: 'imap', address: 'a@b.co' };
+    const gmail = { provider: 'gmail', address: 'me@gmail.com' };
+    expect(googleAccount([imap])).toBeUndefined();
+    expect(googleAccount([imap, gmail])).toBe(gmail);
+    expect(googleAccount([])).toBeUndefined();
   });
 });

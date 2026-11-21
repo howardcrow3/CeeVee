@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type MailAccountLine } from '$lib/bindings';
-  import { looksLikeAddress, syncSummary } from '$lib/inbox';
+  import { googleAccount, looksLikeAddress, syncSummary } from '$lib/inbox';
 
   let accounts = $state<MailAccountLine[]>([]);
   let address = $state('');
@@ -60,6 +60,12 @@
     await load();
   }
 
+  async function cancelGoogle() {
+    await commands.cancelGoogleSignIn();
+  }
+
+  let signedIn = $derived(googleAccount(accounts));
+
   async function disconnect(a: MailAccountLine) {
     const r = await commands.disconnectMailAccount(a.id);
     if (r.status === 'ok') await load();
@@ -104,7 +110,17 @@
         applications up to date. CeeVee asks for read-only access: it cannot send, change or delete
         anything. You can remove access at any time in your Google account.
       </p>
-      <div class="row"><button onclick={signInWithGoogle} disabled={busy}>{busy ? 'Waiting for Google' : 'Sign in with Google'}</button></div>
+      {#if signedIn}
+        <p><b>Signed in with Google</b> as {signedIn.address}.</p>
+      {/if}
+      <div class="row">
+        {#if busy}
+          <span class="note">Waiting for Google. Finish in your browser, or cancel to start over.</span>
+          <button class="ghost" onclick={cancelGoogle}>Cancel</button>
+        {:else}
+          <button onclick={signInWithGoogle}>{signedIn ? 'Sign in with a different Google account' : 'Sign in with Google'}</button>
+        {/if}
+      </div>
     </div>
     <p class="note">Or connect any email account with an app password:</p>
   {/if}

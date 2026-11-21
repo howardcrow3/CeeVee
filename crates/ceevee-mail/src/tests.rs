@@ -505,3 +505,110 @@ async fn removing_an_account_removes_its_mail() {
         .unwrap()
         .is_empty());
 }
+
+mod google_sign_in {
+    use super::*;
+    use crate::google_account::{google_key, save_google_account};
+    use crate::secrets::{MemoryStore, SecretStore};
+    use ceevee_google::oauth::{Tokens, GMAIL_READONLY};
+
+    fn tokens(refresh: Option<&str>, scopes: &[&str]) -> Tokens {
+        Tokens {
+            access_token: "at".into(),
+            refresh_token: refresh.map(str::to_string),
+            expires_in: 3600,
+            email: Some("Howard@Example.com".into()),
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+
+    /// A keychain that says yes to a write and then forgets it.
+    struct Forgetful;
+    impl SecretStore for Forgetful {
+        fn get(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn set(&self, _: &str, _: &str) -> std::result::Result<(), String> {
+            Ok(())
+        }
+        fn delete(&self, _: &str) {}
+    }
+
+    /// A keychain the person denied.
+    struct Denied;
+    impl SecretStore for Denied {
+        fn get(&self, _: &str) -> Option<String> {
+            None
+        }
+        fn set(&self, _: &str, _: &str) -> std::result::Result<(), String> {
+            Err("could not save to the keychain: access denied".into())
+        }
+        fn delete(&self, _: &str) {}
+    }
+
+    #[tokio::test]
+    async fn a_finished_sign_in_leaves_a_listed_gmail_account_and_a_stored_token() {
+        let db = Db::open_in_memory().await.unwrap();
+        let secrets = MemoryStore::default();
+        let t = tokens(Some("rt-1"), &["openid", GMAIL_READONLY]);
+        let a = save_google_account(&db, &secrets, &t, "Howard@Example.com")
+            .await
+            .unwrap();
+        assert_eq!(
+            (a.provider.as_str(), a.address.as_str()),
+            ("gmail", "howard@example.com")
+        );
+        let listed = store::list_accounts(&db).await.unwrap();
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].provider, "gmail");
+        assert_eq!(
+            secrets.get(&google_key("howard@example.com")).as_deref(),
+            Some("rt-1")
+        );
+        assert_eq!(
+            store::secret_ref(&db, a.id).await.unwrap().as_deref(),
+            Some("google:howard@example.com")
+        );
+        // Signing in again updates the same account instead of adding a second one.
+        save_google_account(
+            &db,
+            &secrets,
+            &tokens(Some("rt-2"), &[GMAIL_READONLY]),
+            "howard@example.com",
+        )
+        .await
+        .unwrap();
+        assert_eq!(store::list_accounts(&db).await.unwrap().len(), 1);
+        assert_eq!(
+            secrets.get(&google_key("howard@example.com")).as_deref(),
+            Some("rt-2")
+        );
+    }
+
+    #[tokio::test]
+    async fn failures_are_reported_and_leave_no_account_behind() {
+        let db = Db::open_in_memory().await.unwrap();
+        let ok = tokens(Some("rt"), &[GMAIL_READONLY]);
+        let e = save_google_account(
+            &db,
+            &MemoryStore::default(),
+            &tokens(Some("rt"), &["openid"]),
+            "a@b.co",
+        )
+        .await;
+        assert!(e.unwrap_err().contains("permission to read your mail"));
+        let e = save_google_account(
+            &db,
+            &MemoryStore::default(),
+            &tokens(None, &[GMAIL_READONLY]),
+            "a@b.co",
+        )
+        .await;
+        assert!(e.unwrap_err().contains("long-lasting"));
+        let e = save_google_account(&db, &Denied, &ok, "a@b.co").await;
+        assert!(e.unwrap_err().contains("access denied"));
+        let e = save_google_account(&db, &Forgetful, &ok, "a@b.co").await;
+        assert!(e.unwrap_err().contains("read back"));
+        assert!(store::list_accounts(&db).await.unwrap().is_empty());
+    }
+}
