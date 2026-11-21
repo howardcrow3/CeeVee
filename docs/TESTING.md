@@ -16,7 +16,7 @@ The test build is ad-hoc signed (its seal is valid) but not signed by an Apple d
 On first start macOS asks whether CeeVee may use the keychain ("CeeVee wants to use your confidential information stored in ..."). Enter your Mac login password and choose **Always Allow**. This is expected on test builds. CeeVee keeps the trial start date and the Google sign-in token there, under the service name `studio.turtlebox.ceevee` (visible in Keychain Access). Because test builds are ad-hoc signed, every new build looks like a different app to macOS, so you will be asked again after installing a newer build. Notarized release builds keep one identity and ask once. Choosing Deny is safe: CeeVee still runs, but the trial date is not anchored and Google sign-in will not stay signed in.
 
 ## Google sign-in
-Settings, Email, "Sign in with Google" opens your browser. When it says CeeVee is connected, Settings shows "Signed in with Google as <address>". If you close the browser tab first, press **Cancel** next to "Waiting for Google" and start again (it also gives up by itself after 5 minutes).
+Settings, Email, "Sign in with Google" opens your browser. When it says CeeVee is connected, Settings shows "Signed in with Google as <address>". If you close the browser tab first, press **Cancel** next to "Waiting for Google" and start again (it also gives up by itself after 5 minutes). To sign out, press **Sign out of Google** next to the signed-in line: CeeVee deletes its saved token and mail, and tells Google to revoke its access.
 
 ## Local AI model
 CeeVee downloads its model itself from Hugging Face (about 2.5 GB for 8 GB Macs, 5 GB for 16 GB or more). Settings, Local AI, "Download". It resumes if interrupted. Nothing needs to be set up by hand.

@@ -127,7 +127,11 @@ export const commands = {
 	 *  the tab). Does nothing when none is running.
 	 */
 	cancelGoogleSignIn: () => __TAURI_INVOKE<void>("cancel_google_sign_in"),
-	/**  Disconnect an account and remove the mail CeeVee kept from it. */
+	/**
+	 *  Disconnect an account and remove the mail CeeVee kept from it. For a Google account this also
+	 *  tells Google to revoke CeeVee's access; if Google cannot be reached the account is still
+	 *  removed here and the person is told to remove access at myaccount.google.com/permissions.
+	 */
 	disconnectMailAccount: (id: number) => typedError<null, string>(__TAURI_INVOKE("disconnect_mail_account", { id })),
 	syncMail: () => typedError<SyncLine, string>(__TAURI_INVOKE("sync_mail")),
 	listInbox: () => typedError<InboxLine_Serialize[], string>(__TAURI_INVOKE("list_inbox")),
