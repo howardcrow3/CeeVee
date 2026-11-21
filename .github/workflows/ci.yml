@@ -85,7 +85,7 @@ jobs:
         env:
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
         # No updater signing key here, so skip updater artifacts (--no-sign used to imply that).
-        run: pnpm tauri build --ci --config '{"bundle":{"createUpdaterArtifacts":false}}' -- --locked
+        run: pnpm tauri build --ci --config src-tauri/tauri.no-updater.conf.json -- --locked
 
       # Catches a bundle macOS would call "damaged" or that crashes on start.
       - name: macOS bundle check (codesign verify and launch smoke test)
