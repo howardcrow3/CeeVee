@@ -125,8 +125,11 @@ test('no workflow builds the mac app with --no-sign, and the test build verifies
     assert.ok(!code.includes('--no-sign'), `${f} uses --no-sign`);
   }
   const tb = readFileSync(new URL('test-build.yml', dir), 'utf8');
-  assert.match(tb, /APPLE_SIGNING_IDENTITY: '-'/);
-  assert.match(tb, /verify-mac-dmg\.sh/);
+  // The Test build must be Developer ID signed and notarized, and prove it, so it installs normally.
+  assert.match(tb, /environment: release-build/);
+  assert.match(tb, /APPLE_CERTIFICATE: /);
+  assert.match(tb, /verify-mac-dmg\.sh .*--require-notarized/);
+  assert.ok(!/APPLE_SIGNING_IDENTITY: '-'/.test(tb), 'test build must not be ad-hoc signed');
 });
 
 // Keychain items must live under CeeVee's own service name (the bundle identifier), so the macOS
