@@ -142,8 +142,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then export APPLE_SIGNING_IDENTITY=-; unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; fi  # ad-hoc seal (an unsealed app shows "damaged" on Apple silicon)
+          NOUPD=(); [ -n "$TAURI_SIGNING_PRIVATE_KEY" ] || NOUPD=(--config '{"bundle":{"createUpdaterArtifacts":false}}')  # no updater key: skip update files instead of failing
           # The certificate is already in our keychain; if Tauri imported the secret itself it would not see it.
-          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
+          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci "${NOUPD[@]}" --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
 
       - name: Collect installers
         shell: bash

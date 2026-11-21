@@ -49,7 +49,7 @@ jobs:
         working-directory: apps/desktop
       - name: Build (real AI engine, ad-hoc signed)
         working-directory: apps/desktop
-        run: pnpm tauri build --ci --bundles dmg --target aarch64-apple-darwin --features llama
+        run: pnpm tauri build --ci --config '{"bundle":{"createUpdaterArtifacts":false}}' --bundles dmg --target aarch64-apple-darwin --features llama
       - name: Verify the bundle opens (codesign check and launch smoke test)
         run: scripts/verify-mac-dmg.sh target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
       - name: Collect
