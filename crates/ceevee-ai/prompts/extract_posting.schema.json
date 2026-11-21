@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["title", "company", "location", "remote", "salary_min", "salary_max", "skills"],
+  "properties": {
+    "title": {"type": "string", "minLength": 1, "maxLength": 200},
+    "company": {"type": ["string", "null"], "maxLength": 200},
+    "location": {"type": ["string", "null"], "maxLength": 200},
+    "remote": {"enum": ["remote", "hybrid", "onsite", "unknown"]},
+    "salary_min": {"type": ["integer", "null"], "minimum": 0},
+    "salary_max": {"type": ["integer", "null"], "minimum": 0},
+    "skills": {"type": "array", "items": {"type": "string", "maxLength": 80}, "maxItems": 15}
+  }
+}

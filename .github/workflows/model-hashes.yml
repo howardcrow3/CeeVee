@@ -1,0 +1,31 @@
+# Manual helper: prints the size and SHA-256 that Hugging Face publishes for the model files in
+# the catalog, so they can be pinned in crates/ceevee-ai/catalog.json. Downloads nothing.
+name: Model hashes
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hashes:
+    runs-on: ubuntu-latest
+    steps:
+      - name: List published sizes and hashes
+        run: |
+          for spec in "Qwen/Qwen3-4B-GGUF Qwen3-4B-Q4_K_M.gguf" "Qwen/Qwen3-8B-GGUF Qwen3-8B-Q4_K_M.gguf" "CompendiumLabs/bge-small-en-v1.5-gguf bge-small-en-v1.5-q8_0.gguf"; do
+            set -- $spec
+            echo "== $1 / $2"
+            curl -fsS "https://huggingface.co/api/models/$1/tree/main" | python3 -c "
+          import sys, json
+          for f in json.load(sys.stdin):
+              if f['path'] == '$2':
+                  print('size', f.get('size'), 'sha256', f.get('lfs', {}).get('oid'))
+          "
+            curl -fsS "https://huggingface.co/api/models/$1" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          print('license', d.get('cardData', {}).get('license'), 'sha', d.get('sha'))
+          "
+          done

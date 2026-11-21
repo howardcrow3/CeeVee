@@ -1,0 +1,36 @@
+name: Post-merge integration
+
+# Runs after every merge to main: the cross-module integration tests (database, task framework,
+# agent loop, policy, approvals, scheduler) on both target platforms, against a scripted model.
+# CI runs them on pull requests too; this job is the check that main itself stays green.
+# The real-model evals live in model-test.yml.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: post-merge-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  integration:
+    name: integration (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: windows-x64, os: windows-latest }
+          - { name: macos-arm64, os: macos-latest }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Integration tests
+        run: cargo test --locked -p ceevee-core -p ceevee-db -p ceevee-ai -p ceevee-agent --tests
