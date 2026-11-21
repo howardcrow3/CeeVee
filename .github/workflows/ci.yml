@@ -80,9 +80,16 @@ jobs:
           cargo clippy -p ceevee-apply --features chrome --all-targets --locked -- -D warnings
           cargo test -p ceevee-apply --features chrome --locked
 
-      - name: Build unsigned app bundle
+      - name: Build app bundle (ad-hoc signed on macOS)
         working-directory: apps/desktop
-        run: pnpm tauri build --ci --no-sign -- --locked
+        env:
+          APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
+        run: pnpm tauri build --ci -- --locked
+
+      # Catches a bundle macOS would call "damaged" or that crashes on start.
+      - name: macOS bundle check (codesign verify and launch smoke test)
+        if: runner.os == 'macOS'
+        run: scripts/verify-mac-dmg.sh target/${{ matrix.target }}/release/bundle/dmg/*.dmg || scripts/verify-mac-dmg.sh target/release/bundle/dmg/*.dmg
 
   licenses:
     name: licenses and advisories

@@ -141,9 +141,9 @@ jobs:
         working-directory: apps/desktop
         shell: bash
         run: |
-          if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then NOSIGN=--no-sign; fi
+          if [ "${{ runner.os }}" = "macOS" ] && [ "$MAC_SIGNED" != "1" ]; then export APPLE_SIGNING_IDENTITY=-; unset APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; fi  # ad-hoc seal (an unsealed app shows "damaged" on Apple silicon)
           # The certificate is already in our keychain; if Tauri imported the secret itself it would not see it.
-          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci ${NOSIGN:-} --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
+          env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci --target ${{ matrix.target }} --features llama ${TAURI_EXTRA_ARGS:-}
 
       - name: Collect installers
         shell: bash
@@ -173,6 +173,10 @@ jobs:
             codesign --verify --deep --strict "$app"
             spctl -a -t exec -vv "$app"
             xcrun stapler validate "$app"
+          elif [ "${{ runner.os }}" = "macOS" ]; then
+            app=$(ls -d target/${{ matrix.target }}/release/bundle/macos/*.app)
+            codesign --verify --deep --strict "$app"
+            echo "::warning::macOS app is ad-hoc signed only (not notarized)"
           else
             echo "::warning::unsigned build; skipping signature verification"
           fi
