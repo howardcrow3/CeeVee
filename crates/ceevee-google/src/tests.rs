@@ -281,3 +281,28 @@ async fn closing_the_browser_does_not_trap_the_app_in_waiting() {
         .unwrap();
     assert_eq!(t.email.as_deref(), Some("me@gmail.com"));
 }
+
+#[tokio::test]
+async fn signing_out_revokes_the_token_with_google() {
+    let (base, log) = http(vec![("/revoke", 200, "{}".into())]).await;
+    let mut c = OAuthClient::google("cid", None);
+    c.revoke_url = format!("{base}/revoke");
+    c.revoke("rt/1").await.unwrap();
+    assert!(
+        log.lock().unwrap().join("\n").contains("POST /revoke")
+            && log.lock().unwrap().join("\n").contains("token=rt%2F1")
+    );
+
+    // A token Google already forgot is fine; any other failure is reported.
+    let (base, _) = http(vec![(
+        "/revoke",
+        400,
+        "{\"error\":\"invalid_token\"}".into(),
+    )])
+    .await;
+    c.revoke_url = format!("{base}/revoke");
+    c.revoke("old").await.unwrap();
+    let (base, _) = http(vec![("/revoke", 500, "{}".into())]).await;
+    c.revoke_url = format!("{base}/revoke");
+    assert!(c.revoke("x").await.is_err());
+}

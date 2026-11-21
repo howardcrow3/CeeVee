@@ -106,15 +106,26 @@ pub async fn connect_imap(
     Ok(account_line(account))
 }
 
-/// Disconnect an account and remove the mail CeeVee kept from it.
+/// Disconnect an account and remove the mail CeeVee kept from it. For a Google account this also
+/// tells Google to revoke CeeVee's access; if Google cannot be reached the account is still
+/// removed here and the person is told to remove access at myaccount.google.com/permissions.
 #[tauri::command]
 #[specta::specta]
 pub async fn disconnect_mail_account(db: tauri::State<'_, Db>, id: u32) -> Result<(), String> {
-    let key = store::secret_ref(&db, i64::from(id)).await.map_err(e)?;
-    if let Some(key) = key {
-        Keychain.delete(&key);
+    let provider = store::get_account(&db, i64::from(id))
+        .await
+        .map_err(e)?
+        .provider;
+    let token = ceevee_mail::google_account::forget_account(&db, &Keychain, i64::from(id)).await?;
+    if provider == "gmail" {
+        if let (Some(token), Some(client)) = (token, google_client()) {
+            if let Err(err) = client.revoke(&token).await {
+                tracing::warn!("could not revoke Google access: {err}");
+                return Err("Signed out of CeeVee, but Google could not be reached to remove its access. You can remove it at myaccount.google.com/permissions.".into());
+            }
+        }
     }
-    store::remove_account(&db, i64::from(id)).await.map_err(e)
+    Ok(())
 }
 
 #[derive(Debug, Clone, Default, Serialize, Type)]

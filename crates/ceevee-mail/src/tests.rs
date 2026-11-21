@@ -611,4 +611,33 @@ mod google_sign_in {
         assert!(e.unwrap_err().contains("read back"));
         assert!(store::list_accounts(&db).await.unwrap().is_empty());
     }
+
+    #[tokio::test]
+    async fn signing_out_removes_the_account_and_the_saved_token() {
+        use crate::google_account::forget_account;
+        let db = Db::open_in_memory().await.unwrap();
+        let secrets = MemoryStore::default();
+        let a = save_google_account(
+            &db,
+            &secrets,
+            &tokens(Some("rt-1"), &[GMAIL_READONLY]),
+            "me@gmail.com",
+        )
+        .await
+        .unwrap();
+        let token = forget_account(&db, &secrets, a.id).await.unwrap();
+        assert_eq!(token.as_deref(), Some("rt-1"));
+        assert!(store::list_accounts(&db).await.unwrap().is_empty());
+        assert_eq!(secrets.get(&google_key("me@gmail.com")), None);
+        // Signing in again afterwards works from a clean slate.
+        save_google_account(
+            &db,
+            &secrets,
+            &tokens(Some("rt-2"), &[GMAIL_READONLY]),
+            "me@gmail.com",
+        )
+        .await
+        .unwrap();
+        assert_eq!(store::list_accounts(&db).await.unwrap().len(), 1);
+    }
 }

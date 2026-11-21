@@ -67,9 +67,12 @@
   let signedIn = $derived(googleAccount(accounts));
 
   async function disconnect(a: MailAccountLine) {
+    error = message = '';
     const r = await commands.disconnectMailAccount(a.id);
-    if (r.status === 'ok') await load();
+    if (r.status === 'ok') message = `Disconnected ${a.address}.`;
     else error = r.error;
+    // The account is gone locally even when Google could not be reached, so always refresh.
+    await load();
   }
 
   async function syncNow() {
@@ -111,7 +114,10 @@
         anything. You can remove access at any time in your Google account.
       </p>
       {#if signedIn}
-        <p><b>Signed in with Google</b> as {signedIn.address}.</p>
+        <p>
+          <b>Signed in with Google</b> as {signedIn.address}.
+          <button class="ghost" onclick={() => disconnect(signedIn!)} disabled={busy}>Sign out of Google</button>
+        </p>
       {/if}
       <div class="row">
         {#if busy}

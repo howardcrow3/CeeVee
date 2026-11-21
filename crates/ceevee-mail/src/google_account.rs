@@ -38,3 +38,21 @@ pub async fn save_google_account(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Sign out: forget the account and its mail, and delete the saved token. Returns the saved token
+/// so the caller can also revoke it with Google. The local sign-out never depends on the network.
+pub async fn forget_account(
+    db: &Db,
+    secrets: &dyn SecretStore,
+    id: i64,
+) -> Result<Option<String>, String> {
+    let key = store::secret_ref(db, id).await.map_err(|e| e.to_string())?;
+    let token = key.as_deref().and_then(|k| secrets.get(k));
+    if let Some(k) = &key {
+        secrets.delete(k);
+    }
+    store::remove_account(db, id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(token)
+}

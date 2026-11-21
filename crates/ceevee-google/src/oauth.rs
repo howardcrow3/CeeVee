@@ -13,6 +13,7 @@ pub const SIGN_IN_SCOPES: [&str; 3] = ["openid", "email", "profile"];
 
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
+const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 
 /// How long to wait for the person to finish signing in (they can also cancel).
 pub const SIGN_IN_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
@@ -28,6 +29,7 @@ pub struct OAuthClient {
     pub client_secret: Option<String>,
     pub auth_url: String,
     pub token_url: String,
+    pub revoke_url: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -135,6 +137,7 @@ impl OAuthClient {
             client_secret: client_secret.map(str::to_string),
             auth_url: AUTH_URL.into(),
             token_url: TOKEN_URL.into(),
+            revoke_url: REVOKE_URL.into(),
         }
     }
 
@@ -212,6 +215,29 @@ impl OAuthClient {
             refresh_token: r.refresh_token,
             expires_in: r.expires_in,
         })
+    }
+
+    /// Tell Google to stop honouring a token, so CeeVee no longer has access to the account.
+    /// An already-revoked or expired token counts as success.
+    pub async fn revoke(&self, token: &str) -> Result<()> {
+        let resp = reqwest::Client::new()
+            .post(&self.revoke_url)
+            .header("content-type", "application/x-www-form-urlencoded")
+            .body(format!("token={}", encode(token)))
+            .send()
+            .await
+            .map_err(err)?;
+        let status = resp.status();
+        if status.is_success() {
+            return Ok(());
+        }
+        let text = resp.text().await.unwrap_or_default();
+        if text.contains("invalid_token") {
+            return Ok(());
+        }
+        Err(err(format!(
+            "Google did not confirm the sign-out ({status})"
+        )))
     }
 
     /// A fresh access token from a saved refresh token.
