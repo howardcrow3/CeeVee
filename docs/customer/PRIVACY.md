@@ -22,7 +22,13 @@ CeeVee runs on your computer. Your resume, profile, jobs, documents, mail and ch
 | Applying for a job | The employer's application site, through Chrome or Edge on your computer | What you submit in the application, the same as if you typed it yourself. |
 | Buying | FastSpring (our payment provider) | Your payment details go to FastSpring, not to CeeVee. |
 
-CeeVee has no analytics or advertising trackers.
+CeeVee has no advertising trackers.
+
+## Optional: anonymous usage counts
+
+The first time you open CeeVee it asks whether you want to share anonymous usage counts. The answer is No unless you choose Share, and you can change it any time in Settings, Usage analytics. While it is off, nothing is sent.
+
+If you choose Share, CeeVee sends counts to Google Analytics: the app version, your operating system, which features you use (for example "ran a job search"), and whether CeeVee closed unexpectedly. It never sends your resume, jobs, email, chats, file names or anything you type. It uses a random number made only for this purpose, not your name, email, license key or computer identifier. Turning sharing off deletes that number. Google receives your IP address as any website would, and handles the counts under its own terms.
 
 ## Optional: Google
 
