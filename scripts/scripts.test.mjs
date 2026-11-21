@@ -113,3 +113,29 @@ test('customer pages: headings, lists, tables and escaping', () => {
   assert.match(html, /<td><code>x<\/code><\/td>/);
   assert.match(page('T', html), /^<!doctype html>/);
 });
+
+// Guard for the macOS "damaged, move to Trash" bug: an app built with --no-sign has no sealed
+// resources, and Apple silicon refuses it once it is quarantined. Ad-hoc sign instead.
+test('no workflow builds the mac app with --no-sign, and the test build verifies it', async () => {
+  const { readdirSync, readFileSync } = await import('node:fs');
+  const dir = new URL('../.github/workflows/', import.meta.url);
+  for (const f of readdirSync(dir).filter((n) => n.endsWith('.yml'))) {
+    const text = readFileSync(new URL(f, dir), 'utf8');
+    const code = text.split('\n').filter((l) => !l.trim().startsWith('#')).join('\n');
+    assert.ok(!code.includes('--no-sign'), `${f} uses --no-sign`);
+  }
+  const tb = readFileSync(new URL('test-build.yml', dir), 'utf8');
+  assert.match(tb, /APPLE_SIGNING_IDENTITY: '-'/);
+  assert.match(tb, /verify-mac-dmg\.sh/);
+});
+
+// Keychain items must live under CeeVee's own service name (the bundle identifier), so the macOS
+// prompt names CeeVee and each item is easy to find and delete in Keychain Access.
+test('keychain service names equal the bundle identifier', async () => {
+  const { readFileSync } = await import('node:fs');
+  const root = new URL('../', import.meta.url);
+  const id = JSON.parse(readFileSync(new URL('apps/desktop/src-tauri/tauri.conf.json', root), 'utf8')).identifier;
+  assert.equal(id, 'studio.turtlebox.ceevee');
+  assert.match(readFileSync(new URL('crates/ceevee-license/src/anchor.rs', root), 'utf8'), new RegExp(`Entry::new\\("${id}"`));
+  assert.match(readFileSync(new URL('crates/ceevee-mail/src/secrets.rs', root), 'utf8'), new RegExp(`SERVICE: &str = "${id}"`));
+});

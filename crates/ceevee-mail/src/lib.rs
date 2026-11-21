@@ -3,6 +3,7 @@
 //! (see docs/TECHNICAL_PLAN.md section 11).
 
 pub mod filter;
+pub mod google_account;
 pub mod imap;
 pub mod label;
 pub mod link;

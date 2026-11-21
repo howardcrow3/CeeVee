@@ -88,6 +88,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             mail_cmd::connect_imap,
             mail_cmd::google_available,
             mail_cmd::connect_google,
+            mail_cmd::cancel_google_sign_in,
             mail_cmd::disconnect_mail_account,
             mail_cmd::sync_mail,
             mail_cmd::list_inbox,
@@ -175,6 +176,7 @@ pub fn run() {
             app.manage(std::sync::Arc::new(models::DownloadState::default()));
             app.manage(std::sync::Arc::new(models::Engine::default()));
             app.manage(bus);
+            app.manage(mail_cmd::GoogleSignIn::default());
             license_cmd::setup(app, db.clone());
             analytics_cmd::setup(app, db.clone());
             deep_link::setup(app);

@@ -416,6 +416,20 @@ pub fn google_available() -> bool {
     google_client().is_some()
 }
 
+/// The sign-in that is waiting for the browser, if any, so it can be cancelled or replaced.
+#[derive(Default)]
+pub struct GoogleSignIn(std::sync::Mutex<Option<Arc<tokio::sync::Notify>>>);
+
+/// Stop a Google sign-in that is still waiting for the browser (for example after the person closed
+/// the tab). Does nothing when none is running.
+#[tauri::command]
+#[specta::specta]
+pub fn cancel_google_sign_in(pending: tauri::State<'_, GoogleSignIn>) {
+    if let Some(n) = pending.0.lock().ok().and_then(|mut p| p.take()) {
+        n.notify_one();
+    }
+}
+
 /// Sign in with Google in the browser, then save the account. CeeVee asks for read-only access to
 /// Gmail; the refresh token goes to the keychain.
 #[tauri::command]
@@ -424,6 +438,7 @@ pub async fn connect_google(
     lic: tauri::State<'_, Arc<Service>>,
     app: AppHandle,
     db: tauri::State<'_, Db>,
+    pending: tauri::State<'_, GoogleSignIn>,
 ) -> Result<MailAccountLine, String> {
     use tauri_plugin_opener::OpenerExt;
     require_write(&lic).await?;
@@ -431,35 +446,42 @@ pub async fn connect_google(
     let mut scopes = ceevee_google::oauth::SIGN_IN_SCOPES.to_vec();
     scopes.push(ceevee_google::oauth::GMAIL_READONLY);
     let opener = app.clone();
-    let tokens = client
-        .sign_in(&scopes, move |url| {
-            if let Err(err) = opener.opener().open_url(url, None::<&str>) {
-                tracing::warn!("could not open the browser: {err}");
-            }
-        })
-        .await
-        .map_err(|err| err.to_string())?;
-    if !tokens
-        .scopes
-        .iter()
-        .any(|s| s == ceevee_google::oauth::GMAIL_READONLY)
+    // A new attempt replaces a stuck one: the old wait ends and its port is freed.
+    let cancel = Arc::new(tokio::sync::Notify::new());
+    if let Some(old) = pending
+        .0
+        .lock()
+        .ok()
+        .and_then(|mut p| p.replace(cancel.clone()))
     {
-        return Err("Google did not give CeeVee permission to read your mail. Try again and leave the Gmail box ticked.".into());
+        old.notify_one();
     }
-    let refresh = tokens
-        .refresh_token
-        .ok_or("Google did not return a long-lasting sign-in. Remove CeeVee at myaccount.google.com/permissions and try again.")?;
-    let address = match tokens.email {
+    let result = client
+        .sign_in_cancellable(
+            &scopes,
+            move |url| {
+                if let Err(err) = opener.opener().open_url(url, None::<&str>) {
+                    tracing::warn!("could not open the browser: {err}");
+                }
+            },
+            &cancel,
+            ceevee_google::oauth::SIGN_IN_WAIT,
+        )
+        .await;
+    if let Ok(mut p) = pending.0.lock() {
+        if p.as_ref().is_some_and(|c| Arc::ptr_eq(c, &cancel)) {
+            *p = None;
+        }
+    }
+    let tokens = result.map_err(|err| err.to_string())?;
+    let address = match tokens.email.clone() {
         Some(a) => a,
         None => ceevee_google::Gmail::new(&tokens.access_token)
             .address()
             .await
             .map_err(|err| err.to_string())?,
     };
-    let key = format!("google:{address}");
-    Keychain.set(&key, &refresh)?;
-    let account = store::add_account(&db, "gmail", &address, &serde_json::json!({}), &key)
-        .await
-        .map_err(e)?;
+    let account =
+        ceevee_mail::google_account::save_google_account(&db, &Keychain, &tokens, &address).await?;
     Ok(account_line(account))
 }

@@ -14,8 +14,8 @@ pub const SIGN_IN_SCOPES: [&str; 3] = ["openid", "email", "profile"];
 const AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
-/// How long to wait for the person to finish signing in.
-const SIGN_IN_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
+/// How long to wait for the person to finish signing in (they can also cancel).
+pub const SIGN_IN_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
 fn err(e: impl std::fmt::Display) -> Error {
     Error::Other(format!("Google sign-in: {e}"))
@@ -232,15 +232,36 @@ impl OAuthClient {
         scopes: &[&str],
         open_browser: impl FnOnce(&str),
     ) -> Result<Tokens> {
+        self.sign_in_cancellable(
+            scopes,
+            open_browser,
+            &tokio::sync::Notify::new(),
+            SIGN_IN_WAIT,
+        )
+        .await
+    }
+
+    /// Like [`sign_in`](Self::sign_in), but gives up when `cancel` is notified or `wait` runs out.
+    /// Either way the local port is released, so signing in again works straight away.
+    pub async fn sign_in_cancellable(
+        &self,
+        scopes: &[&str],
+        open_browser: impl FnOnce(&str),
+        cancel: &tokio::sync::Notify,
+        wait: std::time::Duration,
+    ) -> Result<Tokens> {
         let listener = TcpListener::bind("127.0.0.1:0").await.map_err(err)?;
         let port = listener.local_addr().map_err(err)?.port();
         let redirect = format!("http://127.0.0.1:{port}");
         let p = pkce()?;
         let state = random_token(16)?;
         open_browser(&self.authorization_url(&redirect, &p.challenge, &state, scopes));
-        let code = tokio::time::timeout(SIGN_IN_WAIT, wait_for_code(&listener, &state))
-            .await
-            .map_err(|_| err("timed out waiting for you to finish signing in"))??;
+        let code = tokio::select! {
+            r = tokio::time::timeout(wait, wait_for_code(&listener, &state)) => r
+                .map_err(|_| err("timed out waiting for you to finish signing in. Choose Sign in with Google to try again"))??,
+            () = cancel.notified() => return Err(err("sign-in cancelled")),
+        };
+        drop(listener);
         self.exchange(&code, &p.verifier, &redirect).await
     }
 }

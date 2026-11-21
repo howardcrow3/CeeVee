@@ -3,7 +3,8 @@ name: Test build
 # An unsigned macOS (Apple silicon) .dmg for hands-on testing, built from whatever commit runs it.
 # Run it from the Actions tab ("Run workflow"), or push a branch named test-build/anything.
 # The download is the "CeeVee-test-macos" artifact at the bottom of the run page.
-# Not for customers: it is not signed or notarized. docs/TESTING.md says how to open it.
+# Not for customers: it is ad-hoc signed (valid seal, no Apple developer identity) and not
+# notarized. docs/TESTING.md says how to open it.
 
 on:
   workflow_dispatch:
@@ -21,6 +22,10 @@ jobs:
       CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
       CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
       CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
+      # "-" means ad-hoc: Tauri seals the whole .app with codesign before making the dmg. Building
+      # with --no-sign left an app with no sealed resources, which Apple silicon Macs report as
+      # "damaged, move to Trash" once the download is quarantined.
+      APPLE_SIGNING_IDENTITY: '-'
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
@@ -42,14 +47,16 @@ jobs:
           cache-dependency-path: apps/desktop/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
         working-directory: apps/desktop
-      - name: Build (real AI engine, no signing)
+      - name: Build (real AI engine, ad-hoc signed)
         working-directory: apps/desktop
-        run: pnpm tauri build --ci --no-sign --bundles dmg --target aarch64-apple-darwin --features llama
+        run: pnpm tauri build --ci --config src-tauri/tauri.no-updater.conf.json --bundles dmg --target aarch64-apple-darwin --features llama
+      - name: Verify the bundle opens (codesign check and launch smoke test)
+        run: scripts/verify-mac-dmg.sh target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
       - name: Collect
         run: |
           mkdir -p out
           v=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/.*"(.*)"/\1/')
-          cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg "out/CeeVee_${v}_build${CEEVEE_BUILD_NUMBER}_${CEEVEE_BUILD_SHA}_aarch64_UNSIGNED.dmg"
+          cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg "out/CeeVee_${v}_build${CEEVEE_BUILD_NUMBER}_${CEEVEE_BUILD_SHA}_aarch64_adhoc.dmg"
           ls -la out
       - uses: actions/upload-artifact@v4
         with:

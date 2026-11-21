@@ -220,3 +220,64 @@ async fn a_revoked_grant_says_what_to_do() {
     let e = Gmail::with_base("T", &base).address().await.unwrap_err();
     assert!(e.to_string().contains("Connect Google again"), "{e}");
 }
+
+#[tokio::test]
+async fn closing_the_browser_does_not_trap_the_app_in_waiting() {
+    use std::time::Duration;
+    let c = OAuthClient::google("cid", None);
+    // Nobody ever comes back: the wait ends by itself.
+    let cancel = tokio::sync::Notify::new();
+    let e = c
+        .sign_in_cancellable(&["openid"], |_| {}, &cancel, Duration::from_millis(150))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("timed out") && e.contains("try again"), "{e}");
+
+    // The person presses Cancel: it ends at once, long before the timeout.
+    let cancel = Arc::new(tokio::sync::Notify::new());
+    let c2 = cancel.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        c2.notify_one();
+    });
+    let started = std::time::Instant::now();
+    let e = c
+        .sign_in_cancellable(&["openid"], |_| {}, &cancel, Duration::from_secs(60))
+        .await
+        .unwrap_err()
+        .to_string();
+    assert!(e.contains("cancelled"), "{e}");
+    assert!(started.elapsed() < Duration::from_secs(5));
+
+    // A cancel pressed just before the wait starts is not lost.
+    cancel.notify_one();
+    assert!(c
+        .sign_in_cancellable(&["openid"], |_| {}, &cancel, Duration::from_secs(60))
+        .await
+        .is_err());
+
+    // After all that, a fresh sign-in still completes.
+    let reply = format!("{{\"access_token\":\"AT\",\"refresh_token\":\"RT\",\"expires_in\":3600,\"scope\":\"openid {GMAIL_READONLY}\",\"id_token\":\"{}\"}}", id_token("me@gmail.com"));
+    let (base, _) = http(vec![("/token", 200, reply)]).await;
+    let mut c = OAuthClient::google("cid", None);
+    c.token_url = format!("{base}/token");
+    let t = c
+        .sign_in_cancellable(
+            &["openid"],
+            |url| {
+                let url = url.to_string();
+                tokio::spawn(async move {
+                    let q = url.split_once('?').unwrap().1.to_string();
+                    let redirect = decode(&query_param(&q, "redirect_uri").unwrap());
+                    let state = query_param(&q, "state").unwrap();
+                    let _ = reqwest::get(format!("{redirect}/?code=C&state={state}")).await;
+                });
+            },
+            &tokio::sync::Notify::new(),
+            Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+    assert_eq!(t.email.as_deref(), Some("me@gmail.com"));
+}

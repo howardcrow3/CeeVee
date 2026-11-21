@@ -122,6 +122,11 @@ export const commands = {
 	 *  Gmail; the refresh token goes to the keychain.
 	 */
 	connectGoogle: () => typedError<MailAccountLine_Serialize, string>(__TAURI_INVOKE("connect_google")),
+	/**
+	 *  Stop a Google sign-in that is still waiting for the browser (for example after the person closed
+	 *  the tab). Does nothing when none is running.
+	 */
+	cancelGoogleSignIn: () => __TAURI_INVOKE<void>("cancel_google_sign_in"),
 	/**  Disconnect an account and remove the mail CeeVee kept from it. */
 	disconnectMailAccount: (id: number) => typedError<null, string>(__TAURI_INVOKE("disconnect_mail_account", { id })),
 	syncMail: () => typedError<SyncLine, string>(__TAURI_INVOKE("sync_mail")),
