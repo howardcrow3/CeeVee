@@ -86,6 +86,7 @@ async fn prepare(
         "ats": report.ats.as_str(),
         "url": report.url,
         "resume": inputs.resume_title,
+        "cover_letter": inputs.cover_letter_title,
         "filled": report.filled.iter().map(|f| json!({
             "label": f.label, "value": f.value, "review": f.review
         })).collect::<Vec<_>>(),
@@ -93,6 +94,10 @@ async fn prepare(
             "label": s.label, "required": s.required, "reason": s.reason
         })).collect::<Vec<_>>(),
         "missing_required": report.missing_required(),
-        "message": "The form is filled in and open in your browser. Check it and press Submit yourself."
+        "message": if inputs.cover_letter_title.is_some() {
+            "The form is filled in, with your resume and cover letter for this job, and open in your browser. Check it and press Submit yourself."
+        } else {
+            "The form is filled in and open in your browser. Check it and press Submit yourself."
+        }
     }))
 }

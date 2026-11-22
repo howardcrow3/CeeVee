@@ -99,3 +99,68 @@ async fn works_without_any_resume_yet() {
     let i = gather(&db, id, dir.path(), Paper::A4).await.unwrap();
     assert!(i.answers.resume_pdf.is_none() && i.resume_title.is_none());
 }
+
+#[tokio::test]
+async fn attaches_the_cover_letter_and_resume_saved_for_this_job() {
+    let db = Db::open_in_memory().await.unwrap();
+    let id = posting(&db).await;
+    set_basics(
+        &db,
+        &Basics {
+            full_name: "Ada Lovelace".into(),
+            ..Basics::default()
+        },
+    )
+    .await
+    .unwrap();
+    let app = ceevee_search::tracking::create(
+        &db,
+        &ceevee_search::tracking::NewApplication {
+            posting_id: Some(id),
+            ..Default::default()
+        },
+        "2026-11-15T00:00:00Z",
+    )
+    .await
+    .unwrap();
+    // Newer documents for some other job must not be picked.
+    store::create(
+        &db,
+        DocKind::CoverLetter,
+        "Letter: this job",
+        Some(app.id),
+        None,
+        "Dear team,\n\nHello.",
+        "test",
+    )
+    .await
+    .unwrap();
+    store::create(
+        &db,
+        DocKind::TailoredResume,
+        "Resume: this job",
+        Some(app.id),
+        None,
+        r#"{"basics":{"name":"Ada Lovelace"}}"#,
+        "test",
+    )
+    .await
+    .unwrap();
+    store::create(
+        &db,
+        DocKind::TailoredResume,
+        "Resume: other job",
+        None,
+        None,
+        r#"{"basics":{"name":"Ada Lovelace"}}"#,
+        "test",
+    )
+    .await
+    .unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let i = gather(&db, id, dir.path(), Paper::UsLetter).await.unwrap();
+    assert_eq!(i.resume_title.as_deref(), Some("Resume: this job"));
+    assert_eq!(i.cover_letter_title.as_deref(), Some("Letter: this job"));
+    let letter = std::fs::read(i.answers.cover_letter_pdf.unwrap()).unwrap();
+    assert!(letter.starts_with(b"%PDF"));
+}
