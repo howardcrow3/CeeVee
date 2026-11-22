@@ -59,4 +59,4 @@ CeeVee can read recruiter replies in Gmail after a Google sign-in. It asks only 
 
 ## Analytics (GA4)
 
-Usage analytics are opt-in in the app and send nothing unless the build has both values. Create a GA4 property and a web data stream, then a Measurement Protocol API secret (stream details, Events, Measurement Protocol API secrets). In the `release-build` environment add the variable `CEEVEE_GA4_MEASUREMENT_ID` (the `G-...` ID) and the secret `CEEVEE_GA4_API_SECRET`. The build log shows "Analytics: on (opt-in)" when both are set. Set event data retention to 2 months and leave Google signals off.
+Usage analytics are opt-in in the app and send nothing unless the build has both values. Create a GA4 property and a web data stream, then a Measurement Protocol API secret (stream details, Events, Measurement Protocol API secrets). In the `release-build` environment add the secret `CEEVEE_GA4_API_SECRET`. The measurement ID (`G-EEQ718X660`, public) is the default in the workflows; a variable `CEEVEE_GA4_MEASUREMENT_ID` overrides it. The build log shows "Analytics: on (opt-in)" when both are set. Set event data retention to 2 months and leave Google signals off.

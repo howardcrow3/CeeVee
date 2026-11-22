@@ -54,8 +54,8 @@ jobs:
       # The client ID is not secret; the "secret" of a desktop client is not confidential either, but is kept out of the repo.
       CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
       CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
-      # Anonymous usage analytics (opt-in in the app). When unset, the build sends nothing.
-      CEEVEE_GA4_MEASUREMENT_ID: ${{ vars.CEEVEE_GA4_MEASUREMENT_ID || secrets.CEEVEE_GA4_MEASUREMENT_ID }}
+      # Anonymous usage analytics (opt-in in the app). The measurement ID is public, so it is the default here; without the API secret the build sends nothing.
+      CEEVEE_GA4_MEASUREMENT_ID: ${{ vars.CEEVEE_GA4_MEASUREMENT_ID || 'G-EEQ718X660' }}
       CEEVEE_GA4_API_SECRET: ${{ secrets.CEEVEE_GA4_API_SECRET }}
       # Update files (.sig) are signed with the updater key.
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
