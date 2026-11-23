@@ -123,7 +123,13 @@ async fn the_whole_sign_in_flow_gets_tokens_and_the_address() {
                 let state = query_param(url.split_once('?').unwrap().1, "state").unwrap();
                 // A stray request with the wrong state is ignored.
                 let _ = reqwest::get(format!("{redirect}/?code=evil&state=nope")).await;
-                let _ = reqwest::get(format!("{redirect}/?code=GOOD%2F1&state={state}")).await;
+                let page = reqwest::get(format!("{redirect}/?code=GOOD%2F1&state={state}"))
+                    .await
+                    .unwrap()
+                    .text()
+                    .await
+                    .unwrap();
+                assert!(page.contains("Google is connected"), "{page}");
             });
         })
         .await
@@ -153,8 +159,13 @@ async fn refusing_access_is_reported_plainly() {
                 let q = url.split_once('?').unwrap().1.to_string();
                 let redirect = decode(&query_param(&q, "redirect_uri").unwrap());
                 let state = query_param(&q, "state").unwrap();
-                let _ =
-                    reqwest::get(format!("{redirect}/?error=access_denied&state={state}")).await;
+                let page = reqwest::get(format!("{redirect}/?error=access_denied&state={state}"))
+                    .await
+                    .unwrap()
+                    .text()
+                    .await
+                    .unwrap();
+                assert!(page.contains("Access was not granted"), "{page}");
             });
         })
         .await
@@ -305,4 +316,16 @@ async fn signing_out_revokes_the_token_with_google() {
     let (base, _) = http(vec![("/revoke", 500, "{}".into())]).await;
     c.revoke_url = format!("{base}/revoke");
     assert!(c.revoke("x").await.is_err());
+}
+
+#[test]
+fn result_pages_are_self_contained() {
+    for page in [
+        include_str!("pages/oauth_done.html"),
+        include_str!("pages/oauth_denied.html"),
+        include_str!("pages/oauth_error.html"),
+    ] {
+        assert!(!page.contains("http://") && !page.contains("https://"));
+        assert!(!page.contains("<script") && !page.contains("<link"));
+    }
 }
