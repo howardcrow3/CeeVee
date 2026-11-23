@@ -826,6 +826,8 @@ pub async fn save_job_draft(
     let k = doc_kind(&kind)?;
     check_content(k, &content)?;
     let (_, name) = posting_text(&db, i64::from(id)).await?;
+    // A draft belongs to the application for this job, so applying attaches it.
+    let application = track_posting(&db, i64::from(id)).await?;
     let label = if kind == "cover_letter" {
         "Cover letter"
     } else {
@@ -835,7 +837,7 @@ pub async fn save_job_draft(
         &db,
         k,
         &format!("{label}: {name}"),
-        None,
+        Some(application),
         None,
         &content,
         "drafted",
@@ -943,12 +945,12 @@ pub async fn set_application_status(
 }
 
 /// Start tracking a posting as a draft application, unless it is tracked already.
-async fn track_posting(db: &ceevee_db::Db, posting_id: i64) -> Result<(), String> {
+async fn track_posting(db: &ceevee_db::Db, posting_id: i64) -> Result<i64, String> {
     let all = ceevee_search::tracking::list(db, &ceevee_search::tracking::Filter::default())
         .await
         .map_err(|e| e.to_string())?;
-    if all.iter().any(|a| a.posting_id == Some(posting_id)) {
-        return Ok(());
+    if let Some(a) = all.iter().find(|a| a.posting_id == Some(posting_id)) {
+        return Ok(a.id);
     }
     let posting = ceevee_search::postings::get(db, posting_id)
         .await
@@ -963,8 +965,8 @@ async fn track_posting(db: &ceevee_db::Db, posting_id: i64) -> Result<(), String
         &ceevee_search::sources::now_iso(),
     )
     .await
-    .map_err(|e| e.to_string())?;
-    Ok(())
+    .map(|a| a.id)
+    .map_err(|e| e.to_string())
 }
 
 /// Open a posting in your browser and fill in its application form. You review and submit.

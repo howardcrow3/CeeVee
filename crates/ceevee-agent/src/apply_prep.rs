@@ -19,11 +19,13 @@ pub struct Inputs {
     pub answers: Answers,
     /// The resume used, so the person can see which one was attached.
     pub resume_title: Option<String>,
+    /// The cover letter attached, if one was saved for this job.
+    pub cover_letter_title: Option<String>,
 }
 
 /// Gather the inputs for applying to a posting. The resume PDF is written into `pdf_dir`.
-/// The newest tailored resume is used if there is one, else the newest base resume. A cover letter
-/// is only attached when it belongs to an application, which is not the case yet.
+/// A resume and a cover letter saved for this posting's application are used first. Otherwise the
+/// newest tailored resume, then the newest base resume, are used, and no cover letter is attached.
 pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> Result<Inputs> {
     let posting = postings::get(db, posting_id).await?;
     let basics = repo::get_basics(db).await?;
@@ -47,9 +49,22 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
         &facts,
     );
 
+    let application =
+        ceevee_search::tracking::list(db, &ceevee_search::tracking::Filter::default())
+            .await?
+            .into_iter()
+            .find(|a| a.posting_id == Some(posting_id))
+            .map(|a| a.id);
+
     let mut resume_title = None;
-    for kind in [DocKind::TailoredResume, DocKind::BaseResume] {
-        if let Some(doc) = store::list(db, Some(kind), None).await?.into_iter().next() {
+    let mut candidates = Vec::new();
+    if let Some(app) = application {
+        candidates.push((DocKind::TailoredResume, Some(app)));
+    }
+    candidates.push((DocKind::TailoredResume, None));
+    candidates.push((DocKind::BaseResume, None));
+    for (kind, app) in candidates {
+        if let Some(doc) = store::list(db, Some(kind), app).await?.into_iter().next() {
             let cur = store::current(db, doc.id).await?;
             let bytes = pdf_for(doc.kind, &cur.content, paper)?;
             std::fs::create_dir_all(pdf_dir)?;
@@ -60,11 +75,28 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
             break;
         }
     }
+    let mut cover_letter_title = None;
+    if let Some(app) = application {
+        if let Some(doc) = store::list(db, Some(DocKind::CoverLetter), Some(app))
+            .await?
+            .into_iter()
+            .next()
+        {
+            let cur = store::current(db, doc.id).await?;
+            let bytes = pdf_for(doc.kind, &cur.content, paper)?;
+            std::fs::create_dir_all(pdf_dir)?;
+            let path = pdf_dir.join(format!("{}.pdf", file_stem(&doc.title)));
+            std::fs::write(&path, bytes)?;
+            answers.cover_letter_pdf = Some(path.display().to_string());
+            cover_letter_title = Some(doc.title);
+        }
+    }
     Ok(Inputs {
         url: posting.url,
         company_and_title: posting.title,
         answers,
         resume_title,
+        cover_letter_title,
     })
 }
 
