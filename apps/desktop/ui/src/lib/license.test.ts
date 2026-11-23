@@ -6,8 +6,8 @@ const base: LicenseView = {
 };
 
 describe('license text', () => {
-  it('stays quiet early in the trial and when licensed', () => {
-    expect(bannerText(base)).toBeNull();
+  it('shows days left during the trial and stays quiet when licensed', () => {
+    expect(bannerText(base)).toBe('Trial: 10 days left.');
     expect(bannerText({ ...base, state: 'licensed' })).toBeNull();
   });
   it('warns in the last days', () => {

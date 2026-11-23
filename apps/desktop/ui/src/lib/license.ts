@@ -8,7 +8,7 @@ export function bannerText(v: LicenseView): string | null {
     return 'Your 14-day trial has ended. CeeVee is read-only: you can still look at and export everything.';
   }
   if (v.state === 'trial' && v.days_left !== null) {
-    if (v.days_left > 3) return null;
+    if (v.days_left > 3) return `Trial: ${v.days_left} days left.`;
     return v.days_left <= 1
       ? 'Your trial ends today or tomorrow.'
       : `Your trial ends in ${v.days_left} days.`;

@@ -7,7 +7,7 @@ use crate::{LicenseError, Result};
 
 /// Base address of the CeeVee license API.
 pub const DEFAULT_BASE: &str = "https://turtlebox.studio/api/ceevee/v1";
-/// Where "Buy CeeVee" sends people (FastSpring checkout is embedded on that page).
+/// Where "Buy CeeVee" sends people (Paddle checkout is on that page).
 pub const PURCHASE_URL: &str = "https://turtlebox.studio/ceevee/buy?from=app";
 /// Where people free a seat or find their key again.
 pub const MY_LICENSE_URL: &str = "https://turtlebox.studio/ceevee/license";
