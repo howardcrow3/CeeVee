@@ -1,6 +1,6 @@
 # License API (turtlebox.studio)
 
-What the CeeVee app expects from the turtlebox.studio backend. The backend lives in the highturtle repo and is not touched from here. FastSpring is not hooked up yet, so the app only links out to the purchase page and calls the three endpoints below. Base address: `https://turtlebox.studio/api/ceevee/v1`. All bodies are JSON.
+What the CeeVee app expects from the turtlebox.studio backend. The backend lives in the highturtle repo and is not touched from here. Payments are Paddle; the app links out to the purchase page and calls the three endpoints below. Base address: `https://turtlebox.studio/api/ceevee/v1`. All bodies are JSON.
 
 ## Signed tokens
 
@@ -25,7 +25,7 @@ Key shape: `CEEV-` plus four groups of five characters from `0-9A-Z` without `I 
 
 ## Pages the app opens
 
-- `https://turtlebox.studio/ceevee/buy?from=app`: FastSpring checkout. FastSpring's fulfillment webhook creates the key; the email carries the key and an `ceevee://activate?key=…` link.
+- `https://turtlebox.studio/ceevee/buy?from=app`: Paddle checkout. The Paddle fulfillment webhook creates the key; the email carries the key and an `ceevee://activate?key=…` link.
 - `https://turtlebox.studio/ceevee/license`: "My license" (seats, free a seat, downloads).
 
 ## Client behavior

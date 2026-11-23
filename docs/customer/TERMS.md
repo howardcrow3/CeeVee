@@ -11,5 +11,5 @@ DRAFT. This text has not been reviewed by a lawyer. It needs legal review and th
 7. **Third-party services.** Job boards, employers, Google and others have their own terms. CeeVee does not control them.
 8. **Updates.** CeeVee updates itself with signed files from turtlebox.studio. Updates are not tied to license status.
 9. **No warranty; limit of liability.** CeeVee is provided as is. To the extent the law allows, our liability is limited to the price you paid.
-10. **Refunds.** [To decide: refund window. Suggested: 30 days, no questions asked, through FastSpring.]
+10. **Refunds.** [To decide: refund window. Suggested: 30 days, no questions asked, through Paddle.]
 11. **Contact.** Through turtlebox.studio/ceevee.
