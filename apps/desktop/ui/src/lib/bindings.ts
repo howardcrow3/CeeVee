@@ -104,6 +104,8 @@ export const commands = {
 	prepareApplication: (id: number) => typedError<PrepareResult_Serialize, string>(__TAURI_INVOKE("prepare_application", { id })),
 	/**  Every application you are tracking, in board order. */
 	listApplications: () => typedError<ApplicationLine_Serialize[], string>(__TAURI_INVOKE("list_applications")),
+	/**  Add an application by hand: a job you applied to outside CeeVee. */
+	addApplication: (company: string, title: string, status: string) => typedError<null, string>(__TAURI_INVOKE("add_application", { company, title, status })),
 	/**  Move an application to a new status, for example after you submit it. */
 	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */

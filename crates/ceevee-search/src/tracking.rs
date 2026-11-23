@@ -359,5 +359,64 @@ pub async fn reminders(db: &Db, now: &str, after_days: i64) -> Result<Vec<Remind
         .collect()
 }
 
+/// Add an application by hand (a job you applied to somewhere else). Creates the company and a
+/// posting for it, then moves it to `status`. `now` is an ISO-8601 UTC timestamp.
+pub async fn add_manual(
+    db: &Db,
+    company: &str,
+    title: &str,
+    status: Status,
+    now: &str,
+) -> Result<Application> {
+    let (company, title) = (company.trim(), title.trim());
+    if company.is_empty() || title.is_empty() {
+        return Err(Error::Invalid(
+            "an application needs a company and a job title".into(),
+        ));
+    }
+    let posting = crate::postings::NewPosting {
+        source: "manual".into(),
+        url: format!("manual:{now}:{company}:{title}"),
+        company: company.into(),
+        title: title.into(),
+        location: None,
+        level: None,
+        pay: None,
+        body: None,
+    };
+    let posting_id = match crate::postings::ingest(db, &posting, now).await? {
+        crate::postings::Ingest::New(id) | crate::postings::Ingest::Duplicate(id) => id,
+        crate::postings::Ingest::Blocked => {
+            return Err(Error::Invalid(format!(
+                "{company} is on your blocked list; unblock it first"
+            )))
+        }
+    };
+    let existing = list(db, &Filter::default())
+        .await?
+        .into_iter()
+        .find(|a| a.posting_id == Some(posting_id));
+    let app = match existing {
+        Some(a) => a,
+        None => {
+            let company_id = crate::postings::get(db, posting_id).await?.company_id;
+            create(
+                db,
+                &NewApplication {
+                    posting_id: Some(posting_id),
+                    company_id,
+                    category_id: None,
+                },
+                now,
+            )
+            .await?
+        }
+    };
+    if app.status == status {
+        return Ok(app);
+    }
+    set_status(db, app.id, status, Cause::Manual, now).await
+}
+
 #[cfg(test)]
 mod tests;

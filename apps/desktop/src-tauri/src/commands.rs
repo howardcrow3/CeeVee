@@ -923,6 +923,30 @@ pub async fn list_applications(
     Ok(out)
 }
 
+/// Add an application by hand: a job you applied to outside CeeVee.
+#[tauri::command]
+#[specta::specta]
+pub async fn add_application(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    company: String,
+    title: String,
+    status: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let status = ceevee_search::tracking::Status::parse(&status).map_err(|e| e.to_string())?;
+    ceevee_search::tracking::add_manual(
+        &db,
+        &company,
+        &title,
+        status,
+        &ceevee_search::sources::now_iso(),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Move an application to a new status, for example after you submit it.
 #[tauri::command]
 #[specta::specta]
