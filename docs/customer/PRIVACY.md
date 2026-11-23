@@ -1,6 +1,6 @@
 # CeeVee privacy notice
 
-Draft for Howard's review before it is published at turtlebox.studio/ceevee/privacy. Last updated 2026-11-15.
+Last updated 2026-11-22.
 
 CeeVee runs on your computer. Your resume, profile, jobs, documents, mail and chats are stored on your computer and are not sent to us.
 
@@ -20,7 +20,7 @@ CeeVee runs on your computer. Your resume, profile, jobs, documents, mail and ch
 | Downloading the AI model | Hugging Face (a model host) | A normal file download. They see your IP address, as any website would. |
 | Searching for jobs | The job boards and company career pages you choose | The same requests your browser would make to read public job lists. |
 | Applying for a job | The employer's application site, through Chrome or Edge on your computer | What you submit in the application, the same as if you typed it yourself. |
-| Buying | FastSpring (our payment provider) | Your payment details go to FastSpring, not to CeeVee. |
+| Buying | Paddle (our payment provider) | Your payment details go to Paddle, not to CeeVee. |
 
 CeeVee has no advertising trackers.
 
