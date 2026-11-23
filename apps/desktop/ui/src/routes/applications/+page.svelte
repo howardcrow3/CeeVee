@@ -36,6 +36,22 @@
     else error = r.error;
   }
 
+  let adding = $state(false);
+  let company = $state('');
+  let title = $state('');
+  let status = $state('sent');
+
+  async function add() {
+    error = '';
+    const r = await commands.addApplication(company, title, status);
+    if (r.status === 'ok') {
+      company = '';
+      title = '';
+      adding = false;
+      await load();
+    } else error = r.error;
+  }
+
   async function move(id: number, status: string) {
     error = '';
     const r = await commands.setApplicationStatus(id, status);
@@ -46,6 +62,24 @@
 
 <span class="label">Applications</span>
 {#if error}<p role="alert">{error}</p>{/if}
+{#if adding}
+  <form class="add" onsubmit={(e) => { e.preventDefault(); add(); }}>
+    <label>Company <input bind:value={company} required /></label>
+    <label>Job title <input bind:value={title} required /></label>
+    <label>
+      Status
+      <select bind:value={status}>
+        {#each statuses as st (st.value)}<option value={st.value}>{st.label}</option>{/each}
+      </select>
+    </label>
+    <div class="row">
+      <button type="submit">Add application</button>
+      <button type="button" class="ghost" onclick={() => (adding = false)}>Cancel</button>
+    </div>
+  </form>
+{:else}
+  <div class="row"><button onclick={() => (adding = true)}>Add application</button></div>
+{/if}
 {#if waiting.length > 0}
   <section>
     <h2>Waiting on you</h2>
@@ -80,8 +114,8 @@
     </ul>
   </section>
 {/each}
-{#if waiting.length === 0 && apps.length === 0 && !error}
-  <EmptyState title="No applications yet"><p>Applications you start appear here with their status.</p></EmptyState>
+{#if waiting.length === 0 && apps.length === 0 && !error && !adding}
+  <EmptyState title="No applications yet"><p>Applications you start appear here with their status. Press Add application to track one you applied to elsewhere.</p></EmptyState>
 {/if}
 
 <style>
@@ -91,5 +125,8 @@
   b { color: var(--ink); font-weight: 500; }
   p { margin: 0; }
   .row { display: flex; gap: 8px; }
+  .add { margin-top: 16px; max-width: 760px; display: flex; flex-direction: column; gap: 12px; border: 1px solid var(--line); background: var(--surface); padding: 16px; }
+  .add label { display: flex; flex-direction: column; gap: 4px; }
+  input { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 8px 12px; }
   select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 8px 12px; }
 </style>

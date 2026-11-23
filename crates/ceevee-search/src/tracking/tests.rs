@@ -181,3 +181,51 @@ async fn next_interview_can_be_set_and_cleared() {
     set_next_interview(&db, a.id, None).await.unwrap();
     assert_eq!(get(&db, a.id).await.unwrap().next_interview_at, None);
 }
+
+#[tokio::test]
+async fn adding_by_hand_creates_company_posting_and_status() {
+    let db = Db::open_in_memory().await.unwrap();
+    let a = add_manual(
+        &db,
+        " Acme Robotics ",
+        "Product Manager",
+        Status::Sent,
+        "2026-11-23T10:00:00Z",
+    )
+    .await
+    .unwrap();
+    assert_eq!(a.status, Status::Sent);
+    assert_eq!(a.applied_at.as_deref(), Some("2026-11-23T10:00:00Z"));
+    let p = crate::postings::get(&db, a.posting_id.unwrap())
+        .await
+        .unwrap();
+    assert_eq!(p.title, "Product Manager");
+    let c = crate::companies::get(&db, p.company_id.unwrap())
+        .await
+        .unwrap();
+    assert_eq!(c.name, "Acme Robotics");
+}
+
+#[tokio::test]
+async fn adding_by_hand_needs_company_and_title() {
+    let db = Db::open_in_memory().await.unwrap();
+    assert!(
+        add_manual(&db, "", "PM", Status::Draft, "2026-11-23T10:00:00Z")
+            .await
+            .is_err()
+    );
+    assert!(
+        add_manual(&db, "Acme", "  ", Status::Draft, "2026-11-23T10:00:00Z")
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
+async fn adding_by_hand_can_start_at_interview() {
+    let db = Db::open_in_memory().await.unwrap();
+    let a = add_manual(&db, "Acme", "PM", Status::Interview, "2026-11-23T10:00:00Z")
+        .await
+        .unwrap();
+    assert_eq!(a.status, Status::Interview);
+}

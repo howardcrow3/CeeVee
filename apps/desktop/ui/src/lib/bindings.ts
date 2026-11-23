@@ -105,6 +105,7 @@ export const commands = {
 	/**  Every application you are tracking, in board order. */
 	listApplications: () => typedError<ApplicationLine_Serialize[], string>(__TAURI_INVOKE("list_applications")),
 	/**  Move an application to a new status, for example after you submit it. */
+	addApplication: (company: string, title: string, status: string) => typedError<null, string>(__TAURI_INVOKE("add_application", { company, title, status })),
 	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
 	pendingApprovalCount: () => typedError<number, string>(__TAURI_INVOKE("pending_approval_count")),

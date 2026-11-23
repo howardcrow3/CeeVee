@@ -2,7 +2,7 @@ import type { ApplicationLine } from '$lib/bindings';
 
 export const statuses = [
   { value: 'draft', label: 'Draft' },
-  { value: 'sent', label: 'Sent' },
+  { value: 'sent', label: 'Applied' },
   { value: 'screening', label: 'Screening' },
   { value: 'interview', label: 'Interview' },
   { value: 'offer', label: 'Offer' },
