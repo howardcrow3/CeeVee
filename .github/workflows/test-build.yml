@@ -21,6 +21,9 @@ jobs:
       CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
       CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
       CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
+      # Anonymous usage analytics (opt-in in the app). The measurement ID is public, so it is the default here; without the API secret the build sends nothing.
+      CEEVEE_GA4_MEASUREMENT_ID: ${{ vars.CEEVEE_GA4_MEASUREMENT_ID || 'G-EEQ718X660' }}
+      CEEVEE_GA4_API_SECRET: ${{ secrets.CEEVEE_GA4_API_SECRET }}
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
       APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
