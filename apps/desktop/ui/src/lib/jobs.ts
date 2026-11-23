@@ -23,13 +23,14 @@ export function placeText(j: Pick<JobLine, 'location'>): string {
 }
 
 /** What to tell the person after CeeVee filled in an application form. */
-export function prepareSummary(r: { filled: number; missing: string[]; resume: string | null }): string {
+export function prepareSummary(r: { filled: number; missing: string[]; resume: string | null; cover_letter?: string | null }): string {
   const fields = r.filled === 1 ? '1 field' : `${r.filled} fields`;
   const resume = r.resume ? ` Resume attached: ${r.resume}.` : ' No resume was attached, add one in Documents.';
+  const letter = r.cover_letter ? ` Cover letter attached: ${r.cover_letter}.` : '';
   const missing = r.missing.length
     ? ` Still for you to answer: ${r.missing.join(', ')}.`
     : '';
-  return `Filled ${fields}.${resume}${missing} Check the form in your browser and press Submit yourself.`;
+  return `Filled ${fields}.${resume}${letter}${missing} Check the form in your browser and press Submit yourself.`;
 }
 
 /** "Know 3 people" next to a company, or nothing when you know no one there. */

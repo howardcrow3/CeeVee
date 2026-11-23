@@ -459,6 +459,8 @@ export type PrepareResult_Deserialize = {
 	/**  Required questions CeeVee could not answer; you finish these in the browser. */
 	missing: string[],
 	resume?: string | null,
+	/**  Title of the cover letter attached, when one was saved for this job. */
+	cover_letter?: string | null,
 };
 
 /**  What happened when CeeVee filled in an application. */
@@ -468,6 +470,8 @@ export type PrepareResult_Serialize = {
 	/**  Required questions CeeVee could not answer; you finish these in the browser. */
 	missing: string[],
 	resume: string | null,
+	/**  Title of the cover letter attached, when one was saved for this job. */
+	cover_letter: string | null,
 };
 
 export type ProfileChange = {

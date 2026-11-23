@@ -23,6 +23,11 @@ describe('prepareSummary', () => {
     expect(t).toContain('Visa sponsorship');
     expect(t).toContain('press Submit yourself');
   });
+  it('mentions the cover letter when one is attached', async () => {
+    const { prepareSummary } = await import('./jobs');
+    const t = prepareSummary({ filled: 2, missing: [], resume: 'Tailored', cover_letter: 'Letter for Acme' });
+    expect(t).toContain('Cover letter attached: Letter for Acme.');
+  });
   it('says when there was no resume', async () => {
     const { prepareSummary } = await import('./jobs');
     expect(prepareSummary({ filled: 1, missing: [], resume: null })).toContain('No resume was attached');

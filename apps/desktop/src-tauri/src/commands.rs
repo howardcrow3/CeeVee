@@ -866,6 +866,8 @@ pub struct PrepareResult {
     /// Required questions CeeVee could not answer; you finish these in the browser.
     pub missing: Vec<String>,
     pub resume: Option<String>,
+    /// Title of the cover letter attached, when one was saved for this job.
+    pub cover_letter: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
@@ -998,5 +1000,6 @@ pub async fn prepare_application(
             .filter_map(|x| x.as_str().map(str::to_string))
             .collect(),
         resume: v["resume"].as_str().map(str::to_string),
+        cover_letter: v["cover_letter"].as_str().map(str::to_string),
     })
 }
