@@ -34,6 +34,7 @@ impl Context {
             rules: Rules {
                 company_domains: store::company_domains(db).await?,
                 sent_message_ids: store::sent_message_ids(db).await?,
+                company_names: store::open_company_names(db).await?,
             },
         })
     }
