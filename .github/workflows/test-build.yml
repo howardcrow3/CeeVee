@@ -2,7 +2,9 @@ name: Test build
 
 # A Developer ID signed, notarized and stapled macOS (Apple silicon) .dmg built from main, for
 # hands-on testing. It installs like any Mac app: double-click, no right-click Open, no Terminal.
-# Nothing is released or published: the download is the "CeeVee-test-macos" artifact of the run.
+# The download is the "CeeVee-test-macos" artifact of the run, and also a GitHub pre-release named
+# "Test build N" (tag test-build-N). These are test builds only, never real releases; the newest
+# five pre-releases are kept. The real release workflow is release.yml and is not touched here.
 # Uses the same secrets and steps as release.yml (environment release-build, which only allows main),
 # so run it from main: Actions, Test build, "Run workflow", branch main.
 
@@ -86,3 +88,34 @@ jobs:
           path: out/*.dmg
           if-no-files-found: error
           retention-days: 14
+
+  publish:
+    # Publishes the build as a GitHub pre-release so there is one place to find the latest test build.
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: CeeVee-test-macos-build*
+          path: out
+          merge-multiple: true
+      - name: Publish pre-release
+        run: |
+          set -euo pipefail
+          dmg=$(ls out/*.dmg | head -1)
+          n=$(basename "$dmg" | sed -E 's/.*_build([0-9]+)_.*/\1/')
+          tag="test-build-$n"
+          notes="TEST BUILD, not a release. Developer ID signed and notarized macOS (Apple silicon) build of commit ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}, for hands-on testing only. Open the .dmg and drag CeeVee to Applications."
+          gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$tag" "$dmg" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Test build $n" --notes "$notes"
+      - name: Keep only the newest five test builds
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("test-build-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+            while read -r t; do gh release delete "$t" --cleanup-tag --yes; done
