@@ -44,6 +44,9 @@ pub struct Rules {
     pub company_domains: HashSet<String>,
     /// Message IDs of mail the user sent from CeeVee.
     pub sent_message_ids: HashSet<String>,
+    /// Lowercase names (and aliases) of companies with an open application. Mail from an
+    /// unknown address, such as a recruiter's personal Gmail, counts when its subject names one.
+    pub company_names: HashSet<String>,
 }
 
 fn matches(domain: &str, list: &[&str]) -> bool {
@@ -75,6 +78,14 @@ pub fn classify(mail: &ParsedMail, rules: &Rules) -> Option<Candidate> {
     if domains.iter().any(|d| matches(d, KNOWN_ALERT_DOMAINS)) {
         return Some(Candidate::Alert);
     }
+    let subject = mail.subject.to_ascii_lowercase();
+    if rules
+        .company_names
+        .iter()
+        .any(|n| n.len() >= 3 && subject.contains(n.as_str()))
+    {
+        return Some(Candidate::Employer);
+    }
     None
 }
 
@@ -99,6 +110,7 @@ mod tests {
         Rules {
             company_domains: ["acme.com".to_string()].into(),
             sent_message_ids: ["mine@x".to_string()].into(),
+            company_names: ["acme robotics".to_string()].into(),
         }
     }
 
@@ -141,6 +153,15 @@ mod tests {
             classify(&mail("jobs-noreply@linkedin.com", None, &[]), &rules()),
             Some(Candidate::Alert)
         );
+    }
+
+    #[test]
+    fn subject_naming_a_tracked_company_matches_any_sender() {
+        let mut m = mail("friend@gmail.com", None, &[]);
+        m.subject = "Interview invitation: Product Manager at Acme Robotics".into();
+        assert_eq!(classify(&m, &rules()), Some(Candidate::Employer));
+        m.subject = "Lunch on Friday?".into();
+        assert_eq!(classify(&m, &rules()), None);
     }
 
     #[test]

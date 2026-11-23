@@ -303,6 +303,30 @@ pub async fn save_label(db: &Db, id: i64, l: &LabelRow<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Lowercase names and aliases of companies you have an open application with.
+pub async fn open_company_names(db: &Db) -> Result<std::collections::HashSet<String>> {
+    let rows = sqlx::query(
+        "SELECT DISTINCT c.name, c.aliases FROM company c \
+         JOIN application a ON a.company_id = c.id \
+         WHERE a.status NOT IN ('accepted','rejected','declined','withdrawn')",
+    )
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    let mut out = std::collections::HashSet::new();
+    for r in rows {
+        out.insert(r.get::<String, _>("name").to_ascii_lowercase());
+        if let Ok(Value::Array(a)) = serde_json::from_str::<Value>(&r.get::<String, _>("aliases")) {
+            out.extend(
+                a.iter()
+                    .filter_map(|v| v.as_str())
+                    .map(str::to_ascii_lowercase),
+            );
+        }
+    }
+    Ok(out)
+}
+
 /// Domains of companies CeeVee tracks: their stored mail domains plus their website host.
 pub async fn company_domains(db: &Db) -> Result<std::collections::HashSet<String>> {
     let rows = sqlx::query("SELECT website, email_domains FROM company")

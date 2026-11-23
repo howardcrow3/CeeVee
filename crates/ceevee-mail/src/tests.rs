@@ -641,3 +641,39 @@ mod google_sign_in {
         assert_eq!(store::list_accounts(&db).await.unwrap().len(), 1);
     }
 }
+
+#[tokio::test]
+async fn demo_mail_from_a_gmail_address_moves_a_hand_added_application_without_a_model() {
+    let db = Db::open_in_memory().await.unwrap();
+    let account = store::add_account(&db, "imap", "me@example.org", &json!({}), "ref")
+        .await
+        .unwrap()
+        .id;
+    let app = tracking::add_manual(&db, "Acme Robotics", "Product Manager", Status::Sent, NOW)
+        .await
+        .unwrap();
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "someone@gmail.com",
+            "Interview invitation: Product Manager at Acme Robotics",
+            "Hi, thank you for applying. We would like to interview you next week for the Product Manager role at Acme Robotics. Please reply with times that work. Thanks, Acme Robotics recruiting",
+            "demo@gmail",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(r.application_id, Some(app.id));
+    assert_eq!(r.status, Some(Outcome::Applied(Status::Interview)));
+    assert_eq!(
+        tracking::get(&db, app.id).await.unwrap().status,
+        Status::Interview
+    );
+}
