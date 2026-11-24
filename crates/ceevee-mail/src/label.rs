@@ -18,7 +18,11 @@ pub enum Kind {
     Rejection,
     Question,
     Acknowledgement,
+    /// A recruiter or employer reaching out about a job the person has not applied to.
+    Inquiry,
     Other,
+    /// The model read it and it is not about a job search. Never stored.
+    NotJob,
 }
 
 impl Kind {
@@ -30,7 +34,9 @@ impl Kind {
             Self::Rejection => "rejection",
             Self::Question => "question",
             Self::Acknowledgement => "acknowledgement",
+            Self::Inquiry => "inquiry",
             Self::Other => "other",
+            Self::NotJob => "not_job",
         }
     }
 
@@ -42,7 +48,21 @@ impl Kind {
             Self::Offer => Some(Status::Offer),
             Self::Rejection => Some(Status::Rejected),
             Self::Acknowledgement => Some(Status::Sent),
-            Self::Question | Self::Other => None,
+            Self::Question | Self::Inquiry | Self::Other | Self::NotJob => None,
+        }
+    }
+
+    /// The column a job created from this kind of mail starts in, or `None` when the mail
+    /// is not enough to start tracking a job.
+    pub fn starts_job_as(self) -> Option<Status> {
+        match self {
+            Self::Inquiry => Some(Status::Draft),
+            Self::Acknowledgement => Some(Status::Sent),
+            Self::Assessment => Some(Status::Screening),
+            Self::Interview => Some(Status::Interview),
+            Self::Offer => Some(Status::Offer),
+            Self::Rejection => Some(Status::Rejected),
+            Self::Question | Self::Other | Self::NotJob => None,
         }
     }
 }
@@ -55,6 +75,8 @@ pub struct Label {
     /// Interview start as the email wrote it.
     pub interview_at: Option<String>,
     pub company: Option<String>,
+    pub job_title: Option<String>,
+    pub location: Option<String>,
     /// `label_email@1`, or `rules@1` when the keyword rules decided.
     pub with: String,
 }
@@ -66,6 +88,10 @@ struct Answer {
     needs_reply: bool,
     interview_at: String,
     mentions_company: String,
+    #[serde(default)]
+    job_title: String,
+    #[serde(default)]
+    location: String,
 }
 
 fn non_empty(s: String) -> Option<String> {
@@ -138,18 +164,40 @@ pub fn by_rules(mail: &ParsedMail) -> Label {
         "we have received your application",
     ]) {
         Kind::Acknowledgement
+    } else if has(&[
+        "came across your profile",
+        "found your profile",
+        "open position",
+        "open role",
+        "job opportunity",
+        "career opportunity",
+        "are you open to",
+        "would you be interested",
+        "are you interested in",
+        "hiring for",
+        "we are hiring",
+        "we're hiring",
+        "recruiter",
+    ]) {
+        Kind::Inquiry
     } else if text.contains('?') {
         Kind::Question
     } else {
         Kind::Other
     };
-    let needs_reply = matches!(kind, Kind::Interview | Kind::Question | Kind::Offer);
+    let needs_reply = matches!(
+        kind,
+        Kind::Interview | Kind::Question | Kind::Offer | Kind::Inquiry
+    );
+    let found = crate::extract::extract(mail);
     Label {
         kind,
         summary: mail.subject.chars().take(200).collect(),
         needs_reply,
         interview_at: None,
-        company: None,
+        company: found.company,
+        job_title: found.title,
+        location: found.location,
         with: "rules@1".into(),
     }
 }
@@ -169,14 +217,20 @@ pub async fn label(worker: Option<&ModelWorker>, mail: &ParsedMail) -> Label {
         ("body", clip(&mail.body, BODY_LIMIT)),
     ];
     match run::<Answer>(worker, &LABEL_EMAIL, &vars, Priority::Background).await {
-        Ok(out) => Label {
-            kind: out.value.kind,
-            summary: out.value.summary,
-            needs_reply: out.value.needs_reply,
-            interview_at: non_empty(out.value.interview_at),
-            company: non_empty(out.value.mentions_company),
-            with: format!("{}@{}", out.task_id, out.version),
-        },
+        Ok(out) => {
+            // What the model leaves blank, the rules may still find.
+            let found = crate::extract::extract(mail);
+            Label {
+                kind: out.value.kind,
+                summary: out.value.summary,
+                needs_reply: out.value.needs_reply,
+                interview_at: non_empty(out.value.interview_at),
+                company: non_empty(out.value.mentions_company).or(found.company),
+                job_title: non_empty(out.value.job_title).or(found.title),
+                location: non_empty(out.value.location).or(found.location),
+                with: format!("{}@{}", out.task_id, out.version),
+            }
+        }
         Err(_) => by_rules(mail),
     }
 }

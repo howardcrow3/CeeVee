@@ -303,12 +303,37 @@ pub async fn save_label(db: &Db, id: i64, l: &LabelRow<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Whether this message was already stored or already read and set aside as not about a job.
+pub async fn is_seen(db: &Db, account_id: i64, message_id: &str) -> Result<bool> {
+    let n: i64 = sqlx::query_scalar(
+        "SELECT (SELECT COUNT(*) FROM email_message WHERE account_id = ?1 AND message_id = ?2) \
+              + (SELECT COUNT(*) FROM mail_seen WHERE account_id = ?1 AND message_id = ?2)",
+    )
+    .bind(account_id)
+    .bind(message_id)
+    .fetch_one(db.pool())
+    .await
+    .map_err(db_err)?;
+    Ok(n > 0)
+}
+
+/// Remember that a message is not about a job, so later syncs skip it. Only the ID is kept.
+pub async fn mark_seen(db: &Db, account_id: i64, message_id: &str) -> Result<()> {
+    sqlx::query("INSERT OR IGNORE INTO mail_seen(account_id, message_id) VALUES (?, ?)")
+        .bind(account_id)
+        .bind(message_id)
+        .execute(db.pool())
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
 /// Lowercase names and aliases of companies you have an open application with.
 pub async fn open_company_names(db: &Db) -> Result<std::collections::HashSet<String>> {
     let rows = sqlx::query(
         "SELECT DISTINCT c.name, c.aliases FROM company c \
          JOIN application a ON a.company_id = c.id \
-         WHERE a.status NOT IN ('accepted','rejected','declined','withdrawn')",
+         WHERE a.review <> 'dismissed' AND a.status NOT IN ('accepted','rejected','declined','withdrawn')",
     )
     .fetch_all(db.pool())
     .await
