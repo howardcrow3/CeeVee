@@ -4,13 +4,23 @@
   import {
     commands,
     type ApplicationChoice,
+    type FoundJob,
     type InboxLine,
     type MessageView
   } from '$lib/bindings';
   import EmptyState from '$lib/components/EmptyState.svelte';
-  import { dateWord, filterInbox, labelWord, syncSummary, type InboxFilter } from '$lib/inbox';
+  import {
+    dateWord,
+    filterInbox,
+    foundStatusWord,
+    foundTitle,
+    labelWord,
+    syncSummary,
+    type InboxFilter
+  } from '$lib/inbox';
 
   let lines = $state<InboxLine[]>([]);
+  let found = $state<FoundJob[]>([]);
   let accounts = $state(0);
   let choices = $state<ApplicationChoice[]>([]);
   let filter = $state<InboxFilter>('all');
@@ -26,11 +36,13 @@
 
   async function load() {
     try {
-      const [l, a, c] = await Promise.all([
+      const [l, a, c, f] = await Promise.all([
         commands.listInbox(),
         commands.listMailAccounts(),
-        commands.listApplicationChoices()
+        commands.listApplicationChoices(),
+        commands.listFoundJobs()
       ]);
+      if (f.status === 'ok') found = f.data;
       if (a.status === 'ok') accounts = a.data.length;
       if (c.status === 'ok') choices = c.data;
       if (l.status === 'ok') lines = l.data;
@@ -53,6 +65,21 @@
     draft = r.data.draft ?? '';
     change = '';
     lines = lines.map((l) => (l.id === id ? { ...l, unread: false } : l));
+  }
+
+  async function decide(j: FoundJob, keep: boolean) {
+    error = message = '';
+    const r = keep
+      ? await commands.confirmFoundJob(j.application_id)
+      : await commands.dismissFoundJob(j.application_id);
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
+    message = keep
+      ? `Kept ${foundTitle(j)}. It is on your Applications board.`
+      : `Dismissed ${foundTitle(j)}. CeeVee will not add it again.`;
+    await load();
   }
 
   async function check() {
@@ -135,6 +162,32 @@
     <p><a href={resolve('/settings')}>Open Settings</a></p>
   </EmptyState>
 {:else if loaded}
+  {#if found.length > 0}
+    <section class="found" aria-label="Jobs found in your email">
+      <h2>{found.length === 1 ? '1 job found in your email' : `${found.length} jobs found in your email`}</h2>
+      <p class="note">CeeVee added these from messages that looked like job updates or recruiter notes. Keep the ones that are real; dismissed ones are not added again.</p>
+      <ul>
+        {#each found as j (j.application_id)}
+          <li>
+            <div class="what">
+              <b>{foundTitle(j)}</b>
+              <span class="meta">
+                {foundStatusWord(j.status)}{j.location ? ` · ${j.location}` : ''}{j.from ? ` · from ${j.from}` : ''}{j.received_at ? ` · ${dateWord(j.received_at)}` : ''}
+              </span>
+              {#if j.summary}<span class="meta">{j.summary}</span>{/if}
+            </div>
+            <div class="row2">
+              {#if j.message_id != null}
+                <button class="ghost" onclick={() => j.message_id != null && show(j.message_id)}>Read the email</button>
+              {/if}
+              <button onclick={() => decide(j, true)}>Keep</button>
+              <button class="ghost" onclick={() => decide(j, false)}>Dismiss</button>
+            </div>
+          </li>
+        {/each}
+      </ul>
+    </section>
+  {/if}
   <div class="bar">
     <div class="tabs" role="group" aria-label="Show">
       <button class="ghost" aria-pressed={filter === 'all'} onclick={() => (filter = 'all')}>All</button>
@@ -206,6 +259,12 @@
 {/if}
 
 <style>
+  .found { border: 1px solid var(--line); background: var(--surface); padding: 24px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px; }
+  .found h2 { margin: 0; }
+  .found ul { list-style: none; padding: 0; margin: 0; }
+  .found li { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding: 16px 0; }
+  .found li + li { border-top: 1px solid var(--line); }
+  .what { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   .bar { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .tabs { display: flex; gap: 8px; }
   .tabs button[aria-pressed='true'] { color: var(--ink); background-size: 100% 1px; }

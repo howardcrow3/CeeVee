@@ -132,6 +132,8 @@ pub async fn disconnect_mail_account(db: tauri::State<'_, Db>, id: u32) -> Resul
 pub struct SyncLine {
     pub employer: u32,
     pub status_changes: u32,
+    /// Jobs started from an email, waiting for you to confirm.
+    pub new_jobs: u32,
     pub waiting_for_you: u32,
     pub drafts: u32,
     /// Messages looked at on the server, whether or not they were about a job.
@@ -177,6 +179,7 @@ pub async fn sync_all(app: &AppHandle, db: &Db) -> Result<SyncLine, String> {
         };
         total.employer += s.employer as u32;
         total.status_changes += s.status_changes as u32;
+        total.new_jobs += s.new_jobs as u32;
         total.waiting_for_you += s.waiting_for_you as u32;
         total.drafts += s.drafts as u32;
         total.seen += s.seen as u32;
@@ -212,6 +215,24 @@ async fn notify_new(app: &AppHandle, db: &Db, s: &SyncLine) {
             format!("{} employer messages are in your Inbox.", s.employer)
         };
         notify(app, db, Kind::EmployerReplied, "New employer mail", &body).await;
+    }
+    if s.new_jobs > 0 {
+        let body = if s.new_jobs == 1 {
+            "CeeVee found a job in your email. Open the Inbox to keep or dismiss it.".to_string()
+        } else {
+            format!(
+                "CeeVee found {} jobs in your email. Open the Inbox to keep or dismiss them.",
+                s.new_jobs
+            )
+        };
+        notify(
+            app,
+            db,
+            Kind::EmployerReplied,
+            "Jobs found in your mail",
+            &body,
+        )
+        .await;
     }
 }
 
@@ -411,6 +432,63 @@ pub async fn list_application_choices(
         .collect();
     v.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(v)
+}
+
+/// A job CeeVee started from an email, waiting for the user to keep or dismiss it.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct FoundJob {
+    pub application_id: u32,
+    pub company: String,
+    pub title: String,
+    pub location: Option<String>,
+    /// Where the job starts: `draft` (a recruiter reached out), `sent`, `interview`, and so on.
+    pub status: String,
+    /// The message that started it.
+    pub message_id: Option<u32>,
+    pub subject: Option<String>,
+    pub from: Option<String>,
+    pub received_at: Option<String>,
+    pub summary: Option<String>,
+}
+
+/// Jobs CeeVee found in email that still wait for a decision, newest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_found_jobs(db: tauri::State<'_, Db>) -> Result<Vec<FoundJob>, String> {
+    let all = ceevee_mail::create::pending(&db).await.map_err(e)?;
+    Ok(all
+        .into_iter()
+        .map(|p| FoundJob {
+            application_id: p.application_id as u32,
+            company: p.company,
+            title: p.title,
+            location: p.location,
+            status: p.status,
+            message_id: p.message_id.map(|m| m as u32),
+            subject: p.subject,
+            from: p.from,
+            received_at: p.received_at,
+            summary: p.summary,
+        })
+        .collect())
+}
+
+/// Keep a job found in email as an ordinary application.
+#[tauri::command]
+#[specta::specta]
+pub async fn confirm_found_job(db: tauri::State<'_, Db>, id: u32) -> Result<(), String> {
+    ceevee_mail::create::confirm(&db, i64::from(id))
+        .await
+        .map_err(e)
+}
+
+/// Remove a job found in email. Its messages stay in the Inbox, unlinked.
+#[tauri::command]
+#[specta::specta]
+pub async fn dismiss_found_job(db: tauri::State<'_, Db>, id: u32) -> Result<(), String> {
+    ceevee_mail::create::dismiss(&db, i64::from(id))
+        .await
+        .map_err(e)
 }
 
 const NOT_SET_UP: &str =
