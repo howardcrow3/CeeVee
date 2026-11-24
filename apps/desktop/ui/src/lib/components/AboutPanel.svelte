@@ -8,12 +8,6 @@
   let error = $state('');
   let found = $state<string | null>(null);
 
-  // The update feed may be unreachable (offline) or not published yet (test builds).
-  // Show a plain message.
-  function friendlyUpdateError(): string {
-    return "Couldn't reach the update server. You may be offline, or no update has been published yet. Try again later.";
-  }
-
   async function check() {
     busy = true;
     message = '';
@@ -21,11 +15,11 @@
     found = null;
     try {
       const r = await commands.checkForUpdate();
-      if (r.status !== 'ok') error = friendlyUpdateError();
+      if (r.status !== 'ok') error = 'Could not check for updates.';
       else if (r.data) found = r.data.version;
-      else message = 'CeeVee is up to date.';
+      else message = 'You have the latest version.';
     } catch {
-      error = friendlyUpdateError();
+      error = 'Could not check for updates.';
     }
     busy = false;
   }
