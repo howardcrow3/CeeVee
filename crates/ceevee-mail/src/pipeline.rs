@@ -175,6 +175,14 @@ pub async fn process(
         let reason = format!("{} ({})", lab.summary, mail.subject);
         outcome = Some(status::apply(db, app, id, to, &reason, now).await?);
     }
+    tracing::info!(
+        "mail {id}: labelled {} by {}, linked to application {:?}, suggested {:?}, outcome {:?}",
+        lab.kind.as_str(),
+        lab.with,
+        application,
+        suggestion.map(Status::as_str),
+        outcome
+    );
     if let (Some(app), Some(when)) = (application, when) {
         if lab.kind == crate::label::Kind::Interview {
             tracking::set_next_interview(db, app, Some(&when)).await?;

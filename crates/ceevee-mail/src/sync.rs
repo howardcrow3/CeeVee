@@ -119,6 +119,13 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     let own = account.address.to_ascii_lowercase();
     let ids = api.list_ids(&query, MAX_PER_SYNC).await?;
     let mut ctx = Context::load(db).await?;
+    tracing::info!(
+        "gmail sync: query \"{query}\" returned {} messages; {} company domains, {} company names, {} sent ids",
+        ids.len(),
+        ctx.rules.company_domains.len(),
+        ctx.rules.company_names.len(),
+        ctx.rules.sent_message_ids.len()
+    );
     let mut summary = Summary {
         seen: ids.len(),
         ..Default::default()
@@ -127,6 +134,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     for id in &ids {
         let head = api.headers(id).await?;
         let Ok(m) = crate::parse::parse(&head) else {
+            tracing::warn!("gmail sync: could not read the headers of a message");
             continue;
         };
         // Mail already stored, or already set aside as not about a job, is not fetched again.
@@ -135,7 +143,13 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
                 continue;
             }
         }
-        if classify(&m, &ctx.rules).is_some() || not_from(&m, &own) {
+        let candidate = classify(&m, &ctx.rules);
+        tracing::info!(
+            "gmail sync: message from {} -> {:?}",
+            m.from_domain().unwrap_or_else(|| "unknown domain".into()),
+            candidate
+        );
+        if candidate.is_some() || not_from(&m, &own) {
             raws.push(api.raw(id).await?);
         }
     }
@@ -146,6 +160,14 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
             summary.add(&p);
         }
     }
+    tracing::info!(
+        "gmail sync done: seen {}, employer {}, status changes {}, waiting {}, drafts {}",
+        summary.seen,
+        summary.employer,
+        summary.status_changes,
+        summary.waiting_for_you,
+        summary.drafts
+    );
     let state = serde_json::to_value(GmailState {
         after: Some(now_secs),
     })

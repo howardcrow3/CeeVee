@@ -304,6 +304,51 @@ mod gmail {
     }
 
     #[tokio::test]
+    async fn gmail_sync_moves_a_hand_added_application_for_mail_from_a_personal_address() {
+        use ceevee_search::tracking::{self, Status};
+        let api = Fake {
+            mails: vec![(
+                "d".into(),
+                mail(
+                    "someone@gmail.com",
+                    "Interview invitation: Product Manager at Acme Robotics",
+                    "Hi, thank you for applying. We would like to interview you next week for the Product Manager role at Acme Robotics. Please reply with times that work. Thanks, Acme Robotics recruiting",
+                    "demo@gmail",
+                ),
+            )],
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        let app = tracking::add_manual(
+            &db,
+            "Acme Robotics",
+            "Product Manager",
+            Status::Sent,
+            "2026-11-13T09:00:00Z",
+        )
+        .await
+        .unwrap();
+        let s = sync::sync_gmail(
+            &db,
+            acct.id,
+            &api,
+            || None,
+            1_794_564_000,
+            "2026-11-13T10:00:00Z",
+        )
+        .await
+        .unwrap();
+        assert_eq!((s.seen, s.employer, s.status_changes), (1, 1, 1));
+        assert_eq!(
+            tracking::get(&db, app.id).await.unwrap().status,
+            Status::Interview
+        );
+    }
+
+    #[tokio::test]
     async fn gmail_sync_stores_only_job_mail_and_does_not_read_set_aside_mail_again() {
         let api = Fake {
             mails: vec![
