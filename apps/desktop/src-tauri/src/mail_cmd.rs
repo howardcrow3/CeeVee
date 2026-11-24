@@ -467,8 +467,11 @@ pub async fn connect_google(
     {
         old.notify_one();
     }
+    let saver = db.inner().clone();
+    // The browser only says "connected" once the account is saved, so a failed keychain write
+    // shows up in the browser and in Settings instead of a false success.
     let result = client
-        .sign_in_cancellable(
+        .sign_in_then(
             &scopes,
             move |url| {
                 if let Err(err) = opener.opener().open_url(url, None::<&str>) {
@@ -477,6 +480,19 @@ pub async fn connect_google(
             },
             &cancel,
             ceevee_google::oauth::SIGN_IN_WAIT,
+            move |tokens| async move {
+                let address = match tokens.email.clone() {
+                    Some(a) => a,
+                    None => ceevee_google::Gmail::new(&tokens.access_token)
+                        .address()
+                        .await
+                        .map_err(|err| err.to_string())?,
+                };
+                ceevee_mail::google_account::save_google_account(
+                    &saver, &Keychain, &tokens, &address,
+                )
+                .await
+            },
         )
         .await;
     if let Ok(mut p) = pending.0.lock() {
@@ -484,15 +500,6 @@ pub async fn connect_google(
             *p = None;
         }
     }
-    let tokens = result.map_err(|err| err.to_string())?;
-    let address = match tokens.email.clone() {
-        Some(a) => a,
-        None => ceevee_google::Gmail::new(&tokens.access_token)
-            .address()
-            .await
-            .map_err(|err| err.to_string())?,
-    };
-    let account =
-        ceevee_mail::google_account::save_google_account(&db, &Keychain, &tokens, &address).await?;
+    let account = result.map_err(|err| err.to_string())?;
     Ok(account_line(account))
 }

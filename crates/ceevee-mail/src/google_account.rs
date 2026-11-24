@@ -28,6 +28,10 @@ pub async fn save_google_account(
         .ok_or("Google did not return a long-lasting sign-in. Remove CeeVee at myaccount.google.com/permissions and try again.")?;
     let address = address.trim().to_ascii_lowercase();
     let key = google_key(&address);
+    // Replace any earlier item outright. An item left by another build of the app (every test
+    // build is a different app to macOS) can refuse an update but still be replaced, and the
+    // new item then belongs to this build.
+    secrets.delete(&key);
     secrets.set(&key, refresh)?;
     // Read it back: a keychain that accepts a write but returns nothing would otherwise look
     // signed in until the first mail check fails.
