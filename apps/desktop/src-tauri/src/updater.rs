@@ -24,7 +24,10 @@ pub async fn check_for_update(app: AppHandle) -> Result<Option<UpdateInfo>, Stri
         // No answer at all (offline, DNS, TLS): say so.
         Err(tauri_plugin_updater::Error::Reqwest(e)) => {
             tracing::warn!("update check could not reach the server: {e}");
-            return Err("Couldn't reach the update server. Check your internet connection and try again.".into());
+            return Err(
+                "Couldn't reach the update server. Check your internet connection and try again."
+                    .into(),
+            );
         }
         Err(e) => return Err(e.to_string()),
     };
