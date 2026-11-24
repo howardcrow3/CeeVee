@@ -15,11 +15,11 @@
     found = null;
     try {
       const r = await commands.checkForUpdate();
-      if (r.status !== 'ok') error = 'Could not check for updates.';
+      if (r.status !== 'ok') error = r.error;
       else if (r.data) found = r.data.version;
       else message = 'You have the latest version.';
-    } catch {
-      error = 'Could not check for updates.';
+    } catch (e) {
+      error = `Could not check for updates: ${String(e)}`;
     }
     busy = false;
   }

@@ -17,22 +17,16 @@ pub struct UpdateInfo {
 #[tauri::command]
 #[specta::specta]
 pub async fn check_for_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
-    let checked = match app.updater() {
-        Ok(updater) => updater.check().await,
-        Err(e) => {
-            tracing::warn!("update check could not start: {e}");
-            return Ok(None);
-        }
-    };
-    // Until a release is published the feed does not exist, and the check fails.
-    // Treat any failed check as "nothing newer" so the user sees "up to date"
-    // rather than a raw error; the cause goes to the log.
-    let update = match checked {
+    let update = match app.updater().map_err(|e| e.to_string())?.check().await {
         Ok(update) => update,
-        Err(e) => {
-            tracing::warn!("update check failed, reporting up to date: {e}");
-            None
+        // The server answered but has no update feed (404, no release yet): up to date.
+        Err(tauri_plugin_updater::Error::ReleaseNotFound) => None,
+        // No answer at all (offline, DNS, TLS): say so.
+        Err(tauri_plugin_updater::Error::Reqwest(e)) => {
+            tracing::warn!("update check could not reach the server: {e}");
+            return Err("Couldn't reach the update server. Check your internet connection and try again.".into());
         }
+        Err(e) => return Err(e.to_string()),
     };
     Ok(update.map(|u| UpdateInfo {
         version: u.version.clone(),
