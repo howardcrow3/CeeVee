@@ -276,19 +276,54 @@ impl OAuthClient {
         cancel: &tokio::sync::Notify,
         wait: std::time::Duration,
     ) -> Result<Tokens> {
+        self.sign_in_then(scopes, open_browser, cancel, wait, |t| async move {
+            Ok::<_, String>(t)
+        })
+        .await
+    }
+
+    /// Like [`sign_in_cancellable`](Self::sign_in_cancellable), but the browser is only told
+    /// "CeeVee is connected" after `finish` has succeeded, so the page never says connected while
+    /// the app failed to save the sign-in. If `finish` fails the browser shows the error page and
+    /// its message is returned.
+    pub async fn sign_in_then<T, F, Fut>(
+        &self,
+        scopes: &[&str],
+        open_browser: impl FnOnce(&str),
+        cancel: &tokio::sync::Notify,
+        wait: std::time::Duration,
+        finish: F,
+    ) -> Result<T>
+    where
+        F: FnOnce(Tokens) -> Fut,
+        Fut: std::future::Future<Output = std::result::Result<T, String>>,
+    {
         let listener = TcpListener::bind("127.0.0.1:0").await.map_err(err)?;
         let port = listener.local_addr().map_err(err)?.port();
         let redirect = format!("http://127.0.0.1:{port}");
         let p = pkce()?;
         let state = random_token(16)?;
         open_browser(&self.authorization_url(&redirect, &p.challenge, &state, scopes));
-        let code = tokio::select! {
+        let (code, mut sock) = tokio::select! {
             r = tokio::time::timeout(wait, wait_for_code(&listener, &state)) => r
                 .map_err(|_| err("timed out waiting for you to finish signing in. Choose Sign in with Google to try again"))??,
             () = cancel.notified() => return Err(err("sign-in cancelled")),
         };
         drop(listener);
-        self.exchange(&code, &p.verifier, &redirect).await
+        let outcome = match self.exchange(&code, &p.verifier, &redirect).await {
+            Ok(tokens) => finish(tokens).await.map_err(Error::Other),
+            Err(e) => Err(e),
+        };
+        if let Some(sock) = sock.as_mut() {
+            let page = if outcome.is_ok() {
+                DONE_PAGE
+            } else {
+                ERROR_PAGE
+            };
+            let _ = sock.write_all(http_ok(page).as_bytes()).await;
+            let _ = sock.shutdown().await;
+        }
+        outcome
     }
 }
 
@@ -297,8 +332,18 @@ const DONE_PAGE: &str = include_str!("pages/oauth_done.html");
 const DENIED_PAGE: &str = include_str!("pages/oauth_denied.html");
 const ERROR_PAGE: &str = include_str!("pages/oauth_error.html");
 
+fn http_ok(body: &str) -> String {
+    format!(
+        "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+        body.len()
+    )
+}
+
 /// Accept connections until one carries the redirect for `state`; answer it and return the code.
-async fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String> {
+async fn wait_for_code(
+    listener: &TcpListener,
+    state: &str,
+) -> Result<(String, Option<tokio::net::TcpStream>)> {
     loop {
         let (mut sock, _) = listener.accept().await.map_err(err)?;
         let mut buf = vec![0u8; 8192];
@@ -338,7 +383,7 @@ async fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String> {
                 .await;
             continue;
         };
-        let _ = sock.write_all(reply("200 OK", DONE_PAGE).as_bytes()).await;
-        return Ok(code);
+        // The page is sent later, once the app has finished with the code.
+        return Ok((code, Some(sock)));
     }
 }

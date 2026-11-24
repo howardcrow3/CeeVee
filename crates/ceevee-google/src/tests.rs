@@ -329,3 +329,44 @@ fn result_pages_are_self_contained() {
         assert!(!page.contains("<script") && !page.contains("<link"));
     }
 }
+
+#[tokio::test]
+async fn the_browser_only_says_connected_after_the_app_has_saved_the_sign_in() {
+    let reply = format!("{{\"access_token\":\"AT\",\"refresh_token\":\"RT\",\"expires_in\":3600,\"scope\":\"openid email {GMAIL_READONLY}\",\"id_token\":\"{}\"}}", id_token("me@gmail.com"));
+    let (base, _) = http(vec![("/token", 200, reply)]).await;
+    let mut c = OAuthClient::google("cid", None);
+    c.token_url = format!("{base}/token");
+    let page = Arc::new(Mutex::new(String::new()));
+    let page2 = page.clone();
+    let e = c
+        .sign_in_then(
+            &["openid"],
+            move |url| {
+                let url = url.to_string();
+                tokio::spawn(async move {
+                    let q = url.split_once('?').unwrap().1.to_string();
+                    let redirect = decode(&query_param(&q, "redirect_uri").unwrap());
+                    let state = query_param(&q, "state").unwrap();
+                    let text = reqwest::get(format!("{redirect}/?code=C&state={state}"))
+                        .await
+                        .unwrap()
+                        .text()
+                        .await
+                        .unwrap();
+                    *page2.lock().unwrap() = text;
+                });
+            },
+            &tokio::sync::Notify::new(),
+            std::time::Duration::from_secs(10),
+            |_tokens| async { Err::<(), String>("could not save to the keychain".into()) },
+        )
+        .await
+        .unwrap_err();
+    assert!(
+        e.to_string().contains("could not save to the keychain"),
+        "{e}"
+    );
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let page = page.lock().unwrap().clone();
+    assert!(!page.contains("Google is connected"), "{page}");
+}
