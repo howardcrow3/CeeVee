@@ -510,6 +510,8 @@ export type SyncLine = {
 	status_changes: number,
 	waiting_for_you: number,
 	drafts: number,
+	/**  Messages looked at on the server, whether or not they were about a job. */
+	seen: number,
 };
 
 export type UpdateInfo = UpdateInfo_Serialize | UpdateInfo_Deserialize;

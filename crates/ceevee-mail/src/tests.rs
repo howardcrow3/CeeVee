@@ -677,3 +677,31 @@ async fn demo_mail_from_a_gmail_address_moves_a_hand_added_application_without_a
         Status::Interview
     );
 }
+
+#[test]
+fn a_clear_interview_wins_over_a_model_that_found_no_status() {
+    use crate::label::{by_rules, Kind};
+    let mail = crate::parse::parse(&raw(
+        "someone@gmail.com",
+        "Interview invitation: Product Manager at Acme Robotics",
+        "Hi, thank you for applying. We would like to interview you next week.",
+        "k@x",
+        "",
+    ))
+    .unwrap();
+    assert_eq!(by_rules(&mail).kind, Kind::Interview);
+}
+
+#[test]
+fn the_rules_only_override_a_model_that_found_nothing() {
+    use crate::label::{strongest, Kind};
+    assert_eq!(
+        strongest(Kind::Acknowledgement, Kind::Interview),
+        Kind::Interview
+    );
+    assert_eq!(strongest(Kind::Other, Kind::Offer), Kind::Offer);
+    // The model found a status of its own: keep it.
+    assert_eq!(strongest(Kind::Rejection, Kind::Interview), Kind::Rejection);
+    // The rules found nothing clear: keep the model.
+    assert_eq!(strongest(Kind::Interview, Kind::Other), Kind::Interview);
+}

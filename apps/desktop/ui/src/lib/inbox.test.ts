@@ -38,7 +38,10 @@ describe('inbox helpers', () => {
     expect(dateWord('nonsense', now)).toBe('');
   });
   it('summarises a sync in plain words', () => {
-    expect(syncSummary({ employer: 0, status_changes: 0, waiting_for_you: 0, drafts: 0 })).toBe('No new employer mail.');
+    expect(syncSummary({ employer: 0, status_changes: 0, waiting_for_you: 0, drafts: 0 })).toBe('No new employer mail. Your mailbox returned no recent messages.');
+    expect(syncSummary({ employer: 0, status_changes: 0, waiting_for_you: 0, drafts: 0, seen: 12 })).toBe(
+      'No new employer mail. Looked at 12 recent messages; none named a company you applied to or came from a job system.'
+    );
     expect(syncSummary({ employer: 2, status_changes: 1, waiting_for_you: 1, drafts: 2 })).toBe(
       '2 new employer messages, 1 application updated, 1 waiting for you in Applications, 2 replies drafted.'
     );

@@ -154,6 +154,21 @@ pub fn by_rules(mail: &ParsedMail) -> Label {
     }
 }
 
+/// A small model can call an interview invitation an acknowledgement. When the keyword rules
+/// find a clear interview, assessment, offer or rejection and the model found no status change
+/// at all, the rules win.
+pub(crate) fn strongest(model: Kind, rules: Kind) -> Kind {
+    let clear = matches!(
+        rules,
+        Kind::Interview | Kind::Assessment | Kind::Offer | Kind::Rejection
+    );
+    if clear && matches!(model, Kind::Acknowledgement | Kind::Question | Kind::Other) {
+        rules
+    } else {
+        model
+    }
+}
+
 /// Label with the model when there is one, otherwise (or when it fails) with the keyword rules.
 pub async fn label(worker: Option<&ModelWorker>, mail: &ParsedMail) -> Label {
     let Some(worker) = worker else {
@@ -170,7 +185,7 @@ pub async fn label(worker: Option<&ModelWorker>, mail: &ParsedMail) -> Label {
     ];
     match run::<Answer>(worker, &LABEL_EMAIL, &vars, Priority::Background).await {
         Ok(out) => Label {
-            kind: out.value.kind,
+            kind: strongest(out.value.kind, by_rules(mail).kind),
             summary: out.value.summary,
             needs_reply: out.value.needs_reply,
             interview_at: non_empty(out.value.interview_at),
