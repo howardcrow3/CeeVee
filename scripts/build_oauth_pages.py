@@ -3,6 +3,7 @@
 
 Inlines the turtle mark and the two fonts as data: URIs so the pages make no network requests.
 Usage: python3 scripts/build_oauth_pages.py <mark-png-192px>
+(the mark is apps/desktop/src-tauri/icons-src/ceevee-icon.png trimmed to its tile and resized to 192px)
 """
 import base64, pathlib, sys
 

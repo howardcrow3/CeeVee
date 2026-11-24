@@ -136,6 +136,8 @@ pub struct SyncLine {
     pub new_jobs: u32,
     pub waiting_for_you: u32,
     pub drafts: u32,
+    /// Messages looked at on the server, whether or not they were about a job.
+    pub seen: u32,
 }
 
 /// Sync every connected account now.
@@ -180,6 +182,14 @@ pub async fn sync_all(app: &AppHandle, db: &Db) -> Result<SyncLine, String> {
         total.new_jobs += s.new_jobs as u32;
         total.waiting_for_you += s.waiting_for_you as u32;
         total.drafts += s.drafts as u32;
+        total.seen += s.seen as u32;
+        tracing::info!(
+            "mail check finished for a {} account: looked at {}, employer mail {}, status changes {}",
+            account.provider,
+            s.seen,
+            s.employer,
+            s.status_changes
+        );
     }
     Ok(total)
 }

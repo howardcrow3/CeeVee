@@ -40,8 +40,13 @@ export function syncSummary(s: {
   new_jobs: number;
   waiting_for_you: number;
   drafts: number;
+  seen?: number;
 }): string {
-  if (s.employer === 0) return 'No new employer mail.';
+  if (s.employer === 0) {
+    if (!s.seen) return 'No new employer mail. Your mailbox returned no recent messages.';
+    const n = s.seen === 1 ? '1 recent message' : `${s.seen} recent messages`;
+    return `No new employer mail. Looked at ${n}; none looked like they were about a job.`;
+  }
   const parts = [s.employer === 1 ? '1 new employer message' : `${s.employer} new employer messages`];
   if (s.new_jobs) parts.push(s.new_jobs === 1 ? '1 new job found to confirm' : `${s.new_jobs} new jobs found to confirm`);
   if (s.status_changes) parts.push(s.status_changes === 1 ? '1 application updated' : `${s.status_changes} applications updated`);
