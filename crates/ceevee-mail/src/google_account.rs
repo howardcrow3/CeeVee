@@ -19,7 +19,17 @@ pub async fn save_google_account(
     tokens: &Tokens,
     address: &str,
 ) -> Result<Account, String> {
+    tracing::info!(
+        "google sign-in: tokens received; scopes granted {:?}, refresh token {}",
+        tokens.scopes,
+        if tokens.refresh_token.is_some() {
+            "present"
+        } else {
+            "missing"
+        }
+    );
     if !tokens.scopes.iter().any(|s| s == GMAIL_READONLY) {
+        tracing::warn!("google sign-in: the Gmail permission was not granted");
         return Err("Google did not give CeeVee permission to read your mail. Try again and leave the Gmail box ticked.".into());
     }
     let refresh = tokens
@@ -32,15 +42,27 @@ pub async fn save_google_account(
     // build is a different app to macOS) can refuse an update but still be replaced, and the
     // new item then belongs to this build.
     secrets.delete(&key);
-    secrets.set(&key, refresh)?;
+    if let Err(e) = secrets.set(&key, refresh) {
+        tracing::warn!("google sign-in: the keychain refused the write: {e}");
+        return Err(e);
+    }
     // Read it back: a keychain that accepts a write but returns nothing would otherwise look
     // signed in until the first mail check fails.
     if secrets.get(&key).as_deref() != Some(refresh) {
+        tracing::warn!("google sign-in: the keychain write could not be read back");
         return Err("CeeVee could not read back the sign-in it saved to the keychain. Choose Always Allow if macOS asked, then try again.".into());
     }
-    store::add_account(db, "gmail", &address, &serde_json::json!({}), &key)
+    let account = store::add_account(db, "gmail", &address, &serde_json::json!({}), &key)
         .await
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string());
+    match &account {
+        Ok(a) => tracing::info!(
+            "google sign-in: keychain write verified, account {} saved",
+            a.id
+        ),
+        Err(e) => tracing::warn!("google sign-in: could not save the account: {e}"),
+    }
+    account
 }
 
 /// Sign out: forget the account and its mail, and delete the saved token. Returns the saved token

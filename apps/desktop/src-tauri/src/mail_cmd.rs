@@ -478,6 +478,7 @@ pub async fn connect_google(
         old.notify_one();
     }
     let saver = db.inner().clone();
+    tracing::info!("google sign-in: started");
     // The browser only says "connected" once the account is saved, so a failed keychain write
     // shows up in the browser and in Settings instead of a false success.
     let result = client
@@ -510,6 +511,13 @@ pub async fn connect_google(
             *p = None;
         }
     }
-    let account = result.map_err(|err| err.to_string())?;
+    let account = match result {
+        Ok(a) => a,
+        Err(err) => {
+            tracing::warn!("google sign-in: ended without an account: {err}");
+            return Err(err.to_string());
+        }
+    };
+    tracing::info!("google sign-in: finished");
     Ok(account_line(account))
 }
