@@ -199,11 +199,12 @@ async fn a_sync_downloads_only_employer_mail_and_does_not_repeat() {
         2
     );
 
-    // The friend's body was never requested: only the header fetch named uid 2.
+    // Every message not sent by the account is read, because a recruiter can write from any
+    // address; the friend's dinner mail is read, found not to be about a job, and not stored.
     let log = server.log.lock().unwrap().clone();
     let body_fetches: Vec<&String> = log.iter().filter(|l| l.contains("BODY.PEEK[]")).collect();
     assert_eq!(body_fetches.len(), 1);
-    assert!(body_fetches[0].contains("1,3"), "{body_fetches:?}");
+    assert!(body_fetches[0].contains("1,2,3"), "{body_fetches:?}");
     assert!(log
         .iter()
         .all(|l| !l.to_ascii_uppercase().contains("STORE")));
@@ -348,7 +349,7 @@ mod gmail {
     }
 
     #[tokio::test]
-    async fn gmail_sync_reads_bodies_only_for_employer_mail_and_remembers_where_it_stopped() {
+    async fn gmail_sync_stores_only_job_mail_and_does_not_read_set_aside_mail_again() {
         let api = Fake {
             mails: vec![
                 (
@@ -383,8 +384,10 @@ mod gmail {
         .await
         .unwrap();
         assert_eq!((s.seen, s.employer), (2, 1));
-        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a"]);
+        // Both are read; only the interview mail is kept.
+        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a", "b"]);
         assert!(api.queries.lock().unwrap()[0].contains("newer_than:90d"));
+        assert!(api.queries.lock().unwrap()[0].contains("-category:promotions"));
         sync::sync_gmail(
             &db,
             acct.id,
@@ -395,10 +398,13 @@ mod gmail {
         )
         .await
         .unwrap();
-        assert_eq!(
-            api.queries.lock().unwrap()[1],
-            format!("in:inbox after:{}", 1_794_564_000 - 86_400)
+        assert!(
+            api.queries.lock().unwrap()[1].ends_with(&format!("after:{}", 1_794_564_000 - 86_400)),
+            "{:?}",
+            api.queries.lock().unwrap()
         );
+        // The day of overlap lists both again, but neither is downloaded a second time.
+        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a", "b"]);
         assert_eq!(
             store::list_messages(&db, &Default::default())
                 .await

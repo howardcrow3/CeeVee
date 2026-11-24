@@ -100,7 +100,7 @@ async fn world() -> World {
 
 fn label_json(kind: &str, needs_reply: bool, at: &str) -> String {
     json!({"kind": kind, "summary": "Asks for a call", "needs_reply": needs_reply,
-           "interview_at": at, "mentions_company": "Acme Analytics"})
+           "interview_at": at, "mentions_company": "Acme Analytics", "job_title": "", "location": ""})
     .to_string()
 }
 
@@ -704,4 +704,426 @@ fn the_rules_only_override_a_model_that_found_nothing() {
     assert_eq!(strongest(Kind::Rejection, Kind::Interview), Kind::Rejection);
     // The rules found nothing clear: keep the model.
     assert_eq!(strongest(Kind::Interview, Kind::Other), Kind::Interview);
+}
+
+// ---- Jobs found in mail from senders CeeVee does not know ---------------------------------------
+
+async fn empty_world() -> (Db, i64) {
+    let db = Db::open_in_memory().await.unwrap();
+    let account = store::add_account(&db, "imap", "me@example.org", &json!({}), "ref")
+        .await
+        .unwrap()
+        .id;
+    (db, account)
+}
+
+/// The `raw` helper names every sender "Dana Recruiter"; this gives a name that hints at nothing.
+fn plain_sender(mail: Vec<u8>) -> Vec<u8> {
+    String::from_utf8(mail)
+        .unwrap()
+        .replace("Dana Recruiter", "Pat Smith")
+        .into_bytes()
+}
+
+const RECRUITER_NOTE: &str = "Hi Maria,\n\nI'm a recruiter and came across your profile. We have an open position for a Senior Data Engineer in Austin, TX. Are you open to a quick call this week?\n\nBest,\nDana Reed, Senior Recruiter, Brightpath Health\n";
+
+#[tokio::test]
+async fn a_recruiter_writing_from_gmail_creates_a_job_to_confirm_without_a_model() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(r.created);
+    let app = tracking::get(&db, r.application_id.unwrap()).await.unwrap();
+    assert_eq!(app.status, Status::Draft);
+    let pending = crate::create::pending(&db).await.unwrap();
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].company, "Brightpath Health");
+    assert_eq!(pending[0].application_id, app.id);
+    assert_eq!(pending[0].from.as_deref(), Some("Dana Recruiter"));
+    let m = &store::list_messages(&db, &Default::default())
+        .await
+        .unwrap()[0];
+    assert_eq!(m.label.as_deref(), Some("inquiry"));
+    assert_eq!(m.application_id, Some(app.id));
+}
+
+#[tokio::test]
+async fn a_second_mail_about_the_same_job_updates_it_instead_of_adding_another() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let first = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let second = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Interview for Senior Data Engineer at Brightpath Health",
+            "Great, I'd like to schedule an interview for the Senior Data Engineer role. Dana Reed, Senior Recruiter, Brightpath Health",
+            "r2@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(first.created);
+    assert!(!second.created);
+    assert_eq!(second.application_id, first.application_id);
+    assert_eq!(
+        tracking::list(&db, &Default::default())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(
+        tracking::get(&db, first.application_id.unwrap())
+            .await
+            .unwrap()
+            .status,
+        Status::Interview
+    );
+}
+
+#[tokio::test]
+async fn an_application_receipt_from_an_ats_starts_a_sent_job_for_a_company_not_yet_tracked() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "no-reply@greenhouse.io",
+            "Thank you for applying",
+            "Hi Maria,\n\nThank you for applying to the Backend Developer position at Orbit Labs. We have received your application.",
+            "g1@gh",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(r.created);
+    let app = tracking::get(&db, r.application_id.unwrap()).await.unwrap();
+    assert_eq!(app.status, Status::Sent);
+    let p = &crate::create::pending(&db).await.unwrap()[0];
+    assert_eq!(
+        (p.company.as_str(), p.title.as_str()),
+        ("Orbit Labs", "Backend Developer")
+    );
+}
+
+#[tokio::test]
+async fn a_rejection_for_a_job_applied_to_elsewhere_is_recorded() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "no-reply@lever.co",
+            "Your application to Orbit Software",
+            "Dear Maria, thank you for interviewing with us. Unfortunately we have decided to pursue other candidates for the Support Engineer position at Orbit Software.",
+            "l1@lever",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let app = tracking::get(&db, r.application_id.unwrap()).await.unwrap();
+    assert_eq!(app.status, Status::Rejected);
+    assert!(r.created);
+}
+
+#[tokio::test]
+async fn everyday_mail_is_set_aside_by_id_and_never_read_twice() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let mail = raw(
+        "pat@gmail.com",
+        "Dinner?",
+        "Are you free Friday?",
+        "d1@x",
+        "",
+    );
+    assert!(process(&db, &mut ctx, None, account, &mail, NOW)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(store::is_seen(&db, account, "d1@x").await.unwrap());
+    assert!(store::list_messages(&db, &Default::default())
+        .await
+        .unwrap()
+        .is_empty());
+    assert!(tracking::list(&db, &Default::default())
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn the_model_can_veto_mail_the_rules_were_unsure_about_and_confirm_an_inquiry() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    // The rules only half-suspect this one ("position", "role", "opportunity"); the model says no.
+    let unsure = plain_sender(raw(
+        "pat@example.com",
+        "Quick question",
+        "The position is open for this role. Are you interested in the opportunity to join our book club?",
+        "u1@x",
+        "",
+    ));
+    let w = worker(vec![
+        json!({"kind": "not_job", "summary": "Book club", "needs_reply": false,
+        "interview_at": "", "mentions_company": "", "job_title": "", "location": ""})
+        .to_string(),
+    ]);
+    assert!(process(&db, &mut ctx, Some(&w), account, &unsure, NOW)
+        .await
+        .unwrap()
+        .is_none());
+    assert!(crate::create::pending(&db).await.unwrap().is_empty());
+    // Without a model the rules do not guess on a thin hint.
+    let unsure2 = plain_sender(raw(
+        "pat@example.com",
+        "Quick question",
+        "The position is open for this role. Are you interested in the opportunity?",
+        "u2@x",
+        "",
+    ));
+    assert!(process(&db, &mut ctx, None, account, &unsure2, NOW)
+        .await
+        .unwrap()
+        .is_none());
+    // The model reads a real inquiry and names the job.
+    let real = raw(
+        "sam@orbitstaffing.com",
+        "Opportunity",
+        RECRUITER_NOTE,
+        "u3@x",
+        "",
+    );
+    let w = worker(vec![
+        json!({"kind": "inquiry", "summary": "Recruiter asks for a call",
+        "needs_reply": true, "interview_at": "", "mentions_company": "Brightpath Health",
+        "job_title": "Senior Data Engineer", "location": "Austin, TX"})
+        .to_string(),
+        "{}".into(),
+    ]);
+    let r = process(&db, &mut ctx, Some(&w), account, &real, NOW)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(r.created);
+    let p = &crate::create::pending(&db).await.unwrap()[0];
+    assert_eq!(p.title, "Senior Data Engineer");
+    assert_eq!(p.location.as_deref(), Some("Austin, TX"));
+}
+
+#[tokio::test]
+async fn dismissing_a_found_job_removes_it_and_a_later_mail_does_not_bring_it_back() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let id = r.application_id.unwrap();
+    crate::create::dismiss(&db, id).await.unwrap();
+    assert!(crate::create::pending(&db).await.unwrap().is_empty());
+    assert!(tracking::list(&db, &Default::default())
+        .await
+        .unwrap()
+        .is_empty());
+    let again = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r2@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(!again.created);
+    assert_eq!(again.application_id, None);
+    assert!(tracking::list(&db, &Default::default())
+        .await
+        .unwrap()
+        .is_empty());
+}
+
+#[tokio::test]
+async fn confirming_keeps_the_job_and_only_email_jobs_can_be_reviewed() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    let id = r.application_id.unwrap();
+    crate::create::confirm(&db, id).await.unwrap();
+    assert!(crate::create::pending(&db).await.unwrap().is_empty());
+    assert_eq!(
+        tracking::list(&db, &Default::default())
+            .await
+            .unwrap()
+            .len(),
+        1
+    );
+    let manual = tracking::add_manual(&db, "Acme", "PM", Status::Sent, NOW)
+        .await
+        .unwrap();
+    assert!(crate::create::dismiss(&db, manual.id).await.is_err());
+}
+
+#[tokio::test]
+async fn a_blocked_company_is_never_created_from_mail() {
+    let (db, account) = empty_world().await;
+    let c = ceevee_search::companies::find_or_create(&db, "Brightpath Health")
+        .await
+        .unwrap();
+    ceevee_search::companies::set_status(&db, c.id, ceevee_search::companies::Status::Blocked)
+        .await
+        .unwrap();
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana.reed@gmail.com",
+            "Senior Data Engineer opportunity",
+            RECRUITER_NOTE,
+            "r1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(!r.created);
+    assert_eq!(r.application_id, None);
+}
+
+#[tokio::test]
+async fn the_company_domain_is_remembered_so_its_next_mail_links_by_sender() {
+    let (db, account) = empty_world().await;
+    let mut ctx = Context::load(&db).await.unwrap();
+    let r = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "dana@brightpath.com",
+            "Interview invitation: Senior Data Engineer at Brightpath Health",
+            "We'd like to schedule an interview for the Senior Data Engineer role. Thanks, Brightpath Health recruiting",
+            "b1@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert!(r.created);
+    let mut ctx = Context::load(&db).await.unwrap();
+    assert!(ctx.rules.company_domains.contains("brightpath.com"));
+    let later = process(
+        &db,
+        &mut ctx,
+        None,
+        account,
+        &raw(
+            "hr@brightpath.com",
+            "Next steps",
+            "Please send times.",
+            "b2@x",
+            "",
+        ),
+        NOW,
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(later.application_id, r.application_id);
+    assert!(!later.created);
 }

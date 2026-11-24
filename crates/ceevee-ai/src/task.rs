@@ -176,7 +176,7 @@ pub const WRITE_COVER_LETTER: TaskSpec = TaskSpec {
 /// time. The answer can only choose a label; it cannot trigger an action.
 pub const LABEL_EMAIL: TaskSpec = TaskSpec {
     id: "label_email",
-    version: 1,
+    version: 2,
     prompt: include_str!("../prompts/label_email.md"),
     schema: include_str!("../prompts/label_email.schema.json"),
     max_tokens: 300,

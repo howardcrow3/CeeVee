@@ -22,7 +22,8 @@ async fn open_for_company(db: &Db, company_id: i64) -> Result<Vec<Open>> {
     let rows = sqlx::query(
         "SELECT a.id, COALESCE(p.title, '') AS title FROM application a \
          LEFT JOIN posting p ON p.id = a.posting_id \
-         WHERE a.company_id = ? AND a.status NOT IN ('accepted','rejected','declined','withdrawn') \
+         WHERE a.company_id = ? AND a.review <> 'dismissed' \
+           AND a.status NOT IN ('accepted','rejected','declined','withdrawn') \
          ORDER BY a.id DESC",
     )
     .bind(company_id)

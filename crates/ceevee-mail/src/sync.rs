@@ -17,6 +17,8 @@ pub struct Summary {
     /// Employer messages stored.
     pub employer: usize,
     pub status_changes: usize,
+    /// Jobs started from an email, waiting for the user to confirm.
+    pub new_jobs: usize,
     pub waiting_for_you: usize,
     pub drafts: usize,
 }
@@ -31,10 +33,19 @@ impl Summary {
             Some(Outcome::Proposed(_)) => self.waiting_for_you += 1,
             _ => {}
         }
+        if p.created {
+            self.new_jobs += 1;
+        }
         if p.drafted {
             self.drafts += 1;
         }
     }
+}
+
+/// Every message not sent by the account itself is read: whether it is about a job search is
+/// decided from its text, not from who sent it (see `detect`).
+fn not_from(m: &crate::parse::ParsedMail, own: &str) -> bool {
+    m.from_address.as_deref() != Some(own)
 }
 
 /// Sync an IMAP account. `now_secs` is Unix time; `now` the same instant as ISO-8601. `worker` is
@@ -53,8 +64,9 @@ pub async fn sync_imap(
     let state: SyncState = serde_json::from_value(account.sync_state.clone()).unwrap_or_default();
     let mut ctx = Context::load(db).await?;
     let rules = std::mem::take(&mut ctx.rules);
+    let own = account.address.to_ascii_lowercase();
     let fetched = fetch_new(&cfg, password, &state, now_secs, |m| {
-        classify(m, &rules).is_some()
+        classify(m, &rules).is_some() || not_from(m, &own)
     })
     .await?;
     ctx.rules = rules;
@@ -98,10 +110,13 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     use crate::imap::MAX_PER_SYNC;
     let account = store::get_account(db, account_id).await?;
     let state: GmailState = serde_json::from_value(account.sync_state.clone()).unwrap_or_default();
+    // Promotions, social and forum tabs are bulk mail; everything else may be a recruiter.
+    const SCOPE: &str = "in:inbox -category:promotions -category:social -category:forums";
     let query = match state.after {
-        Some(t) => format!("in:inbox after:{}", t - 86_400),
-        None => format!("in:inbox newer_than:{}d", crate::imap::FIRST_SYNC_DAYS),
+        Some(t) => format!("{SCOPE} after:{}", t - 86_400),
+        None => format!("{SCOPE} newer_than:{}d", crate::imap::FIRST_SYNC_DAYS),
     };
+    let own = account.address.to_ascii_lowercase();
     let ids = api.list_ids(&query, MAX_PER_SYNC).await?;
     let mut ctx = Context::load(db).await?;
     tracing::info!(
@@ -118,23 +133,23 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     let mut raws = vec![];
     for id in &ids {
         let head = api.headers(id).await?;
-        let parsed = crate::parse::parse(&head);
-        let wanted = match &parsed {
-            Ok(m) => {
-                let c = classify(m, &ctx.rules);
-                tracing::info!(
-                    "gmail sync: message from {} -> {:?}",
-                    m.from_domain().unwrap_or_else(|| "unknown domain".into()),
-                    c
-                );
-                c.is_some()
-            }
-            Err(e) => {
-                tracing::warn!("gmail sync: could not read headers of a message: {e}");
-                false
-            }
+        let Ok(m) = crate::parse::parse(&head) else {
+            tracing::warn!("gmail sync: could not read the headers of a message");
+            continue;
         };
-        if wanted {
+        // Mail already stored, or already set aside as not about a job, is not fetched again.
+        if let Some(mid) = &m.message_id {
+            if store::is_seen(db, account_id, mid).await? {
+                continue;
+            }
+        }
+        let candidate = classify(&m, &ctx.rules);
+        tracing::info!(
+            "gmail sync: message from {} -> {:?}",
+            m.from_domain().unwrap_or_else(|| "unknown domain".into()),
+            candidate
+        );
+        if candidate.is_some() || not_from(&m, &own) {
             raws.push(api.raw(id).await?);
         }
     }
