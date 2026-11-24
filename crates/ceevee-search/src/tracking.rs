@@ -207,7 +207,7 @@ pub async fn list(db: &Db, filter: &Filter) -> Result<Vec<Application>> {
     let rows = sqlx::query(&format!(
         "SELECT {COLUMNS} FROM application \
          WHERE (?1 IS NULL OR status = ?1) AND (?2 IS NULL OR category_id = ?2) \
-           AND (?3 IS NULL OR company_id = ?3) \
+           AND (?3 IS NULL OR company_id = ?3) AND review <> 'dismissed' \
          ORDER BY board_order, id"
     ))
     .bind(filter.status.map(Status::as_str))
@@ -340,7 +340,7 @@ pub async fn reminders(db: &Db, now: &str, after_days: i64) -> Result<Vec<Remind
         "SELECT a.id AS id, a.status AS status, \
                 CAST(julianday(?1) - julianday(MAX(e.at)) AS INTEGER) AS quiet \
          FROM application a JOIN status_event e ON e.application_id = a.id \
-         WHERE a.status IN ('sent','screening','interview','offer') \
+         WHERE a.status IN ('sent','screening','interview','offer') AND a.review <> 'dismissed' \
          GROUP BY a.id HAVING quiet >= ?2 ORDER BY quiet DESC, a.id",
     )
     .bind(now)

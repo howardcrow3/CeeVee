@@ -2,6 +2,9 @@
 //! status changes and reply drafts. Fetching (IMAP, Gmail) feeds [`pipeline::process`]
 //! (see docs/TECHNICAL_PLAN.md section 11).
 
+pub mod create;
+pub mod detect;
+pub mod extract;
 pub mod filter;
 pub mod google_account;
 pub mod imap;

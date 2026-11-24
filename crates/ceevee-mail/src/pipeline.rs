@@ -7,11 +7,11 @@ use ceevee_db::Db;
 use ceevee_search::tracking::{self, Status};
 
 use crate::filter::{classify, Candidate, Rules};
-use crate::label::{label, parse_when};
+use crate::label::{label, parse_when, Kind};
 use crate::parse::parse;
 use crate::status::{self, Outcome};
 use crate::store::{self, LabelRow, NewMessage};
-use crate::{link, reply};
+use crate::{create, detect, link, reply};
 
 /// What one message turned into.
 #[derive(Debug, Clone, PartialEq)]
@@ -21,6 +21,8 @@ pub struct Processed {
     pub application_id: Option<i64>,
     pub status: Option<Outcome>,
     pub drafted: bool,
+    /// This message started a job that now waits for the user to confirm.
+    pub created: bool,
 }
 
 /// The mailbox context a run needs, loaded once per sync rather than per message.
@@ -51,13 +53,41 @@ pub async fn process(
     now: &str,
 ) -> Result<Option<Processed>> {
     let mail = parse(raw)?;
-    let Some(candidate) = classify(&mail, &ctx.rules) else {
-        return Ok(None);
-    };
     let message_id = mail
         .message_id
         .clone()
         .unwrap_or_else(|| format!("no-id-{}-{}", mail.sent_at.unwrap_or(0), mail.subject));
+    // Mail from someone CeeVee knows is taken as it is. Anything else is read for signs of a
+    // job search (a recruiter writing from a personal address, a company never added), and set
+    // aside, ID only, when it is not one.
+    let mut early = None;
+    let candidate = match classify(&mail, &ctx.rules) {
+        Some(c) => c,
+        None => {
+            if store::is_seen(db, account_id, &message_id).await? {
+                return Ok(None);
+            }
+            let verdict = detect::verdict(&mail);
+            if verdict == detect::Verdict::No {
+                store::mark_seen(db, account_id, &message_id).await?;
+                return Ok(None);
+            }
+            // A thin hint needs the model to settle it; the rules alone do not guess.
+            if verdict == detect::Verdict::Maybe && worker.is_none() {
+                store::mark_seen(db, account_id, &message_id).await?;
+                return Ok(None);
+            }
+            let lab = label(worker, &mail).await;
+            if lab.kind == Kind::NotJob
+                || (lab.kind == Kind::Other && verdict == detect::Verdict::Maybe)
+            {
+                store::mark_seen(db, account_id, &message_id).await?;
+                return Ok(None);
+            }
+            early = Some(lab);
+            Candidate::Employer
+        }
+    };
     let received = mail.sent_at.map(unix_to_iso);
     let thread = mail
         .references
@@ -97,13 +127,26 @@ pub async fn process(
             application_id: None,
             status: None,
             drafted: false,
+            created: false,
         }));
     }
     // A reply to this message later is recognized by its ID.
     ctx.rules.sent_message_ids.insert(message_id.clone());
 
-    let lab = label(worker, &mail).await;
-    let application = link::find_application(db, &mail, lab.company.as_deref()).await?;
+    let lab = match early {
+        Some(l) => l,
+        None => label(worker, &mail).await,
+    };
+    let mut application = link::find_application(db, &mail, lab.company.as_deref()).await?;
+    // No job matches: this mail may be the first sign of one. It is created for the user to
+    // confirm, and a job they already dismissed is left alone.
+    let mut created = false;
+    if application.is_none() {
+        if let Some(c) = create::from_mail(db, &mail, &lab, now).await? {
+            application = Some(c.application_id);
+            created = c.new;
+        }
+    }
     if let Some(app) = application {
         store::set_application(db, id, Some(app)).await?;
     }
@@ -148,6 +191,7 @@ pub async fn process(
         application_id: application,
         status: outcome,
         drafted,
+        created,
     }))
 }
 

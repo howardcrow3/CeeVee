@@ -202,7 +202,7 @@ fn email_tasks_are_well_formed_and_cannot_name_an_action() {
         );
     }
     let label = LABEL_EMAIL.schema_value().unwrap();
-    let ok = r#"{"kind":"interview","summary":"Asks for a call","needs_reply":true,"interview_at":"","mentions_company":"Acme"}"#;
+    let ok = r#"{"kind":"interview","summary":"Asks for a call","needs_reply":true,"interview_at":"","mentions_company":"Acme","job_title":"","location":""}"#;
     assert!(parse_output::<Value>(&label, ok).is_ok());
     // A model tricked by an email cannot invent a kind such as "send_resume".
     let bad = ok.replace("interview\"", "send_resume\"");
