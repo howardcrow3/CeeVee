@@ -7,6 +7,7 @@ const labelWords: Record<string, string> = {
   rejection: 'Rejection',
   question: 'Question',
   acknowledgement: 'Received',
+  inquiry: 'Recruiter inquiry',
   other: 'Other'
 };
 
@@ -36,11 +37,13 @@ export function dateWord(iso: string | null | undefined, now = new Date()): stri
 export function syncSummary(s: {
   employer: number;
   status_changes: number;
+  new_jobs: number;
   waiting_for_you: number;
   drafts: number;
 }): string {
   if (s.employer === 0) return 'No new employer mail.';
   const parts = [s.employer === 1 ? '1 new employer message' : `${s.employer} new employer messages`];
+  if (s.new_jobs) parts.push(s.new_jobs === 1 ? '1 new job found to confirm' : `${s.new_jobs} new jobs found to confirm`);
   if (s.status_changes) parts.push(s.status_changes === 1 ? '1 application updated' : `${s.status_changes} applications updated`);
   if (s.waiting_for_you) parts.push(`${s.waiting_for_you} waiting for you in Applications`);
   if (s.drafts) parts.push(s.drafts === 1 ? '1 reply drafted' : `${s.drafts} replies drafted`);
@@ -55,4 +58,24 @@ export function looksLikeAddress(a: string): boolean {
 /** The connected Google (Gmail) account, if any, for the "Signed in" line in Settings. */
 export function googleAccount<T extends { provider: string }>(accounts: T[]): T | undefined {
   return accounts.find((a) => a.provider === 'gmail');
+}
+
+const foundStatus: Record<string, string> = {
+  draft: 'A recruiter reached out',
+  sent: 'You applied',
+  screening: 'Assessment',
+  interview: 'Interview',
+  offer: 'Offer',
+  rejected: 'Rejected'
+};
+
+/** What the email that started a found job said, in the person's words. */
+export function foundStatusWord(status: string): string {
+  return foundStatus[status] ?? 'Found in email';
+}
+
+/** `Role at Company`, or just the company when the email did not name the role. */
+export function foundTitle(j: { company: string; title: string }): string {
+  const noRole = j.title === '' || j.title.startsWith('Role not stated');
+  return noRole ? j.company : `${j.title} at ${j.company}`;
 }
