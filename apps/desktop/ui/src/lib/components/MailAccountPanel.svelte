@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import { commands, type MailAccountLine } from '$lib/bindings';
   import { googleAccount, looksLikeAddress, syncSummary } from '$lib/inbox';
 
@@ -18,9 +18,22 @@
     if (r.status === 'ok') accounts = r.data;
     else error = r.error;
   }
+  // While waiting for Google, and whenever the window comes back to the front, read the accounts
+  // again so Settings never shows a stale "Sign in with Google" after the browser step finished.
+  let timer: number | undefined;
+  const refresh = () => load().catch(() => {});
   onMount(() => {
     load().catch((e) => (error = `Running outside the desktop app: ${String(e)}`));
     commands.googleAvailable().then((g) => (google = g)).catch(() => {});
+    window.addEventListener('focus', refresh);
+    timer = window.setInterval(() => {
+      if (busy) refresh();
+    }, 2000);
+  });
+  onDestroy(() => {
+    if (typeof window === 'undefined') return;
+    window.removeEventListener('focus', refresh);
+    window.clearInterval(timer);
   });
 
   async function fillServer() {
@@ -50,14 +63,19 @@
   async function signInWithGoogle() {
     busy = true;
     error = message = '';
-    const r = await commands.connectGoogle();
-    busy = false;
-    if (r.status !== 'ok') {
-      error = r.error;
-      return;
+    try {
+      const r = await commands.connectGoogle();
+      if (r.status !== 'ok') {
+        error = r.error;
+        return;
+      }
+      message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
+    } catch (e) {
+      error = `Google sign-in stopped unexpectedly: ${String(e)}`;
+    } finally {
+      busy = false;
+      await refresh();
     }
-    message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
-    await load();
   }
 
   async function cancelGoogle() {
