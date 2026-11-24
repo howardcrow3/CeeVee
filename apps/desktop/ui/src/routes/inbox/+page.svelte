@@ -177,8 +177,8 @@
               {#if j.summary}<span class="meta">{j.summary}</span>{/if}
             </div>
             <div class="row2">
-              {#if j.message_id !== null}
-                <button class="ghost" onclick={() => j.message_id !== null && show(j.message_id)}>Read the email</button>
+              {#if j.message_id != null}
+                <button class="ghost" onclick={() => j.message_id != null && show(j.message_id)}>Read the email</button>
               {/if}
               <button onclick={() => decide(j, true)}>Keep</button>
               <button class="ghost" onclick={() => decide(j, false)}>Dismiss</button>

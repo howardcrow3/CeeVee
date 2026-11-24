@@ -146,7 +146,7 @@ export const commands = {
 	draftMailReply: (id: number, instructions: string, again: boolean) => typedError<ReplyResult, string>(__TAURI_INVOKE("draft_mail_reply", { id, instructions, again })),
 	listApplicationChoices: () => typedError<ApplicationChoice[], string>(__TAURI_INVOKE("list_application_choices")),
 	/**  Jobs CeeVee found in email that still wait for a decision, newest first. */
-	listFoundJobs: () => typedError<FoundJob[], string>(__TAURI_INVOKE("list_found_jobs")),
+	listFoundJobs: () => typedError<FoundJob_Serialize[], string>(__TAURI_INVOKE("list_found_jobs")),
 	/**  Keep a job found in email as an ordinary application. */
 	confirmFoundJob: (id: number) => typedError<null, string>(__TAURI_INVOKE("confirm_found_job", { id })),
 	/**  Remove a job found in email. Its messages stay in the Inbox, unlinked. */
@@ -277,7 +277,26 @@ export type Event =
 { type: "setting_changed"; key: string };
 
 /**  A job CeeVee started from an email, waiting for the user to keep or dismiss it. */
-export type FoundJob = {
+export type FoundJob = FoundJob_Serialize | FoundJob_Deserialize;
+
+/**  A job CeeVee started from an email, waiting for the user to keep or dismiss it. */
+export type FoundJob_Deserialize = {
+	application_id: number,
+	company: string,
+	title: string,
+	location?: string | null,
+	/**  Where the job starts: `draft` (a recruiter reached out), `sent`, `interview`, and so on. */
+	status: string,
+	/**  The message that started it. */
+	message_id?: number | null,
+	subject?: string | null,
+	from?: string | null,
+	received_at?: string | null,
+	summary?: string | null,
+};
+
+/**  A job CeeVee started from an email, waiting for the user to keep or dismiss it. */
+export type FoundJob_Serialize = {
 	application_id: number,
 	company: string,
 	title: string,
@@ -557,4 +576,3 @@ async function typedError<T, E>(result: Promise<T>): Promise<{ status: "ok"; dat
         return { status: "error", error: e as any };
     }
 }
-
