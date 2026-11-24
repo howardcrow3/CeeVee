@@ -104,6 +104,13 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     };
     let ids = api.list_ids(&query, MAX_PER_SYNC).await?;
     let mut ctx = Context::load(db).await?;
+    tracing::info!(
+        "gmail sync: query \"{query}\" returned {} messages; {} company domains, {} company names, {} sent ids",
+        ids.len(),
+        ctx.rules.company_domains.len(),
+        ctx.rules.company_names.len(),
+        ctx.rules.sent_message_ids.len()
+    );
     let mut summary = Summary {
         seen: ids.len(),
         ..Default::default()
@@ -111,9 +118,22 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     let mut raws = vec![];
     for id in &ids {
         let head = api.headers(id).await?;
-        let wanted = crate::parse::parse(&head)
-            .map(|m| classify(&m, &ctx.rules).is_some())
-            .unwrap_or(false);
+        let parsed = crate::parse::parse(&head);
+        let wanted = match &parsed {
+            Ok(m) => {
+                let c = classify(m, &ctx.rules);
+                tracing::info!(
+                    "gmail sync: message from {} -> {:?}",
+                    m.from_domain().unwrap_or_else(|| "unknown domain".into()),
+                    c
+                );
+                c.is_some()
+            }
+            Err(e) => {
+                tracing::warn!("gmail sync: could not read headers of a message: {e}");
+                false
+            }
+        };
         if wanted {
             raws.push(api.raw(id).await?);
         }
@@ -125,6 +145,14 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
             summary.add(&p);
         }
     }
+    tracing::info!(
+        "gmail sync done: seen {}, employer {}, status changes {}, waiting {}, drafts {}",
+        summary.seen,
+        summary.employer,
+        summary.status_changes,
+        summary.waiting_for_you,
+        summary.drafts
+    );
     let state = serde_json::to_value(GmailState {
         after: Some(now_secs),
     })
