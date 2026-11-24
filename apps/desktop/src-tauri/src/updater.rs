@@ -17,12 +17,20 @@ pub struct UpdateInfo {
 #[tauri::command]
 #[specta::specta]
 pub async fn check_for_update(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
-    let update = app
-        .updater()
-        .map_err(|e| e.to_string())?
-        .check()
-        .await
-        .map_err(|e| e.to_string())?;
+    let update = match app.updater().map_err(|e| e.to_string())?.check().await {
+        Ok(update) => update,
+        // The server answered but has no update feed (404, no release yet): up to date.
+        Err(tauri_plugin_updater::Error::ReleaseNotFound) => None,
+        // No answer at all (offline, DNS, TLS): say so.
+        Err(tauri_plugin_updater::Error::Reqwest(e)) => {
+            tracing::warn!("update check could not reach the server: {e}");
+            return Err(
+                "Couldn't reach the update server. Check your internet connection and try again."
+                    .into(),
+            );
+        }
+        Err(e) => return Err(e.to_string()),
+    };
     Ok(update.map(|u| UpdateInfo {
         version: u.version.clone(),
         notes: u.body.clone(),
