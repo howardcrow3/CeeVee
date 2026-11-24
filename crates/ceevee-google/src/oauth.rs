@@ -292,9 +292,10 @@ impl OAuthClient {
     }
 }
 
-const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>CeeVee</title>\
-<body style=\"font-family:system-ui;margin:48px\"><h1>You can close this tab</h1>\
-<p>CeeVee is connected. Go back to the app.</p>";
+// Self-contained pages (fonts and mark inlined); regenerate with scripts/build_oauth_pages.py.
+const DONE_PAGE: &str = include_str!("pages/oauth_done.html");
+const DENIED_PAGE: &str = include_str!("pages/oauth_denied.html");
+const ERROR_PAGE: &str = include_str!("pages/oauth_error.html");
 
 /// Accept connections until one carries the redirect for `state`; answer it and return the code.
 async fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String> {
@@ -319,11 +320,12 @@ async fn wait_for_code(listener: &TcpListener, state: &str) -> Result<String> {
             continue;
         }
         if let Some(e) = query_param(query, "error") {
-            let _ = sock
-                .write_all(
-                    reply("200 OK", "Sign-in was cancelled. You can close this tab.").as_bytes(),
-                )
-                .await;
+            let page = if e == "access_denied" {
+                DENIED_PAGE
+            } else {
+                ERROR_PAGE
+            };
+            let _ = sock.write_all(reply("200 OK", page).as_bytes()).await;
             return Err(err(if e == "access_denied" {
                 "you chose not to allow access".to_string()
             } else {
