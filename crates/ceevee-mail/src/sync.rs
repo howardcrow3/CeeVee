@@ -4,6 +4,7 @@ use ceevee_ai::ModelWorker;
 use ceevee_core::{Error, Result};
 use ceevee_db::Db;
 
+use crate::detect;
 use crate::filter::classify;
 use crate::imap::{fetch_new, ImapConfig, SyncState};
 use crate::pipeline::{process, Context, Processed};
@@ -101,7 +102,7 @@ pub struct GmailState {
 }
 
 /// Raise this whenever the rules for finding job mail change.
-pub const RULES_VERSION: u32 = 2;
+pub const RULES_VERSION: u32 = 3;
 
 /// Sync a Gmail account through the Gmail API. Headers are read first, and a whole message is
 /// downloaded only when the candidate filter wants it. A day of overlap covers mail that arrives
@@ -147,9 +148,16 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         ..Default::default()
     };
     let mut raws = vec![];
-    let (mut skipped_seen, mut skipped_other) = (0, 0);
+    let (mut skipped_seen, mut skipped_other, mut failed) = (0, 0, 0);
     for id in &ids {
-        let head = api.headers(id).await?;
+        let head = match api.headers(id).await {
+            Ok(h) => h,
+            Err(e) => {
+                tracing::warn!("gmail sync: could not read a message's headers: {e}");
+                failed += 1;
+                continue;
+            }
+        };
         let Ok(m) = crate::parse::parse(&head) else {
             tracing::warn!("gmail sync: could not read the headers of a message");
             continue;
@@ -167,9 +175,23 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
             m.from_domain().unwrap_or_else(|| "unknown domain".into()),
             candidate
         );
-        if candidate.is_some() || not_from(&m, &own) {
-            raws.push(api.raw(id).await?);
+        // Known senders are read in full. Anyone else is read in full only when the subject,
+        // sender or Gmail's preview hints at a job search; the rest are set aside by ID.
+        let hint = detect::score(&m);
+        if candidate.is_some() || (not_from(&m, &own) && hint >= 2) {
+            match api.raw(id).await {
+                Ok(r) => raws.push(r),
+                Err(e) => {
+                    tracing::warn!("gmail sync: could not download a message: {e}");
+                    failed += 1;
+                }
+            }
         } else {
+            if not_from(&m, &own) {
+                if let Some(mid) = &m.message_id {
+                    store::mark_seen(db, account_id, mid).await?;
+                }
+            }
             skipped_other += 1;
         }
     }
@@ -181,7 +203,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         }
     }
     tracing::info!(
-        "gmail sync done: listed {}, already handled {skipped_seen}, sent by you {skipped_other}, read in full {}; employer {}, status changes {}, waiting {}, drafts {}",
+        "gmail sync done: listed {}, already handled {skipped_seen}, not job mail or sent by you {skipped_other}, failed {failed}, read in full {}; employer {}, status changes {}, waiting {}, drafts {}",
         summary.seen,
         raws.len(),
         summary.employer,
@@ -189,8 +211,16 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         summary.waiting_for_you,
         summary.drafts
     );
+    if failed > 0 {
+        // Some messages could not be read; keep the old window so the next check tries them again.
+        tracing::warn!("gmail sync: {failed} messages could not be read; they will be tried again");
+    }
     let state = serde_json::to_value(GmailState {
-        after: Some(now_secs),
+        after: if failed > 0 {
+            state.after
+        } else {
+            Some(now_secs)
+        },
         rules: RULES_VERSION,
     })
     .unwrap_or_default();

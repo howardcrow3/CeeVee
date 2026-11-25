@@ -441,8 +441,8 @@ mod gmail {
         .await
         .unwrap();
         assert_eq!((s.seen, s.employer), (2, 1));
-        // Both are read; only the interview mail is kept.
-        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a", "b"]);
+        // Only mail that hints at a job search is downloaded.
+        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a"]);
         assert!(api.queries.lock().unwrap()[0].contains("newer_than:90d"));
         assert!(api.queries.lock().unwrap()[0].contains("-category:promotions"));
         sync::sync_gmail(
@@ -461,7 +461,7 @@ mod gmail {
             api.queries.lock().unwrap()
         );
         // The day of overlap lists both again, but neither is downloaded a second time.
-        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a", "b"]);
+        assert_eq!(api.raw_calls.lock().unwrap().as_slice(), ["a"]);
         assert_eq!(
             store::list_messages(&db, &Default::default())
                 .await
