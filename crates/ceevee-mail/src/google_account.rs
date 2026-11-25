@@ -30,7 +30,7 @@ pub async fn save_google_account(
     );
     if !tokens.scopes.iter().any(|s| s == GMAIL_READONLY) {
         tracing::warn!("google sign-in: the Gmail permission was not granted");
-        return Err("Google did not give CeeVee permission to read your mail. Try again and leave the Gmail box ticked.".into());
+        return Err("Google did not give CeeVee permission to read your mail. Try again and tick the box that lets CeeVee see your Gmail messages (Google shows it as a checkbox when the app is still being verified).".into());
     }
     let refresh = tokens
         .refresh_token

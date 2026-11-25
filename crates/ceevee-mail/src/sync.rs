@@ -94,7 +94,14 @@ pub async fn sync_imap(
 pub struct GmailState {
     /// Unix seconds of the start of the last sync.
     pub after: Option<i64>,
+    /// Which version of the mail rules made the last sync. When the rules change, mail that
+    /// was set aside under the old ones is looked at again.
+    #[serde(default)]
+    pub rules: u32,
 }
+
+/// Raise this whenever the rules for finding job mail change.
+pub const RULES_VERSION: u32 = 2;
 
 /// Sync a Gmail account through the Gmail API. Headers are read first, and a whole message is
 /// downloaded only when the candidate filter wants it. A day of overlap covers mail that arrives
@@ -109,7 +116,16 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
 ) -> Result<Summary> {
     use crate::imap::MAX_PER_SYNC;
     let account = store::get_account(db, account_id).await?;
-    let state: GmailState = serde_json::from_value(account.sync_state.clone()).unwrap_or_default();
+    let mut state: GmailState =
+        serde_json::from_value(account.sync_state.clone()).unwrap_or_default();
+    if state.rules != RULES_VERSION {
+        tracing::info!(
+            "gmail sync: mail rules changed (v{} -> v{RULES_VERSION}); looking at set-aside mail again",
+            state.rules
+        );
+        store::clear_seen(db, account_id).await?;
+        state.after = None;
+    }
     // Promotions, social and forum tabs are bulk mail; everything else may be a recruiter.
     const SCOPE: &str = "in:inbox -category:promotions -category:social -category:forums";
     let query = match state.after {
@@ -131,6 +147,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         ..Default::default()
     };
     let mut raws = vec![];
+    let (mut skipped_seen, mut skipped_other) = (0, 0);
     for id in &ids {
         let head = api.headers(id).await?;
         let Ok(m) = crate::parse::parse(&head) else {
@@ -140,6 +157,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         // Mail already stored, or already set aside as not about a job, is not fetched again.
         if let Some(mid) = &m.message_id {
             if store::is_seen(db, account_id, mid).await? {
+                skipped_seen += 1;
                 continue;
             }
         }
@@ -151,6 +169,8 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         );
         if candidate.is_some() || not_from(&m, &own) {
             raws.push(api.raw(id).await?);
+        } else {
+            skipped_other += 1;
         }
     }
     let worker = if raws.is_empty() { None } else { worker() };
@@ -161,8 +181,9 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         }
     }
     tracing::info!(
-        "gmail sync done: seen {}, employer {}, status changes {}, waiting {}, drafts {}",
+        "gmail sync done: listed {}, already handled {skipped_seen}, sent by you {skipped_other}, read in full {}; employer {}, status changes {}, waiting {}, drafts {}",
         summary.seen,
+        raws.len(),
         summary.employer,
         summary.status_changes,
         summary.waiting_for_you,
@@ -170,6 +191,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     );
     let state = serde_json::to_value(GmailState {
         after: Some(now_secs),
+        rules: RULES_VERSION,
     })
     .unwrap_or_default();
     store::set_sync_state(db, account_id, &state, now).await?;

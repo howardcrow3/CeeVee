@@ -349,6 +349,63 @@ mod gmail {
     }
 
     #[tokio::test]
+    async fn mail_set_aside_by_older_rules_is_looked_at_again() {
+        use ceevee_search::tracking::{self, Status};
+        let api = Fake {
+            mails: vec![(
+                "d".into(),
+                mail(
+                    "someone@gmail.com",
+                    "Interview invitation: Product Manager at Acme Robotics",
+                    "We would like to interview you next week for the Product Manager role. Thanks, recruiting",
+                    "demo2@gmail",
+                ),
+            )],
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        // An older build set the message aside and recorded an old rules version.
+        store::mark_seen(&db, acct.id, "<demo2@gmail>")
+            .await
+            .unwrap();
+        store::set_sync_state(
+            &db,
+            acct.id,
+            &json!({"after": 1_794_000_000_i64}),
+            "2026-11-13T09:00:00Z",
+        )
+        .await
+        .unwrap();
+        let app = tracking::add_manual(
+            &db,
+            "Acme Robotics",
+            "Product Manager",
+            Status::Sent,
+            "2026-11-13T09:00:00Z",
+        )
+        .await
+        .unwrap();
+        let s = sync::sync_gmail(
+            &db,
+            acct.id,
+            &api,
+            || None,
+            1_794_564_000,
+            "2026-11-13T10:00:00Z",
+        )
+        .await
+        .unwrap();
+        assert_eq!(s.status_changes, 1);
+        assert_eq!(
+            tracking::get(&db, app.id).await.unwrap().status,
+            Status::Interview
+        );
+    }
+
+    #[tokio::test]
     async fn gmail_sync_stores_only_job_mail_and_does_not_read_set_aside_mail_again() {
         let api = Fake {
             mails: vec![

@@ -65,22 +65,38 @@ pub async fn process(
         Some(c) => c,
         None => {
             if store::is_seen(db, account_id, &message_id).await? {
+                tracing::info!("mail: already handled, skipped");
                 return Ok(None);
             }
             let verdict = detect::verdict(&mail);
+            tracing::info!(
+                "mail from {}: not from a known sender; job-search score {} ({:?}), model {}",
+                mail.from_domain()
+                    .unwrap_or_else(|| "unknown domain".into()),
+                detect::score(&mail),
+                verdict,
+                if worker.is_some() {
+                    "available"
+                } else {
+                    "not loaded"
+                }
+            );
             if verdict == detect::Verdict::No {
+                tracing::info!("mail: set aside, no sign of a job search");
                 store::mark_seen(db, account_id, &message_id).await?;
                 return Ok(None);
             }
             // A thin hint needs the model to settle it; the rules alone do not guess.
+            // It is not set aside for good: with a model, a later check can settle it.
             if verdict == detect::Verdict::Maybe && worker.is_none() {
-                store::mark_seen(db, account_id, &message_id).await?;
+                tracing::info!("mail: unclear and no model loaded, left for a later check");
                 return Ok(None);
             }
             let lab = label(worker, &mail).await;
             if lab.kind == Kind::NotJob
                 || (lab.kind == Kind::Other && verdict == detect::Verdict::Maybe)
             {
+                tracing::info!("mail: set aside, the model says {} ", lab.kind.as_str());
                 store::mark_seen(db, account_id, &message_id).await?;
                 return Ok(None);
             }
@@ -117,6 +133,7 @@ pub async fn process(
     )
     .await?
     else {
+        tracing::info!("mail: already stored, skipped");
         return Ok(None);
     };
     if candidate == Candidate::Alert {

@@ -328,6 +328,16 @@ pub async fn mark_seen(db: &Db, account_id: i64, message_id: &str) -> Result<()>
     Ok(())
 }
 
+/// Forget which messages were set aside, so the next sync looks at them again.
+pub async fn clear_seen(db: &Db, account_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM mail_seen WHERE account_id = ?")
+        .bind(account_id)
+        .execute(db.pool())
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
 /// Lowercase names and aliases of companies you have an open application with.
 pub async fn open_company_names(db: &Db) -> Result<std::collections::HashSet<String>> {
     let rows = sqlx::query(
