@@ -285,6 +285,8 @@ mod gmail {
         mails: Vec<(String, Vec<u8>)>,
         queries: std::sync::Mutex<Vec<String>>,
         raw_calls: std::sync::Mutex<Vec<String>>,
+        /// Downloading this message fails, as a 403 would.
+        fail_raw: Option<String>,
     }
 
     impl MailApi for Fake {
@@ -299,6 +301,9 @@ mod gmail {
         }
         async fn raw(&self, id: &str) -> Result<Vec<u8>> {
             self.raw_calls.lock().unwrap().push(id.into());
+            if self.fail_raw.as_deref() == Some(id) {
+                return Err(ceevee_core::Error::Invalid("403 Forbidden".into()));
+            }
             Ok(self.mails.iter().find(|m| m.0 == id).unwrap().1.clone())
         }
     }
@@ -346,6 +351,57 @@ mod gmail {
             tracking::get(&db, app.id).await.unwrap().status,
             Status::Interview
         );
+    }
+
+    #[tokio::test]
+    async fn a_failed_download_does_not_cost_the_mail_already_handled() {
+        use ceevee_search::tracking::{self, Status};
+        let body = "We would like to interview you for the role at Acme Robotics.";
+        let api = Fake {
+            mails: vec![
+                (
+                    "a".into(),
+                    mail("x@gmail.com", "Interview at Acme Robotics", body, "f1@x"),
+                ),
+                (
+                    "b".into(),
+                    mail("y@gmail.com", "Interview at Acme Robotics", body, "f2@x"),
+                ),
+            ],
+            fail_raw: Some("b".into()),
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        let app = tracking::add_manual(
+            &db,
+            "Acme Robotics",
+            "PM",
+            Status::Sent,
+            "2026-11-13T09:00:00Z",
+        )
+        .await
+        .unwrap();
+        let s = sync::sync_gmail(
+            &db,
+            acct.id,
+            &api,
+            || None,
+            1_794_564_000,
+            "2026-11-13T10:00:00Z",
+        )
+        .await
+        .unwrap();
+        assert_eq!(s.status_changes, 1);
+        assert_eq!(
+            tracking::get(&db, app.id).await.unwrap().status,
+            Status::Interview
+        );
+        // The window did not advance, so the failed message is tried again.
+        let st = store::get_account(&db, acct.id).await.unwrap().sync_state;
+        assert!(st["after"].is_null(), "{st}");
     }
 
     #[tokio::test]

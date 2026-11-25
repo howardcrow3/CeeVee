@@ -145,6 +145,21 @@ pub fn by_rules(mail: &ParsedMail) -> Label {
         "invite you to interview",
         "interview invitation",
         "your interview",
+        "interview you",
+        "to interview",
+        "for an interview",
+        "interview request",
+        "interview invite",
+        "video interview",
+        "phone interview",
+        "onsite interview",
+        "interview on ",
+        "interview at ",
+        "interview next",
+        "set up a time",
+        "schedule a time",
+        "schedule time",
+        "book a time",
     ]) {
         Kind::Interview
     } else if has(&[

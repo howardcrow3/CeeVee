@@ -102,7 +102,7 @@ pub struct GmailState {
 }
 
 /// Raise this whenever the rules for finding job mail change.
-pub const RULES_VERSION: u32 = 3;
+pub const RULES_VERSION: u32 = 4;
 
 /// Sync a Gmail account through the Gmail API. Headers are read first, and a whole message is
 /// downloaded only when the candidate filter wants it. A day of overlap covers mail that arrives
@@ -134,6 +134,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         None => format!("{SCOPE} newer_than:{}d", crate::imap::FIRST_SYNC_DAYS),
     };
     let own = account.address.to_ascii_lowercase();
+    tracing::info!("gmail sync: started for account {account_id}");
     let ids = api.list_ids(&query, MAX_PER_SYNC).await?;
     let mut ctx = Context::load(db).await?;
     tracing::info!(
@@ -147,7 +148,11 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         seen: ids.len(),
         ..Default::default()
     };
-    let mut raws = vec![];
+    // Each message is handled the moment it is downloaded, so a failure later in the list never
+    // costs the mail already read. The model is started on the first message that needs it.
+    let mut start_worker = Some(worker);
+    let mut model: Option<ModelWorker> = None;
+    let mut read_in_full = 0usize;
     let (mut skipped_seen, mut skipped_other, mut failed) = (0, 0, 0);
     for id in &ids {
         let head = match api.headers(id).await {
@@ -180,7 +185,20 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         let hint = detect::score(&m);
         if candidate.is_some() || (not_from(&m, &own) && hint >= 2) {
             match api.raw(id).await {
-                Ok(r) => raws.push(r),
+                Ok(r) => {
+                    if let Some(start) = start_worker.take() {
+                        model = start();
+                    }
+                    read_in_full += 1;
+                    match process(db, &mut ctx, model.as_ref(), account_id, &r, now).await {
+                        Ok(Some(p)) => summary.add(&p),
+                        Ok(None) => {}
+                        Err(e) => {
+                            tracing::warn!("gmail sync: could not handle a message: {e}");
+                            failed += 1;
+                        }
+                    }
+                }
                 Err(e) => {
                     tracing::warn!("gmail sync: could not download a message: {e}");
                     failed += 1;
@@ -195,17 +213,10 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
             skipped_other += 1;
         }
     }
-    let worker = if raws.is_empty() { None } else { worker() };
-    // Oldest first, so a thread's first message is stored before its replies are linked.
-    for raw in raws.iter().rev() {
-        if let Some(p) = process(db, &mut ctx, worker.as_ref(), account_id, raw, now).await? {
-            summary.add(&p);
-        }
-    }
     tracing::info!(
         "gmail sync done: listed {}, already handled {skipped_seen}, not job mail or sent by you {skipped_other}, failed {failed}, read in full {}; employer {}, status changes {}, waiting {}, drafts {}",
         summary.seen,
-        raws.len(),
+        read_in_full,
         summary.employer,
         summary.status_changes,
         summary.waiting_for_you,
