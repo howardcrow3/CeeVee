@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- A tighter sidebar with an account menu at the bottom left: Settings, Send feedback and a System, Light or Dark theme choice.
 - New look: Inter throughout, smaller and tighter controls, rounded corners, and matching light and dark themes.
 - First internal builds.
 - A 14-day trial, license key entry and a Buy button. After the trial CeeVee is read-only until a license is activated.
