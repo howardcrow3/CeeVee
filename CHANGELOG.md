@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Settings is now a window with tabs down the left (General, Job search, Accounts, Privacy and about), opened from the account menu.
 - A tighter sidebar with an account menu at the bottom left: Settings, Send feedback and a System, Light or Dark theme choice.
 - New look: Inter throughout, smaller and tighter controls, rounded corners, and matching light and dark themes.
 - First internal builds.

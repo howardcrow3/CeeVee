@@ -10,7 +10,7 @@ export default ts.config(
     files: ['**/*.svelte', '**/*.ts'],
     languageOptions: {
       parserOptions: { parser: ts.parser },
-      globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly', HTMLDivElement: 'readonly', MouseEvent: 'readonly', KeyboardEvent: 'readonly', Node: 'readonly' }
+      globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly', HTMLDivElement: 'readonly', HTMLElement: 'readonly', MouseEvent: 'readonly', KeyboardEvent: 'readonly', Node: 'readonly' }
     }
   },
   { files: ['**/*.mjs'], languageOptions: { globals: { process: 'readonly', console: 'readonly' } } },
