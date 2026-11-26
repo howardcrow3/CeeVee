@@ -51,12 +51,8 @@ pub fn spawn(app: AppHandle, db: Db, bus: EventBus) {
 }
 
 async fn run_once(db: &Db) -> ceevee_core::Result<sources::SearchSummary> {
-    let boards = sources::load_boards(db).await?;
-    if boards.is_empty() {
-        return Ok(sources::SearchSummary::default());
-    }
     let fetcher = HttpFetcher::new()?;
-    sources::run(db, &fetcher, &boards, &sources::now_iso()).await
+    ceevee_search::starter::run_all(db, &fetcher, &sources::now_iso()).await
 }
 
 /// Tell the user about new postings that score well, if "new matches" notifications are on.

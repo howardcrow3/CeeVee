@@ -1,0 +1,24 @@
+name: starter boards
+
+# Checks that every starter job board in crates/ceevee-search/src/starter.rs still answers.
+# Runs when that list changes, weekly, and on demand.
+on:
+  pull_request:
+    paths:
+      - crates/ceevee-search/src/starter.rs
+      - scripts/check-starter-boards.sh
+      - .github/workflows/starter-boards.yml
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - run: scripts/check-starter-boards.sh
