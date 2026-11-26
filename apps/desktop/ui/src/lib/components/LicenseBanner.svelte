@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { openSettings } from '$lib/settings-ui.svelte';
   import { onMount } from 'svelte';
-  import { resolve } from '$app/paths';
   import { commands } from '$lib/bindings';
   import { bannerText, type LicenseView } from '$lib/license';
 
@@ -30,7 +30,7 @@
     <span>{text}</span>
     <span class="actions">
       <button onclick={buy}>Buy CeeVee</button>
-      <a href={resolve('/settings')}>License</a>
+      <button class="link" onclick={() => openSettings('general')}>License</button>
     </span>
   </div>
 {/if}
@@ -39,5 +39,4 @@
   .banner { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; border: 1px solid var(--line); background: var(--surface); padding: 12px 16px; }
   .banner.expired { border-color: var(--danger); }
   .actions { display: flex; gap: 12px; align-items: baseline; }
-  a { color: var(--ink); font-size: 13px; }
 </style>
