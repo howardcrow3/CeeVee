@@ -46,7 +46,6 @@ const STARTER: &[(BoardKind, &str, &str)] = &[
     (G, "samsara", "Samsara"),
     (G, "toast", "Toast"),
     (G, "squarespace", "Squarespace"),
-    (G, "etsy", "Etsy"),
     (L, "palantir", "Palantir"),
     (L, "spotify", "Spotify"),
 ];
