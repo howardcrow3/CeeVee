@@ -3,7 +3,7 @@ import { isCurrent, sections } from './nav';
 
 describe('nav', () => {
   it('marks only the home section current on /', () => {
-    expect(sections.filter((s) => isCurrent(s.href, '/')).map((s) => s.label)).toEqual(['Today']);
+    expect(sections.filter((s) => isCurrent(s.href, '/')).map((s) => s.label)).toEqual(['Chat']);
   });
   it('lists Job types before Jobs', () => {
     const labels = sections.map((x) => x.label);
