@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- CeeVee now opens to a chat. Ask about your jobs and applications and the local AI answers from what CeeVee has found. It can only answer for now, not make changes, and conversations are not saved yet.
 - A clearer Sign in with Google button, shown in setup and in Settings under Accounts. It is optional, says it is read-only, and shows a waiting state with Cancel.
 - Applications is a board with a column for each stage (Draft, Applied, Screening, Interview, Offer, Closed), the top five cards in each and "+N more". A Table view is one click away, and items waiting on you sit in a strip at the top.
 - Jobs is a compact list: one line per job, filters for New and Saved plus a text filter, and a detail panel on the right with the actions for the job you click.

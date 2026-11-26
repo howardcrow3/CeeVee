@@ -1,6 +1,6 @@
 /** The sections in the left navigation, in order. Settings is in the account menu. */
 export const sections = [
-  { href: '/', label: 'Today' },
+  { href: '/', label: 'Chat' },
   { href: '/job-types', label: 'Job types' },
   { href: '/jobs', label: 'Jobs' },
   { href: '/applications', label: 'Applications' },
