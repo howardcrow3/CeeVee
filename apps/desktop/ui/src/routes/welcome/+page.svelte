@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import { commands, type ProfileChange } from '$lib/bindings';
   import { accepted, savedSummary } from '$lib/onboarding';
+  import GoogleSignIn from '$lib/components/GoogleSignIn.svelte';
 
   let text = $state('');
   let changes = $state<ProfileChange[]>([]);
@@ -70,6 +71,11 @@
   <li>
     <h2>4. Say what jobs you want</h2>
     <p>Add a <a href={resolve('/job-types')}>job type</a> for the work you want, and the companies to watch in <button class="link" onclick={() => openSettings('search')}>Settings</button>.</p>
+  </li>
+  <li>
+    <h2>5. Connect your email</h2>
+    <GoogleSignIn />
+    <p class="note">Prefer not to use Google? Add any email account in <button class="link" onclick={() => openSettings('accounts')}>Settings</button>.</p>
   </li>
 </ol>
 
