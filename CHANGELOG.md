@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Network: reminders to get back in touch (close people after 30 days, warm after 90, weak after 180) with "I reached out" and "Not now".
 - Jobs is a compact list: one line per job, filters for New and Saved plus a text filter, and a detail panel on the right with the actions for the job you click.
 - Network: a people list you can search and sort into close, warm and weak, with contact import from vCard and CSV files (Google, Outlook, phone).
 - Job types in the sidebar: each job type is a saved search you can turn on or off with a switch. They replace Kinds of jobs in Settings.

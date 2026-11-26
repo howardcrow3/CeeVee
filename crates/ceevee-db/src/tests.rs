@@ -10,7 +10,7 @@ async fn count(db: &Db, sql: &str) -> i64 {
 #[tokio::test]
 async fn migrations_create_all_core_tables() {
     let db = Db::open_in_memory().await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 6);
+    assert_eq!(db.schema_version().await.unwrap(), 7);
     let tables = count(
         &db,
         "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' \
@@ -120,7 +120,7 @@ async fn file_database_uses_wal_and_reopens_without_backup() {
         db.pool().close().await;
     }
     let db = Db::open(&path).await.unwrap();
-    assert_eq!(db.schema_version().await.unwrap(), 6);
+    assert_eq!(db.schema_version().await.unwrap(), 7);
     let backups = std::fs::read_dir(dir.path())
         .unwrap()
         .filter(|e| {

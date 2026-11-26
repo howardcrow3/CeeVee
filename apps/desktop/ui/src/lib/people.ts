@@ -23,3 +23,11 @@ export function importSummary(s: PeopleImport): string {
   if (s.skipped > 0) parts.push(`skipped ${s.skipped} with no name`);
   return parts.join(', ') + '.';
 }
+
+/** "Not in touch since you added them" or "Last in touch about 3 months ago". */
+export function silenceText(days: number, never: boolean): string {
+  if (never) return 'Not in touch since you added them';
+  if (days >= 365) return 'Last in touch over a year ago';
+  if (days >= 60) return `Last in touch about ${Math.round(days / 30)} months ago`;
+  return `Last in touch ${days} days ago`;
+}

@@ -1,10 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { commands, type PersonLine } from '$lib/bindings';
-  import { importSummary, tiers, workLine } from '$lib/people';
+  import { commands, type DueLine, type PersonLine } from '$lib/bindings';
+  import { importSummary, silenceText, tiers, workLine } from '$lib/people';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let people = $state<PersonLine[]>([]);
+  let due = $state<DueLine[]>([]);
   let query = $state('');
   let tier = $state('');
   let result = $state('');
@@ -24,6 +25,8 @@
         people = r.data;
         error = '';
       } else error = r.error;
+      const d = await commands.peopleDue();
+      if (d.status === 'ok') due = d.data;
     } catch (e) {
       error = `Running outside the desktop app: ${String(e)}`;
     } finally {
@@ -64,6 +67,18 @@
     }
   }
 
+  async function reachedOut(id: number) {
+    const r = await commands.logContact(id, 'message', 'Got in touch');
+    if (r.status !== 'ok') error = r.error;
+    await load();
+  }
+
+  async function notNow(id: number) {
+    const r = await commands.snoozePerson(id, 30);
+    if (r.status !== 'ok') error = r.error;
+    await load();
+  }
+
   async function setTier(id: number, value: string) {
     const r = await commands.setPersonTier(id, value);
     if (r.status !== 'ok') error = r.error;
@@ -84,6 +99,27 @@
   </label>
 </div>
 {#if result}<p role="status">{result}</p>{/if}
+
+{#if due.length > 0}
+  <section class="due">
+    <h2>Time to reach out</h2>
+    <ul>
+      {#each due.slice(0, 5) as d (d.id)}
+        <li>
+          <div class="who">
+            <b>{d.name}</b>
+            <span class="muted">{workLine('', d.company)}{d.company ? ' · ' : ''}{silenceText(d.days_silent, d.never_contacted)}</span>
+          </div>
+          <div class="row">
+            <button onclick={() => reachedOut(d.id)}>I reached out</button>
+            <button class="ghost" onclick={() => notNow(d.id)}>Not now</button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+    {#if due.length > 5}<p class="muted">And {due.length - 5} more.</p>{/if}
+  </section>
+{/if}
 
 {#if people.length === 0 && !query && !tier && loaded && !error}
   <EmptyState title="Who you know">
@@ -123,6 +159,8 @@
   .who { display: flex; flex-direction: column; min-width: 0; }
   b { color: var(--ink); font-weight: 500; }
   .muted { color: var(--ink-muted, inherit); opacity: 0.8; }
+  .due { margin-top: 24px; max-width: 760px; }
+  .due h2 { margin: 0; }
   .button { display: inline-block; }
   .disabled { opacity: 0.5; }
   input, select { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 6px 10px; }

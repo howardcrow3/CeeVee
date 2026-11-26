@@ -4,3 +4,4 @@
 pub mod import;
 pub mod linkedin;
 pub mod people;
+pub mod reminders;
