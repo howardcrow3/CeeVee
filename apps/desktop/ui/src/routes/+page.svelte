@@ -24,7 +24,7 @@
 {#if waiting > 0}
   <p><span class="dot on"></span>{waiting} {waiting === 1 ? 'item is' : 'items are'} waiting for your approval. <a href="{resolve('/applications')}">See them</a></p>
 {:else}
-  <p>Nothing is waiting on you yet. Add your resume in Documents and set the kinds of jobs you want in Settings, and CeeVee starts searching. <a href="{resolve('/welcome')}">Walk me through it</a>.</p>
+  <p>Nothing is waiting on you yet. Add your resume in Documents and add a job type for the work you want, and CeeVee starts searching. <a href="{resolve('/welcome')}">Walk me through it</a>.</p>
 {/if}
 {#if info}<p>{describe(info)}</p>{/if}
 {#if error}<p>Running outside the desktop app: {error}</p>{/if}

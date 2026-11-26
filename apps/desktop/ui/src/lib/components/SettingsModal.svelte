@@ -3,7 +3,6 @@
   import { settingsUi, closeSettings } from '$lib/settings-ui.svelte';
   import LicensePanel from './LicensePanel.svelte';
   import LocalAiPanel from './LocalAiPanel.svelte';
-  import CategoriesPanel from './CategoriesPanel.svelte';
   import BoardsPanel from './BoardsPanel.svelte';
   import MailAccountPanel from './MailAccountPanel.svelte';
   import AnalyticsPanel from './AnalyticsPanel.svelte';
@@ -42,7 +41,6 @@
           <LicensePanel />
           <LocalAiPanel />
         {:else if settingsUi.tab === 'search'}
-          <CategoriesPanel />
           <BoardsPanel />
         {:else if settingsUi.tab === 'accounts'}
           <MailAccountPanel />

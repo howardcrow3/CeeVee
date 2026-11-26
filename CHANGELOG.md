@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Job types in the sidebar: each job type is a saved search you can turn on or off with a switch. They replace Kinds of jobs in Settings.
 - Settings is now a window with tabs down the left (General, Job search, Accounts, Privacy and about), opened from the account menu.
 - A tighter sidebar with an account menu at the bottom left: Settings, Send feedback and a System, Light or Dark theme choice.
 - New look: Inter throughout, smaller and tighter controls, rounded corners, and matching light and dark themes.
