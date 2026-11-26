@@ -123,6 +123,7 @@ async fn prepare(
             "label": s.label, "required": s.required, "reason": s.reason
         })).collect::<Vec<_>>(),
         "missing_required": report.missing_required(),
+        "checklist": report.checklist(),
         "message": if inputs.cover_letter_title.is_some() {
             "The form is filled in, with your resume and cover letter for this job, and open in your browser. Check it and press Submit yourself."
         } else {

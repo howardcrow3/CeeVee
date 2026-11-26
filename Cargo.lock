@@ -711,6 +711,7 @@ dependencies = [
  "ceevee-core",
  "chromiumoxide",
  "futures",
+ "serde",
  "serde_json",
  "tokio",
  "url",
