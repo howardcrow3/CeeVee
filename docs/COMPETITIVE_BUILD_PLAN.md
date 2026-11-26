@@ -1,6 +1,6 @@
 # Competitive build list: beating Simplify
 
-Last updated 2026-11-26 (items 1, 5, 13 and 15 decided). Source: the [Simplify competitive review](https://claude.ai/artifact/35wvxXYEgAuJTfzJHhmHfh). This is a plan only. No feature in it is started.
+Last updated 2026-11-26 (items 1, 5, 12, 13 and 15 decided). Source: the [Simplify competitive review](https://claude.ai/artifact/35wvxXYEgAuJTfzJHhmHfh). This is a plan only. No feature in it is started.
 
 The rule for every item: CeeVee does it **better** (more control, more private, more accurate) and **simpler** (fewer steps, fewer settings, fewer screens). Each item names what Simplify does, what CeeVee does instead, the size, and where it sits in the build order.
 
@@ -168,6 +168,10 @@ The five steps are built in order. Each is useful alone.
 - **Chat home:** the weekly five people to contact and the day's meeting briefs appear as cards.
 - **Shared components:** the person row and note timeline are good candidates for turtlebox-ui, since Golden also manages people.
 
+#### Scope decision
+
+Howard decided on 2026-11-26 that all five steps ship in v1. Build 12a first, since it unlocks "people you know here" on every job, and keep 12b to 12e in order behind it. With the browser extension (item 5) also in v1, these two are the largest pieces of the launch and should start in parallel once the Turtlebox shell is ready. Expect the v1 schedule to move out by the combined size; review the launch date when the order is set.
+
 #### Data and size
 
 - Extends the contacts and companies tables in the approved schema. Add interaction, reminder, and meeting tables as needed; confirm against the 37-table design before building.
@@ -230,4 +234,4 @@ Build the new components in turtlebox-ui once and reuse them in CeeVee and Golde
 2. ~~Companion browser extension in v1 or v1.1?~~ Decided 2026-11-26: in v1.
 3. ~~How to connect an optional stronger online model?~~ Decided 2026-11-26: neither for now (item 13 deferred).
 4. ~~Mobile companion?~~ Decided 2026-11-26: not now, revisit after launch (item 15 deferred).
-5. Network builder: is the full five-step scope wanted in v1, or only 12a (contacts, imports, people-at-company) with the rest in v1.1? Should calendar connection be limited to Google and Outlook at first?
+5. ~~Network builder scope?~~ Decided 2026-11-26: all five steps (12a to 12e) in v1. Still open: should calendar connection be limited to Google and Outlook (plus ICS) at first? Recommended: yes.
