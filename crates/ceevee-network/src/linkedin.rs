@@ -83,6 +83,9 @@ pub fn parse_connections(csv_text: &str) -> Result<Vec<Connection>> {
 pub struct ImportSummary {
     pub added: usize,
     pub updated: usize,
+    /// People already saved whose company or title is different in this export. Each is written
+    /// to `contact_change` so the person can see who moved.
+    pub changed: usize,
 }
 
 /// Save connections. Importing the same export again updates people already saved (matched by
@@ -130,6 +133,37 @@ pub async fn import(db: &Db, connections: &[Connection]) -> Result<ImportSummary
         };
         if let Some(company_name) = &c.company {
             let company = ceevee_search::companies::find_or_create(db, company_name).await?;
+            let before: Option<(String, Option<String>)> = sqlx::query_as(
+                "SELECT co.name, r.title FROM contact_role r JOIN company co ON co.id = r.company_id \
+                 WHERE r.contact_id = ? AND r.is_current = 1 ORDER BY r.id DESC LIMIT 1",
+            )
+            .bind(id)
+            .fetch_optional(db.pool())
+            .await
+            .map_err(db_err)?;
+            if let Some((was_company, was_title)) = before {
+                let same_company = ceevee_search::companies::find_or_create(db, &was_company)
+                    .await?
+                    .id
+                    == company.id;
+                let same_title =
+                    was_title.as_deref().map(str::trim) == c.position.as_deref().map(str::trim);
+                if !same_company || !same_title {
+                    summary.changed += 1;
+                    sqlx::query(
+                        "INSERT INTO contact_change(contact_id, from_company, from_title, to_company, to_title) \
+                         VALUES (?, ?, ?, ?, ?)",
+                    )
+                    .bind(id)
+                    .bind(&was_company)
+                    .bind(&was_title)
+                    .bind(&company.name)
+                    .bind(&c.position)
+                    .execute(db.pool())
+                    .await
+                    .map_err(db_err)?;
+                }
+            }
             sqlx::query("DELETE FROM contact_role WHERE contact_id = ? AND is_current = 1")
                 .bind(id)
                 .execute(db.pool())
@@ -209,7 +243,8 @@ mod tests {
             first,
             ImportSummary {
                 added: 3,
-                updated: 0
+                updated: 0,
+                changed: 0
             }
         );
         let second = import(&db, &c).await.unwrap();
@@ -217,7 +252,8 @@ mod tests {
             second,
             ImportSummary {
                 added: 0,
-                updated: 3
+                updated: 3,
+                changed: 0
             }
         );
 
@@ -229,5 +265,29 @@ mod tests {
         assert_eq!(people.len(), 2);
         assert_eq!(people[0].full_name, "Ada Lovelace");
         assert_eq!(people[1].title.as_deref(), Some("VP, Engineering"));
+    }
+
+    #[tokio::test]
+    async fn a_newer_export_records_who_moved() {
+        let db = Db::open_in_memory().await.unwrap();
+        import(&db, &parse_connections(EXPORT).unwrap())
+            .await
+            .unwrap();
+        let newer = EXPORT.replace("Acme Inc.,Engineer", "Globex,Staff Engineer");
+        let s = import(&db, &parse_connections(&newer).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(s.changed, 1);
+        let changes = crate::people::recent_changes(&db, 10).await.unwrap();
+        assert_eq!(changes.len(), 1);
+        assert_eq!(changes[0].full_name, "Ada Lovelace");
+        assert_eq!(changes[0].from_company.as_deref(), Some("Acme Inc."));
+        assert_eq!(changes[0].to_company.as_deref(), Some("Globex"));
+        assert_eq!(changes[0].to_title.as_deref(), Some("Staff Engineer"));
+        // Importing the same newer export again changes nothing more.
+        let again = import(&db, &parse_connections(&newer).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(again.changed, 0);
     }
 }
