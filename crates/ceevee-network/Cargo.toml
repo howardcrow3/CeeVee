@@ -12,6 +12,8 @@ ceevee-core.workspace = true
 ceevee-db.workspace = true
 ceevee-search = { path = "../ceevee-search" }
 csv = "1"
+serde.workspace = true
+serde_json.workspace = true
 sqlx.workspace = true
 
 [dev-dependencies]
