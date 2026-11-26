@@ -58,3 +58,8 @@ th { text-align: left; font: 500 11px var(--sans); letter-spacing: 0.06em; text-
 td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* A button that reads as an inline link, for text that opens a dialog. */
+button.link { all: unset; cursor: pointer; color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent);
+  text-underline-offset: 3px; text-decoration-thickness: 2px; border-radius: var(--r-sm); }
+button.link:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }

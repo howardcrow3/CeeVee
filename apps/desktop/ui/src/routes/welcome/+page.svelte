@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { openSettings } from '$lib/settings-ui.svelte';
   import { resolve } from '$app/paths';
   import { commands, type ProfileChange } from '$lib/bindings';
   import { accepted, savedSummary } from '$lib/onboarding';
@@ -44,7 +45,7 @@
 <ol>
   <li>
     <h2>1. Download the local AI</h2>
-    <p>CeeVee reads your resume with an AI model that runs on this computer. <a href={resolve('/settings')}>Download it in Settings</a>.</p>
+    <p>CeeVee reads your resume with an AI model that runs on this computer. <button class="link" onclick={() => openSettings('general')}>Download it in Settings</button>.</p>
   </li>
   <li>
     <h2>2. Add your resume</h2>
@@ -68,7 +69,7 @@
   </li>
   <li>
     <h2>4. Say what jobs you want</h2>
-    <p>Add the kinds of jobs and the companies to watch in <a href={resolve('/settings')}>Settings</a>.</p>
+    <p>Add the kinds of jobs and the companies to watch in <button class="link" onclick={() => openSettings('search')}>Settings</button>.</p>
   </li>
 </ol>
 

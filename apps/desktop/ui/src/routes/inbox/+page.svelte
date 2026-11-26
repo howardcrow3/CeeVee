@@ -1,6 +1,6 @@
 <script lang="ts">
+  import { openSettings } from '$lib/settings-ui.svelte';
   import { onMount } from 'svelte';
-  import { resolve } from '$app/paths';
   import {
     commands,
     type ApplicationChoice,
@@ -159,7 +159,7 @@
 {#if loaded && accounts === 0}
   <EmptyState title="Connect your email">
     <p>CeeVee reads replies from employers and keeps your applications up to date. Connect an account in Settings.</p>
-    <p><a href={resolve('/settings')}>Open Settings</a></p>
+    <p><button class="link" onclick={() => openSettings('accounts')}>Open Settings</button></p>
   </EmptyState>
 {:else if loaded}
   {#if found.length > 0}

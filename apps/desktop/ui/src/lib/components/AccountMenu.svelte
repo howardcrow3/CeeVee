@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { resolve } from '$app/paths';
+  import { openSettings } from '$lib/settings-ui.svelte';
   import { onMount } from 'svelte';
   import { applyTheme, loadTheme, saveTheme, type ThemeChoice } from '$lib/theme';
 
@@ -36,7 +36,7 @@
 <div class="account" bind:this={root}>
   {#if open}
     <div class="menu" role="menu" aria-label="Account">
-      <a role="menuitem" href={resolve('/settings')} onclick={() => (open = false)}>Settings</a>
+      <button role="menuitem" onclick={() => { open = false; openSettings(); }}>Settings</button>
       {#if canFeedback}
         <button role="menuitem" onclick={() => { open = false; onfeedback?.(); }}>Send feedback</button>
       {/if}
@@ -66,9 +66,9 @@
     display: grid; place-items: center; font-size: 11px; font-weight: 600; }
   .menu { position: absolute; bottom: 40px; left: 0; width: 220px; background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--r-md); box-shadow: var(--shadow-pop); padding: 4px; display: flex; flex-direction: column; gap: 1px; z-index: 20; }
-  .menu a, .menu > button { display: block; height: 28px; line-height: 28px; padding: 0 8px; border: 0; background: transparent;
+  .menu > button { display: block; height: 28px; line-height: 28px; padding: 0 8px; border: 0; background: transparent;
     color: var(--body); text-decoration: none; font-size: 13px; text-align: left; border-radius: var(--r-sm); }
-  .menu a:hover, .menu > button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+  .menu > button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
   .sep { height: 1px; background: var(--line); margin: 4px 0; }
   .row { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 2px 8px; }
   .lbl { font-size: 12px; color: var(--muted); }

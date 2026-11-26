@@ -7,6 +7,7 @@
   import AnalyticsPanel from './AnalyticsPanel.svelte';
   import FeedbackDialog from './FeedbackDialog.svelte';
   import AccountMenu from './AccountMenu.svelte';
+  import SettingsModal from './SettingsModal.svelte';
   import { onMount } from 'svelte';
   import { commands } from '$lib/bindings';
   let { children } = $props();
@@ -31,6 +32,7 @@
   </nav>
   <main class="content"><CrashNotice /><LicenseBanner /><AnalyticsPanel mode="ask" />{@render children()}</main>
 </div>
+<SettingsModal />
 {#if canFeedback}<FeedbackDialog bind:open={feedbackOpen} />{/if}
 
 <style>
