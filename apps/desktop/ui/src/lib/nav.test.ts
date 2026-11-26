@@ -5,6 +5,10 @@ describe('nav', () => {
   it('marks only the home section current on /', () => {
     expect(sections.filter((s) => isCurrent(s.href, '/')).map((s) => s.label)).toEqual(['Today']);
   });
+  it('lists Job types before Jobs', () => {
+    const labels = sections.map((x) => x.label);
+    expect(labels.indexOf('Job types')).toBeLessThan(labels.indexOf('Jobs'));
+  });
   it('keeps Settings out of the sidebar list', () => {
     expect(sections.map((x) => x.label)).not.toContain('Settings');
   });

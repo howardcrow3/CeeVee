@@ -69,7 +69,7 @@
   </li>
   <li>
     <h2>4. Say what jobs you want</h2>
-    <p>Add the kinds of jobs and the companies to watch in <button class="link" onclick={() => openSettings('search')}>Settings</button>.</p>
+    <p>Add a <a href={resolve('/job-types')}>job type</a> for the work you want, and the companies to watch in <button class="link" onclick={() => openSettings('search')}>Settings</button>.</p>
   </li>
 </ol>
 
