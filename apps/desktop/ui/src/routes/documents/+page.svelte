@@ -188,7 +188,7 @@
   ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
   .item { width: 100%; text-align: left; text-transform: none; letter-spacing: 0; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }
   .item.cur { border-color: var(--accent); }
-  .kind { font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--body); }
+  .kind { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
   .form { display: flex; flex-direction: column; gap: 8px; }
   textarea { font: 400 14px/1.6 var(--font-body, inherit); background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 16px; width: 100%; resize: vertical; }

@@ -85,7 +85,7 @@
 
 <style>
   dialog { width: min(560px, calc(100vw - 32px)); border: 1px solid var(--line); background: var(--paper); color: var(--body);
-    padding: 32px; border-radius: 0; }
+    padding: 24px; border-radius: var(--r-lg); box-shadow: var(--shadow-pop); }
   dialog[open] { display: flex; flex-direction: column; gap: 12px; }
   dialog::backdrop { background: rgb(28 28 28 / 0.45); }
   .note { font-size: 13px; }
@@ -98,7 +98,7 @@
   .cats label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
   .cats input { accent-color: var(--ink); }
   textarea, input[type='email'] { width: 100%; font: 400 14px/1.5 var(--font-text); color: var(--ink); background: var(--paper);
-    border: 1px solid var(--border-control); border-radius: 0; padding: 10px 12px; }
+    border: 1px solid var(--border-control); border-radius: var(--r-sm); padding: 6px 10px; }
   textarea { resize: vertical; }
   .err { color: var(--danger); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }

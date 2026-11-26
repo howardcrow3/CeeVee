@@ -82,8 +82,8 @@
 <style>
   .form { display: flex; flex-direction: column; gap: 16px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
-  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--body); }
-  input, textarea { font: 400 14px/1.5 var(--font-body, inherit); background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 8px 12px; text-transform: none; letter-spacing: 0; width: 100%; box-sizing: border-box; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--body); }
+  input, textarea { font: 400 14px/1.5 var(--font-body, inherit); background: var(--surface); color: var(--ink); border: 1px solid var(--border-control); border-radius: var(--r-sm); padding: 6px 10px; text-transform: none; letter-spacing: 0; width: 100%; box-sizing: border-box; }
   fieldset { border: 1px solid var(--border-control); padding: 16px; margin: 0; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; }
   p { margin: 0; }
