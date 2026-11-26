@@ -11,6 +11,7 @@
 
 pub mod anchor;
 pub mod api;
+pub mod feedback;
 pub mod key;
 pub mod machine;
 pub mod service;

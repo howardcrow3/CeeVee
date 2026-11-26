@@ -60,3 +60,7 @@ CeeVee can read recruiter replies in Gmail after a Google sign-in. It asks only 
 ## Analytics (GA4)
 
 Usage analytics are opt-in in the app and send nothing unless the build has both values. Create a GA4 property and a web data stream, then a Measurement Protocol API secret (stream details, Events, Measurement Protocol API secrets). In the `release-build` environment add the secret `CEEVEE_GA4_API_SECRET`. The measurement ID (`G-EEQ718X660`, public) is the default in the workflows; a variable `CEEVEE_GA4_MEASUREMENT_ID` overrides it. The build log shows "Analytics: on (opt-in)" when both are set. Set event data retention to 2 months and leave Google signals off.
+
+## Send feedback
+
+The Send feedback form is hidden unless the build has `FEEDBACK_KEY`. Copy CeeVee's key from AWS Systems Manager, Parameter Store, `/highturtle/feedback/app-keys` (the `ceevee` value; region us-east-2), and add it as a repository secret `FEEDBACK_KEY` (Settings -> Secrets and variables -> Actions). The release and test-build workflows pass it to the build. The service is described in howardcrow3/highturtle `feedback/README.md`.

@@ -16,6 +16,7 @@ CeeVee runs on your computer. Your resume, profile, jobs, documents, mail and ch
 | When | To | What |
 |---|---|---|
 | First start, and when the trial or a license is checked | turtlebox.studio | A random machine identifier (a one-way hash, not your name or computer name), the app version, and your license key when you activate or remove it. |
+| Only when you press Send in Send feedback | feedback.turtlebox.studio | What you wrote in the feedback form: your star rating, your words, and your email if you add it, with the app version and your operating system. Nothing else from CeeVee. |
 | Update checks | dl.turtlebox.studio | A request for the update file list. No account or personal data. |
 | Downloading the AI model | Hugging Face (a model host) | A normal file download. They see your IP address, as any website would. |
 | Searching for jobs | The job boards and company career pages you choose | The same requests your browser would make to read public job lists. |

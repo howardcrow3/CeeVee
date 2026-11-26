@@ -6,6 +6,7 @@ mod apply_tool;
 mod commands;
 mod deep_link;
 mod diagnostics;
+mod feedback_cmd;
 mod license_cmd;
 mod mail_cmd;
 mod models;
@@ -44,6 +45,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             diagnostics::dismiss_crash,
             diagnostics::open_log_folder,
             license_cmd::open_info_page,
+            feedback_cmd::feedback_available,
+            feedback_cmd::send_feedback,
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
