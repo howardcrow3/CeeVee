@@ -38,7 +38,7 @@
 <style>
   .shell { display: grid; grid-template-columns: 200px 1fr; min-height: 100vh; }
   .side { border-right: 1px solid var(--line); padding: 24px 16px; display: flex; flex-direction: column; gap: 8px; }
-  .mark { font-family: var(--font-display); font-size: 24px; color: var(--ink); margin-bottom: 24px; }
+  .mark { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; color: var(--ink); margin-bottom: 24px; }
   .side a { color: var(--body); text-decoration: none; padding: 8px 0; font-size: 13px;
     background: linear-gradient(var(--accent), var(--accent)) 0 100% / 0 1px no-repeat; transition: background-size 300ms var(--ease); }
   .side a:hover { background-size: 100% 1px; }
