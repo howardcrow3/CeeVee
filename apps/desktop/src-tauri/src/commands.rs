@@ -1194,10 +1194,9 @@ pub async fn log_contact(
     summary: String,
 ) -> Result<(), String> {
     crate::license_cmd::require_write(&lic).await?;
-    let kind = serde_json::from_value::<ceevee_network::people::Kind>(serde_json::Value::String(
-        kind,
-    ))
-    .map_err(|_| "Unknown kind of contact.".to_string())?;
+    let kind =
+        serde_json::from_value::<ceevee_network::people::Kind>(serde_json::Value::String(kind))
+            .map_err(|_| "Unknown kind of contact.".to_string())?;
     ceevee_network::people::add_touch(&db, i64::from(id), kind, &summary, &now_iso())
         .await
         .map(|_| ())
