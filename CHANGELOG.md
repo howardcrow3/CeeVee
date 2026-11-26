@@ -13,3 +13,4 @@ User-facing notes, one section per release. The release workflow copies the sect
 - CeeVee now reads your mail for anything that looks like a job update or a recruiter message, whoever sends it. It starts tracking jobs it finds (for you to confirm or dismiss) and updates the ones you already have. Mail that is not about a job is not stored.
 
 - CeeVee keeps a record of every form it fills in for you: the answers it used, the resume and cover letter it attached, and the job post as it was that day.
+- Before you submit an application, CeeVee lists every field it filled, every required field it could not answer, and anything to double check, so nothing goes out blank.
