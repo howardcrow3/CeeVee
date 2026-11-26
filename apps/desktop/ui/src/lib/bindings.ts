@@ -28,6 +28,9 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
+	/**  True when this build can send feedback (it carries a feedback key). */
+	feedbackAvailable: () => __TAURI_INVOKE<boolean>("feedback_available"),
+	sendFeedback: (input: FeedbackInput_Deserialize) => typedError<null, string>(__TAURI_INVOKE("send_feedback", { input })),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
@@ -275,6 +278,31 @@ export type Event =
 { type: "task_due"; task: string } | 
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
+
+/**  What the user filled in on the feedback form. */
+export type FeedbackInput = FeedbackInput_Serialize | FeedbackInput_Deserialize;
+
+/**  What the user filled in on the feedback form. */
+export type FeedbackInput_Deserialize = {
+	/**  1 to 5 stars, or none. */
+	rating?: number | null,
+	message: string,
+	/**  `feature`, `issue`, `praise` or `other`. */
+	category?: string | null,
+	/**  Only when the user wants a reply. */
+	email?: string | null,
+};
+
+/**  What the user filled in on the feedback form. */
+export type FeedbackInput_Serialize = {
+	/**  1 to 5 stars, or none. */
+	rating: number | null,
+	message: string,
+	/**  `feature`, `issue`, `praise` or `other`. */
+	category: string | null,
+	/**  Only when the user wants a reply. */
+	email: string | null,
+};
 
 /**  A job CeeVee started from an email, waiting for the user to keep or dismiss it. */
 export type FoundJob = FoundJob_Serialize | FoundJob_Deserialize;
