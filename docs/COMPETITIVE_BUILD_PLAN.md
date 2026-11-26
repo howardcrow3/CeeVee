@@ -6,6 +6,8 @@ The rule for every item: CeeVee does it **better** (more control, more private, 
 
 Sizes: **S** is under a week, **M** is 1 to 3 weeks, **L** is over 3 weeks. Sizes are rough and assume the core app in docs/PLAN.md exists.
 
+Item 12, the network builder, was added on 2026-11-26 at Howard's request.
+
 ## Principles that apply to every item
 
 1. **One place for each thing.** Every feature lives in the chat-anchored home, the job-type pages or the account settings modal from the Turtlebox UX framework. No new top-level screens.
@@ -19,8 +21,8 @@ Sizes: **S** is under a week, **M** is 1 to 3 weeks, **L** is over 3 weeks. Size
 | Phase | Theme | Items |
 |---|---|---|
 | 1 | Make the first ten minutes work | 1 Free autofill tier, 2 Starter job feed, 3 Blank-field check, 4 Application record |
-| 2 | Match Simplify where it is strongest | 5 Companion browser extension, 6 Explained matches, 7 Resume score and tailoring, 8 Import from Simplify |
-| 3 | Go past what Simplify can do | 9 Reply-aware nudges, 10 Controlled automation, 11 Interview practice, 12 Network and referrals |
+| 2 | Match Simplify where it is strongest | 5 Companion browser extension, 6 Explained matches, 7 Resume score and tailoring, 8 Import from Simplify, 12a Contacts and imports |
+| 3 | Go past what Simplify can do | 9 Reply-aware nudges, 10 Controlled automation, 11 Interview practice, 12b to 12e Network builder |
 | 4 | Reach and polish | 13 Better writing option, 14 Public job lists, 15 Mobile companion |
 
 Phase 1 is the launch blocker. Phase 2 closes the gaps that decide first impressions. Phase 3 is where CeeVee pulls ahead. Phase 4 is growth.
@@ -105,10 +107,69 @@ Phase 1 is the launch blocker. Phase 2 closes the gaps that decide first impress
 - **Simplify:** free AI mock interviews.
 - **CeeVee, better and simpler:** practice from the real job post and the user's own resume, using the local model, so there is no cost and nothing leaves the machine. Triggered from an interview invite (item 9) with one button on the application card. Notes from each session stay with the application.
 
-### 12. Network and referrals (M)
+### 12. Network builder (L, built in five steps)
 
-- **Simplify:** finds referral contacts and drafts outreach.
-- **CeeVee, better and simpler:** uses the user's own LinkedIn connections export and email contacts to show "people you know at this company" on each job. Drafts a short ask and leaves sending to the user. No scraping and no automated messaging, which keeps accounts safe.
+- **Simplify:** a referral finder and outreach drafts for a target company. It does not keep a network. There is no contact list, meeting log, reminder or relationship history.
+- **CeeVee, better and simpler:** a personal network manager that lives next to the job search and uses it. It is a people list with the context that makes it useful, kept on the user's machine. No LinkedIn scraping, no automatic connection requests or messages, and no contact data uploaded anywhere.
+- **Why it is more than a feature:** most hires still come through people. A job search app that only tracks applications ignores the biggest source of interviews. It also gives CeeVee a reason to be opened every week after the job is found.
+- **Where it lives:** a Network entry in the left nav beside Job types, using the same three panes (list, person, chat).
+
+The five steps are built in order. Each is useful alone.
+
+#### 12a. Contacts and imports (M, Phase 2)
+
+- One people list with name, company, title, how you know them, tags, links and the date of last contact.
+- **Imports, all local:** the LinkedIn data export (Connections file), Google and Outlook contacts through the optional sign-ins, vCard and CSV, and a "people I have emailed" suggestion list built from the mailbox sync.
+- **Simpler:** drop a file or click Connect, and the app dedupes and merges. Re-importing a newer LinkedIn export shows who changed jobs or titles since last time.
+- **Better:** every contact links to a company, so each job and company page shows "people you know here".
+
+#### 12b. Relationship notes and follow-up reminders (M, Phase 3)
+
+- A short note per person, plus a timeline of every touch (email, meeting, note). Notes can be dictated into chat ("Met Dana at the PM meetup, she is hiring in Q1").
+- Three tiers: Close, Warm, Weak, each with a default follow-up cadence the user can change in one place. A weekly list of the five people most worth contacting, shown in the chat home and the tray. Snooze or done with one key.
+- **Better:** reminders say why now ("Dana's company posted a PM role you saved") instead of a bare date.
+- **Simpler:** no manual dates. The app proposes the next touch and the user accepts or skips.
+
+#### 12c. Meetings and calendar (M, Phase 3)
+
+- Connect Google or Outlook calendars, or an ICS file. Calendar events that include a known contact are linked automatically.
+- **Before:** a one-screen prep brief (last notes, mutual context, open asks, their company's open jobs). **After:** a prompt to log the outcome in one sentence, and a drafted thank-you or follow-up the user can send.
+- Schedule a coffee chat from the person page by proposing times from the user's free slots, as an email draft.
+- Informational interviews and coffee chats are tracked as a type of meeting, so progress can be seen as a pipeline.
+
+#### 12d. Warm-intro paths and outreach (M, Phase 3)
+
+- For any target company or job, rank the people who can help: direct contacts there, former colleagues from the user's own work history, alumni of the same schools, and contacts whose past employers overlap with that company's team. Uses only the data the user already has.
+- Each path ends in a drafted ask: introduction request, informational chat, reconnect note, thank-you, or referral request. The user edits in chat and sends. Email can send under the automation level the user chose. Anything for LinkedIn is copied to the clipboard or opened for the user to send, never automated.
+- **Better:** shows the chance of a reply honestly ("Close, last spoke 3 weeks ago" or "Weak, not contacted in 2 years") and suggests who to ask first.
+- **Referrals:** a contact can be attached to an application as the referrer, so the outcome of referrals is visible.
+
+#### 12e. Network pipeline, goals and giving back (S to M, Phase 3 to 4)
+
+- **Pipeline:** each outreach moves through Identified, Reached out, Talking, Met, Followed up. Same board style as the application tracker.
+- **Weekly goal:** an optional target ("3 conversations a week") with a quiet progress bar. No streak pressure and no guilt copy.
+- **Give back:** a list of "people I could help" (intros, feedback, job leads) so the user builds goodwill, not just asks. Nudges appear when a saved job or news item fits a contact.
+- **Events:** a simple list of meetups and conferences with who is attending, added by hand or from calendar invites.
+- **Health view:** how many active relationships, who has gone cold, and which target companies have no contact yet.
+
+#### What stays out
+
+- No scraping of LinkedIn, no auto connection requests or messages, no browser automation against LinkedIn messaging. This also stays inside the automation hard denials in docs/PLAN.md.
+- No cloud contact sync and no shared contact database. Contacts belong to the user.
+- No scoring of people's value. Tiers are the user's own labels.
+
+#### Fits the UX
+
+- **Left nav:** Network, with views for People, Companies and Pipeline.
+- **Three panes:** list of people, person detail (notes, timeline, linked jobs), and chat with commands like "who do I know at Stripe?" or "remind me to follow up with Dana after her launch".
+- **Settings modal:** a Connections tab for LinkedIn export import, Google and Outlook contacts and calendars, and the reminder cadence.
+- **Chat home:** the weekly five people to contact and the day's meeting briefs appear as cards.
+- **Shared components:** the person row and note timeline are good candidates for turtlebox-ui, since Golden also manages people.
+
+#### Data and size
+
+- Extends the contacts and companies tables in the approved schema. Add interaction, reminder, and meeting tables as needed; confirm against the 37-table design before building.
+- Rough total: 12a M, 12b M, 12c M, 12d M, 12e S to M. About 8 to 10 weeks of work in all, and 12a plus the basic company view can ship well before the rest.
 
 ## Phase 4: reach and polish
 
@@ -141,8 +202,9 @@ Phase 1 is the launch blocker. Phase 2 closes the gaps that decide first impress
 | Chat-anchored home | 3, 6, 7, 9, 11, 13 (cards and drafts appear in chat) |
 | Job types in left nav | 2, 6, 10 (feed, dealbreakers and automation level per type) |
 | Three-pane chat, list, detail | 2, 3, 4, 7 |
-| Account menu and tabbed settings modal | 1 (Billing), 5 (Browser), 8 (Data), 13 (AI) |
-| Dense lists and toggles | 2, 10 |
+| Account menu and tabbed settings modal | 1 (Billing), 5 (Browser), 8 (Data), 12 (Connections), 13 (AI) |
+| Network entry in left nav | 12 (People, Companies, Pipeline) |
+| Dense lists and toggles | 2, 10, 12 |
 | Light and dark themes | all |
 
 Build the new components in turtlebox-ui once and reuse them in CeeVee and Golden: the checklist card (item 3), the record viewer (item 4) and the level slider (item 10) are likely candidates.
@@ -153,6 +215,7 @@ Build the new components in turtlebox-ui once and reuse them in CeeVee and Golde
 - Blank required fields at submit: zero.
 - Autofill success on Greenhouse, Lever, Ashby, Workday: measured in CI against saved forms, with a published floor in evals/thresholds.json.
 - Time from install to first filled application: under 10 minutes.
+- Network: a LinkedIn export imports and merges in under a minute; every saved job with a known contact shows "people you know here"; follow-ups the user marks done each week.
 - Trial to paid conversion and refund requests: refund requests should stay below 2%.
 
 ## Open questions for Howard
@@ -161,3 +224,4 @@ Build the new components in turtlebox-ui once and reuse them in CeeVee and Golde
 2. Is a companion browser extension (item 5) in scope for v1, or v1.1? It is the largest item and the biggest ease-of-use gap.
 3. Should the optional stronger online model (item 13) go through Anthropic's API, a key the user provides, or both?
 4. Is a read-only mobile companion (item 15) wanted at all?
+5. Network builder: is the full five-step scope wanted in v1, or only 12a (contacts, imports, people-at-company) with the rest in v1.1? Should calendar connection be limited to Google and Outlook at first?
