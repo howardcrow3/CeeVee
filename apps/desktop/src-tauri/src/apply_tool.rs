@@ -78,6 +78,35 @@ async fn prepare(
             return Err(e);
         }
     };
+    let filled: Vec<Value> = report
+        .filled
+        .iter()
+        .map(|f| json!({"label": f.label, "value": f.value, "review": f.review}))
+        .collect();
+    let skipped: Vec<Value> = report
+        .skipped
+        .iter()
+        .map(|s| json!({"label": s.label, "required": s.required, "reason": s.reason}))
+        .collect();
+    // The record is a convenience for the person; a failure to write it must not lose the window.
+    if let Err(e) = ceevee_search::record::save(
+        db,
+        &ceevee_search::record::NewRecord {
+            posting_id: inputs.posting_id,
+            application_id: inputs.application_id,
+            event: ceevee_search::record::Event::Prepared,
+            url: report.url.clone(),
+            ats: Some(report.ats.as_str().to_string()),
+            resume_version_id: inputs.resume_version_id,
+            cover_letter_version_id: inputs.cover_letter_version_id,
+            filled: Value::Array(filled),
+            skipped: Value::Array(skipped),
+        },
+    )
+    .await
+    {
+        tracing::warn!("could not save the application record: {e}");
+    }
     keep.0
         .lock()
         .map_err(|e| Error::Other(e.to_string()))?

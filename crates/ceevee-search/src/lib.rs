@@ -6,6 +6,7 @@ pub mod alerts;
 pub mod categories;
 pub mod companies;
 pub mod postings;
+pub mod record;
 pub mod sources;
 pub mod tracking;
 
