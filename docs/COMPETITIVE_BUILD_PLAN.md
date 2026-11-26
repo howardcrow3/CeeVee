@@ -1,6 +1,6 @@
 # Competitive build list: beating Simplify
 
-Last updated 2026-11-26. Source: the [Simplify competitive review](https://claude.ai/artifact/35wvxXYEgAuJTfzJHhmHfh). This is a plan only. No feature in it is started.
+Last updated 2026-11-26 (items 1, 5, 13 and 15 decided). Source: the [Simplify competitive review](https://claude.ai/artifact/35wvxXYEgAuJTfzJHhmHfh). This is a plan only. No feature in it is started.
 
 The rule for every item: CeeVee does it **better** (more control, more private, more accurate) and **simpler** (fewer steps, fewer settings, fewer screens). Each item names what Simplify does, what CeeVee does instead, the size, and where it sits in the build order.
 
@@ -20,21 +20,22 @@ Item 12, the network builder, was added on 2026-11-26 at Howard's request.
 
 | Phase | Theme | Items |
 |---|---|---|
-| 1 | Make the first ten minutes work | 1 Free autofill tier, 2 Starter job feed, 3 Blank-field check, 4 Application record |
+| 1 | Make the first ten minutes work | 1 Trial and license, 2 Starter job feed, 3 Blank-field check, 4 Application record |
 | 2 | Match Simplify where it is strongest | 5 Companion browser extension, 6 Explained matches, 7 Resume score and tailoring, 8 Import from Simplify, 12a Contacts and imports |
 | 3 | Go past what Simplify can do | 9 Reply-aware nudges, 10 Controlled automation, 11 Interview practice, 12b to 12e Network builder |
-| 4 | Reach and polish | 13 Better writing option, 14 Public job lists, 15 Mobile companion |
+| 4 | Reach and polish | 13 Better writing option (deferred), 14 Public job lists, 15 Mobile companion (deferred) |
 
 Phase 1 is the launch blocker. Phase 2 closes the gaps that decide first impressions. Phase 3 is where CeeVee pulls ahead. Phase 4 is growth.
 
 ## Phase 1: make the first ten minutes work
 
-### 1. Free autofill tier (Decision, then S)
+### 1. Trial and license (Decided: 14 days, then fully locked, S)
 
 - **Simplify:** Copilot autofill is free forever, with no application cap. Payment is pitched later.
-- **CeeVee, better and simpler:** keep the 14-day full trial, and after it ends keep autofill, the tracker and the document editor free. A license unlocks search, email tracking, drafting and the higher automation levels. One rule, easy to explain: "Fill forms free. Pay once for the rest."
-- **Needs a decision from Howard:** free autofill after the trial, a 30-day trial, or neither. See docs/QUESTIONS.md.
-- **Fits the UX:** the trial banner and license state live in the account menu and the Billing tab of the settings modal. No locked screens, only a quiet "Upgrade" row beside the features that need it.
+- **Decision (Howard, 2026-11-26):** keep the 14-day full trial, then lock the app until a license is bought. No permanent free tier. Pricing stays $19.99 one-time.
+- **What this means for the plan:** CeeVee cannot win on free entry, so it has to win the first 14 days. Items 2, 3 and 4 (starter feed, blank-field check, application record) become launch blockers, and onboarding should reach a real filled application within the first session.
+- **Better and simpler:** the trial banner shows days left and what will lock, in plain words, and the user's data is never held back. The app opens read-only after the trial, so the user can still view and export everything (the licensing work already plans read-only enforcement). The refund rule is shown before purchase, which answers Simplify's refund complaints (open Q22).
+- **Fits the UX:** the license state lives in the account menu and the Billing tab of the settings modal. A quiet "Buy" row, no locked-screen walls.
 - **Depends on:** license store backend.
 
 ### 2. Starter job feed (M)
@@ -58,12 +59,13 @@ Phase 1 is the launch blocker. Phase 2 closes the gaps that decide first impress
 
 ## Phase 2: match Simplify where it is strongest
 
-### 5. Companion browser extension (L)
+### 5. Companion browser extension (Decided: in v1, L)
 
 - **Simplify:** the Copilot extension fills forms inside the user's own, already signed-in browser. This is its biggest ease-of-use edge.
 - **CeeVee, better and simpler:** a thin extension (Chrome, Edge, Brave, Firefox) that fills in the user's own browser but takes everything from the desktop app over a local connection. The profile, answers, policy and records stay on the machine. The extension stores no personal data and makes no network calls to us. The separate automated browser window stays for scheduled and hands-off runs.
 - **Better:** one automation policy applies in both places, and the extension shows the same blank-field check as item 3.
 - **Simpler:** pairing is one click ("Connect to CeeVee") with no account or code to type.
+- **Decision (Howard, 2026-11-26):** ships in v1. Start it early because it is the largest item and store review time can delay launch; submit to the stores as soon as a pairing build works.
 - **Risks:** store review for broad page permissions. Ask only for the ATS domains and listed job sites.
 - **Fits the UX:** pairing and status live in the Browser tab of the settings modal.
 
@@ -173,7 +175,9 @@ The five steps are built in order. Each is useful alone.
 
 ## Phase 4: reach and polish
 
-### 13. Better-writing option (S)
+### 13. Better-writing option (Deferred, S)
+
+- **Decision (Howard, 2026-11-26):** not now. Local model only for v1. Revisit when evals show the writing gap hurts users; the design below is the starting point.
 
 - **Simplify:** hosted AI for all paid writing.
 - **CeeVee, better and simpler:** a single switch in the AI tab, "Use a stronger online model for writing", with a plain list of what is sent (job text and the section being edited, never the full profile or email). Off by default. Answers the local model's quality gap without giving up the privacy story.
@@ -183,7 +187,9 @@ The five steps are built in order. Each is useful alone.
 - **Simplify:** GitHub lists such as Summer 2027 internships, about 48K stars, feed its brand.
 - **CeeVee, better and simpler:** publish a small number of high-quality lists in areas we serve, generated from the same feed as item 2, each ending with a link to CeeVee. Marketing task more than a product feature; schedule after the feed is reliable.
 
-### 15. Mobile companion (L, optional)
+### 15. Mobile companion (Deferred, L)
+
+- **Decision (Howard, 2026-11-26):** not now. Revisit after launch.
 
 - **Simplify:** iOS app for jobs, Autopilot and Application History.
 - **CeeVee, better and simpler:** a read-only view of jobs and application status on the phone, synced through a local-network pair or the user's own cloud drive, with no CeeVee server. Build only if user demand shows up after launch.
@@ -220,8 +226,8 @@ Build the new components in turtlebox-ui once and reuse them in CeeVee and Golde
 
 ## Open questions for Howard
 
-1. After the 14-day trial, should autofill stay free (item 1), or should the trial be longer?
-2. Is a companion browser extension (item 5) in scope for v1, or v1.1? It is the largest item and the biggest ease-of-use gap.
-3. Should the optional stronger online model (item 13) go through Anthropic's API, a key the user provides, or both?
-4. Is a read-only mobile companion (item 15) wanted at all?
+1. ~~After the 14-day trial, should autofill stay free?~~ Decided 2026-11-26: keep 14 days, fully locked, read-only after.
+2. ~~Companion browser extension in v1 or v1.1?~~ Decided 2026-11-26: in v1.
+3. ~~How to connect an optional stronger online model?~~ Decided 2026-11-26: neither for now (item 13 deferred).
+4. ~~Mobile companion?~~ Decided 2026-11-26: not now, revisit after launch (item 15 deferred).
 5. Network builder: is the full five-step scope wanted in v1, or only 12a (contacts, imports, people-at-company) with the rest in v1.1? Should calendar connection be limited to Google and Outlook at first?
