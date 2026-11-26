@@ -154,6 +154,15 @@ export const commands = {
 	confirmFoundJob: (id: number) => typedError<null, string>(__TAURI_INVOKE("confirm_found_job", { id })),
 	/**  Remove a job found in email. Its messages stay in the Inbox, unlinked. */
 	dismissFoundJob: (id: number) => typedError<null, string>(__TAURI_INVOKE("dismiss_found_job", { id })),
+	/**
+	 *  The people you know, closest first. `query` searches names, companies and notes; `tier` is
+	 *  `close`, `warm`, `weak` or empty for everyone.
+	 */
+	listPeople: (query: string, tier: string) => typedError<PersonLine[], string>(__TAURI_INVOKE("list_people", { query, tier })),
+	/**  Import contacts from a vCard (.vcf) or CSV file's text. Nothing already saved is overwritten. */
+	importContacts: (fileName: string, text: string) => typedError<PeopleImport, string>(__TAURI_INVOKE("import_contacts", { fileName, text })),
+	/**  Move a person between close, warm and weak. */
+	setPersonTier: (id: number, tier: string) => typedError<null, string>(__TAURI_INVOKE("set_person_tier", { id, tier })),
 };
 
 /* Types */
@@ -518,6 +527,27 @@ export type ModelStatus = {
 	name: string,
 	size_mb: number,
 	installed: boolean,
+};
+
+/**  What an import of contacts did. */
+export type PeopleImport = {
+	added: number,
+	matched: number,
+	skipped: number,
+};
+
+/**  One person in the Network list. */
+export type PersonLine = {
+	id: number,
+	name: string,
+	/**  Where they work, or empty. */
+	company: string,
+	title: string,
+	email: string,
+	/**  `close`, `warm` or `weak`. */
+	tier: string,
+	/**  The date you last were in touch, or empty. */
+	last_contacted: string,
 };
 
 /**  What happened when CeeVee filled in an application. */

@@ -1024,3 +1024,106 @@ pub async fn prepare_application(
         cover_letter: v["cover_letter"].as_str().map(str::to_string),
     })
 }
+
+/// One person in the Network list.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct PersonLine {
+    pub id: u32,
+    pub name: String,
+    /// Where they work, or empty.
+    pub company: String,
+    pub title: String,
+    pub email: String,
+    /// `close`, `warm` or `weak`.
+    pub tier: String,
+    /// The date you last were in touch, or empty.
+    pub last_contacted: String,
+}
+
+/// What an import of contacts did.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct PeopleImport {
+    pub added: u32,
+    pub matched: u32,
+    pub skipped: u32,
+}
+
+/// The people you know, closest first. `query` searches names, companies and notes; `tier` is
+/// `close`, `warm`, `weak` or empty for everyone.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_people(
+    db: tauri::State<'_, ceevee_db::Db>,
+    query: String,
+    tier: String,
+) -> Result<Vec<PersonLine>, String> {
+    let tier = match tier.as_str() {
+        "" => None,
+        t => Some(
+            serde_json::from_value::<ceevee_network::people::Tier>(serde_json::Value::String(
+                t.to_string(),
+            ))
+            .map_err(|_| "Unknown tier.".to_string())?,
+        ),
+    };
+    let q = query.trim();
+    let rows = ceevee_network::people::list(&db, (!q.is_empty()).then_some(q), tier)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|p| PersonLine {
+            id: p.id as u32,
+            name: p.full_name,
+            company: p.company.unwrap_or_default(),
+            title: p.title.unwrap_or_default(),
+            email: p.email.unwrap_or_default(),
+            tier: p.tier.as_str().to_string(),
+            last_contacted: p.last_contacted.unwrap_or_default(),
+        })
+        .collect())
+}
+
+/// Import contacts from a vCard (.vcf) or CSV file's text. Nothing already saved is overwritten.
+#[tauri::command]
+#[specta::specta]
+pub async fn import_contacts(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    file_name: String,
+    text: String,
+) -> Result<PeopleImport, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let lower = file_name.to_lowercase();
+    let people = if lower.ends_with(".vcf") || text.trim_start().starts_with("BEGIN:VCARD") {
+        ceevee_network::import::parse_vcards(&text)
+    } else {
+        ceevee_network::import::parse_csv(&text).map_err(|e| e.to_string())?
+    };
+    let s = ceevee_network::import::save(&db, &people, "import")
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(PeopleImport {
+        added: s.added as u32,
+        matched: s.matched as u32,
+        skipped: s.skipped as u32,
+    })
+}
+
+/// Move a person between close, warm and weak.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_person_tier(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    tier: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let tier =
+        serde_json::from_value::<ceevee_network::people::Tier>(serde_json::Value::String(tier))
+            .map_err(|_| "Unknown tier.".to_string())?;
+    ceevee_network::people::set_tier(&db, i64::from(id), tier)
+        .await
+        .map_err(|e| e.to_string())
+}
