@@ -8,6 +8,7 @@ pub mod companies;
 pub mod postings;
 pub mod record;
 pub mod sources;
+pub mod starter;
 pub mod tracking;
 
 fn db_err(e: sqlx::Error) -> ceevee_core::Error {

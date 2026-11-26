@@ -14,3 +14,4 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 - CeeVee keeps a record of every form it fills in for you: the answers it used, the resume and cover letter it attached, and the job post as it was that day.
 - Before you submit an application, CeeVee lists every field it filled, every required field it could not answer, and anything to double check, so nothing goes out blank.
+- Your first search now works right away: CeeVee also looks at the job boards of about 30 well-known companies, so you see real openings before you add anything. You can turn this off.

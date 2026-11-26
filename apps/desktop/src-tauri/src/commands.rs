@@ -383,12 +383,9 @@ pub async fn run_search(
             ceevee_analytics::Feature::JobSearchRun,
         ))
         .await;
-    let boards = ceevee_search::sources::load_boards(&db)
-        .await
-        .map_err(|e| e.to_string())?;
     let fetcher = ceevee_search::sources::HttpFetcher::new().map_err(|e| e.to_string())?;
     let now = ceevee_search::sources::now_iso();
-    let s = ceevee_search::sources::run(&db, &fetcher, &boards, &now)
+    let s = ceevee_search::starter::run_all(&db, &fetcher, &now)
         .await
         .map_err(|e| e.to_string())?;
     Ok(SearchResult {
