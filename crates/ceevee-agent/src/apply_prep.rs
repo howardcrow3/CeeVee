@@ -21,6 +21,12 @@ pub struct Inputs {
     pub resume_title: Option<String>,
     /// The cover letter attached, if one was saved for this job.
     pub cover_letter_title: Option<String>,
+    /// For the application record: the posting, its application if there is one, and the exact
+    /// document versions that were attached.
+    pub posting_id: i64,
+    pub application_id: Option<i64>,
+    pub resume_version_id: Option<i64>,
+    pub cover_letter_version_id: Option<i64>,
 }
 
 /// Gather the inputs for applying to a posting. The resume PDF is written into `pdf_dir`.
@@ -57,6 +63,7 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
             .map(|a| a.id);
 
     let mut resume_title = None;
+    let mut resume_version_id = None;
     let mut candidates = Vec::new();
     if let Some(app) = application {
         candidates.push((DocKind::TailoredResume, Some(app)));
@@ -72,10 +79,12 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
             std::fs::write(&path, bytes)?;
             answers.resume_pdf = Some(path.display().to_string());
             resume_title = Some(doc.title);
+            resume_version_id = Some(cur.id);
             break;
         }
     }
     let mut cover_letter_title = None;
+    let mut cover_letter_version_id = None;
     if let Some(app) = application {
         if let Some(doc) = store::list(db, Some(DocKind::CoverLetter), Some(app))
             .await?
@@ -89,6 +98,7 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
             std::fs::write(&path, bytes)?;
             answers.cover_letter_pdf = Some(path.display().to_string());
             cover_letter_title = Some(doc.title);
+            cover_letter_version_id = Some(cur.id);
         }
     }
     Ok(Inputs {
@@ -97,6 +107,10 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
         answers,
         resume_title,
         cover_letter_title,
+        posting_id,
+        application_id: application,
+        resume_version_id,
+        cover_letter_version_id,
     })
 }
 
