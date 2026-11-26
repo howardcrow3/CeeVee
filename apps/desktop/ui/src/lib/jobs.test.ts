@@ -67,3 +67,23 @@ describe('drafts', () => {
     expect(draftLabel('tailored_resume')).toBe('tailored resume');
   });
 });
+
+import { filterJobs } from './jobs';
+
+describe('filterJobs', () => {
+  const jobs = [
+    { title: 'Product Manager', company: 'Acme', location: 'Denver', state: 'new' },
+    { title: 'Designer', company: 'Globex', location: null, state: 'saved' }
+  ];
+  it('keeps everything with no filter', () => {
+    expect(filterJobs(jobs, { state: 'all', text: '' })).toHaveLength(2);
+  });
+  it('filters by status', () => {
+    expect(filterJobs(jobs, { state: 'saved', text: '' }).map((j) => j.title)).toEqual(['Designer']);
+    expect(filterJobs(jobs, { state: 'new', text: '' }).map((j) => j.title)).toEqual(['Product Manager']);
+  });
+  it('matches every typed word across title, company and place', () => {
+    expect(filterJobs(jobs, { state: 'all', text: 'acme denver' })).toHaveLength(1);
+    expect(filterJobs(jobs, { state: 'all', text: 'acme tokyo' })).toHaveLength(0);
+  });
+});

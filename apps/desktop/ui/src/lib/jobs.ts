@@ -48,3 +48,16 @@ export function draftNote(flagged: string[]): string {
 export function draftLabel(kind: string): string {
   return kind === 'cover_letter' ? 'cover letter' : 'tailored resume';
 }
+
+export type JobFilter = { state: 'all' | 'new' | 'saved'; text: string };
+
+/** Jobs matching the status chip and the typed words (title, company or place). */
+export function filterJobs<T extends Pick<JobLine, 'title' | 'company' | 'location' | 'state'>>(jobs: T[], f: JobFilter): T[] {
+  const words = f.text.toLowerCase().split(/\s+/).filter((w) => w !== '');
+  return jobs.filter((j) => {
+    if (f.state === 'saved' && j.state !== 'saved') return false;
+    if (f.state === 'new' && j.state === 'saved') return false;
+    const hay = `${j.title} ${j.company ?? ''} ${j.location ?? ''}`.toLowerCase();
+    return words.every((w) => hay.includes(w));
+  });
+}
