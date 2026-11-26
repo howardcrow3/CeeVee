@@ -1,56 +1,60 @@
-/* Turtlebox tokens as role names. Components use these, never raw hex. */
-@font-face { font-family: 'Cormorant Garamond'; font-weight: 300; src: url('/fonts/CormorantGaramond-Light.woff2') format('woff2'); font-display: swap; }
-@font-face { font-family: 'Cormorant Garamond'; font-weight: 400; src: url('/fonts/CormorantGaramond-Regular.woff2') format('woff2'); font-display: swap; }
-@font-face { font-family: 'Inter'; font-weight: 300; src: url('/fonts/Inter-Light.woff2') format('woff2'); font-display: swap; }
+/* Turtlebox UX framework tokens, vendored from howardcrow3/turtlebox-ui (css/tokens.css).
+   Components use role names, never raw hex. Light and dark are both first class. */
+@import './styles/turtlebox-tokens.css';
+
 @font-face { font-family: 'Inter'; font-weight: 400; src: url('/fonts/Inter-Regular.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'Inter'; font-weight: 500; src: url('/fonts/Inter-Medium.woff2') format('woff2'); font-display: swap; }
+@font-face { font-family: 'Inter'; font-weight: 600; src: url('/fonts/Inter-SemiBold.woff2') format('woff2'); font-display: swap; }
 
 :root {
-  --paper: #f5f0e7; --surface: #f0e8d8; --line: #d9d2c5; --ink: #1c1c1c; --body: #3a3530;
-  --border-control: #8a8278; --accent: #d4a853; --on-ink: #f5f0e7; --on-accent: #1c1c1c;
-  --danger: #9b2c2c; --focus-ring: #1c1c1c;
-  --font-display: 'Cormorant Garamond', Georgia, serif;
-  --font-text: 'Inter', system-ui, sans-serif;
-  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Names CeeVee code already uses, mapped onto the framework tokens. */
+  --border-control: var(--control);
+  --focus-ring: var(--ink);
+  --font-text: var(--sans);
+  --font-display: var(--sans);
+  --ease: ease-out;
+  --dur: 150ms;
   color-scheme: light;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --paper: #1c1c1c; --surface: #282828; --line: #2e2e2e; --ink: #f5f0e7; --body: #c8b99a;
-    --on-ink: #1c1c1c; --danger: #e08a8a; --focus-ring: #f5f0e7; color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --paper: #1c1c1c; --surface: #282828; --line: #2e2e2e; --ink: #f5f0e7; --body: #c8b99a;
-  --on-ink: #1c1c1c; --danger: #e08a8a; --focus-ring: #f5f0e7; color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; background: var(--paper); color: var(--body); font: 400 14px/1.6 var(--font-text); }
-h1, h2 { font-family: var(--font-display); font-weight: 300; color: var(--ink); margin: 0; }
-h1 { font-size: 36px; line-height: 1.1; }
-h2 { font-size: 24px; }
-p { max-width: 34em; margin: 0; }
-.label { font: 500 11px var(--font-text); letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink); }
-:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 4px; }
+body { margin: 0; background: var(--paper); color: var(--body); font: 400 13px/1.55 var(--sans); letter-spacing: -0.005em; }
+h1, h2, h3 { font-family: var(--sans); color: var(--ink); margin: 0; text-wrap: balance; }
+h1 { font-size: 20px; line-height: 1.25; font-weight: 600; letter-spacing: -0.025em; }
+h2 { font-size: 15px; line-height: 1.35; font-weight: 600; letter-spacing: -0.02em; }
+h3 { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+p { max-width: 62ch; margin: 0; }
+a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 2px; }
+.label { font: 500 11px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 
 button, .button {
-  font: 500 11px var(--font-text); letter-spacing: 0.3em; text-transform: uppercase;
-  border: 1px solid var(--ink); background: var(--ink); color: var(--on-ink);
-  padding: 12px 24px; cursor: pointer; border-radius: 0;
-  transition: background 300ms var(--ease), color 300ms var(--ease), border-color 300ms var(--ease);
+  font: 500 12.5px/1 var(--sans); letter-spacing: 0; text-transform: none;
+  min-height: 26px; padding: 0 11px; border: 1px solid var(--ink); background: var(--ink); color: var(--on-ink);
+  cursor: pointer; border-radius: var(--r-sm);
+  transition: background var(--dur) var(--ease), color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
 button:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 button.ghost { background: transparent; color: var(--ink); border-color: var(--border-control); }
-button.ghost:hover:not(:disabled) { background: transparent; border-color: var(--accent); color: var(--ink); }
+button.ghost:hover:not(:disabled) { background: var(--hover); border-color: var(--border-control); color: var(--ink); }
 button:disabled { opacity: 0.5; cursor: default; }
 
-.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; border: 1px solid var(--border-control); }
+input:not([type='radio']):not([type='checkbox']), select, textarea {
+  font: 400 12.5px/1.4 var(--sans); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border-control); border-radius: var(--r-sm); padding: 0 10px; min-height: 28px;
+}
+textarea { padding: 6px 10px; }
+select {
+  appearance: none; padding-right: 28px;
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%238a8278' stroke-width='1.6'%3E%3Cpath d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right 10px center;
+}
+
+.dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; border: 1px solid var(--border-control); }
 .dot.on { background: var(--accent); border-color: var(--accent); }
 .dot.warn { background: var(--danger); border-color: var(--danger); }
 
-table { border-collapse: collapse; width: 100%; font-size: 13px; }
-th { text-align: left; font: 500 11px var(--font-text); letter-spacing: 0.3em; text-transform: uppercase; color: var(--ink); padding: 16px; border-bottom: 1px solid var(--ink); }
-td { padding: 16px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+th { text-align: left; font: 500 11px var(--sans); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 7px 12px; border-bottom: 1px solid var(--line); }
+td { padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
 
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
