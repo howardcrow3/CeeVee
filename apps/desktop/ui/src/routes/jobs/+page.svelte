@@ -3,6 +3,8 @@
   import { commands, type JobDraft, type JobLine, type KnownLine } from '$lib/bindings';
   import { byMatch, filterJobs, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
+  import ChatLayout from '$lib/components/ChatLayout.svelte';
+  import { jobFocus } from '$lib/chat';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let jobs = $state<JobLine[]>([]);
@@ -111,6 +113,7 @@
     searching = false;
   }
 </script>
+<ChatLayout focus={open ? jobFocus(open) : ''}>
 
 <header class="head">
   <span class="label">Jobs</span>
@@ -192,6 +195,7 @@
     {/if}
   </div>
 {/if}
+</ChatLayout>
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; }

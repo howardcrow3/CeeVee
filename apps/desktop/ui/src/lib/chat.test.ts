@@ -57,3 +57,14 @@ describe('chat', () => {
     expect(suggestions(ctx)).toHaveLength(4);
   });
 });
+
+import { focusLine, jobFocus } from './chat';
+
+describe('focus', () => {
+  it('adds nothing when nothing is open', () => expect(focusLine('  ')).toBe(''));
+  it('names what the person is looking at', () => expect(focusLine('the job PM')).toContain('looking at: the job PM'));
+  it('describes a job with company and match', () =>
+    expect(jobFocus({ title: 'PM', company: 'Acme', score: 89.6, state: 'new' })).toBe('the job PM at Acme (new, 90% match)'));
+  it('copes with a missing company and score', () =>
+    expect(jobFocus({ title: 'PM', company: null, score: null, state: 'saved' })).toBe('the job PM (saved)'));
+});
