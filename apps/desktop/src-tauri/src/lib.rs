@@ -3,6 +3,7 @@
 
 mod analytics_cmd;
 mod apply_tool;
+mod chat_act;
 mod commands;
 mod deep_link;
 mod diagnostics;
@@ -72,6 +73,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             models::model_progress,
             models::cancel_model_download,
             models::ask_model,
+            chat_act::chat_act,
             commands::list_documents,
             commands::get_document,
             commands::create_document,

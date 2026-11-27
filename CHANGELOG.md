@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Chat can add a job type or switch one off when you ask (for example, "add a job type for product managers"). It tells you what it changed.
 - An Ask CeeVee button on Jobs and Applications opens the chat beside the list. It knows which job you have open.
 - CeeVee now opens to a chat. Ask about your jobs and applications and the local AI answers from what CeeVee has found. It can only answer for now, not make changes, and conversations are not saved yet.
 - A clearer Sign in with Google button, shown in setup and in Settings under Accounts. It is optional, says it is read-only, and shows a waiting state with Cancel.
