@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Jobs can be narrowed to one job type with a menu above the list.
 - Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
 - Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.
 - Chat can add a job type or switch one off when you ask (for example, "add a job type for product managers"). It tells you what it changed.

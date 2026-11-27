@@ -47,6 +47,8 @@ export const commands = {
 	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
 	/**  Jobs found by searches that you have not dismissed, newest first. */
 	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
+	/**  Which jobs fit which job types (a stored score of 50 or more). */
+	listJobTypeMatches: () => typedError<JobTypeMatch[], string>(__TAURI_INVOKE("list_job_type_matches")),
 	/**  People you know at the company that posted a job. */
 	peopleAtJob: (id: number) => typedError<KnownLine_Serialize[], string>(__TAURI_INVOKE("people_at_job", { id })),
 	/**  Hide a job you are not interested in. */
@@ -450,6 +452,12 @@ export type JobLine_Serialize = {
 	url: string,
 	/**  How many of your LinkedIn connections currently work at this company. */
 	known: number,
+};
+
+/**  A job that fits a job type well enough to be listed under it. */
+export type JobTypeMatch = {
+	job: number,
+	job_type: number,
 };
 
 export type KnownLine = KnownLine_Serialize | KnownLine_Deserialize;

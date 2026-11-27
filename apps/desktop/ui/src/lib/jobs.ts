@@ -49,14 +49,15 @@ export function draftLabel(kind: string): string {
   return kind === 'cover_letter' ? 'cover letter' : 'tailored resume';
 }
 
-export type JobFilter = { state: 'all' | 'new' | 'saved'; text: string };
+export type JobFilter = { state: 'all' | 'new' | 'saved'; text: string; only?: ReadonlySet<number> | null };
 
 /** Jobs matching the status chip and the typed words (title, company or place). */
-export function filterJobs<T extends Pick<JobLine, 'title' | 'company' | 'location' | 'state'>>(jobs: T[], f: JobFilter): T[] {
+export function filterJobs<T extends Pick<JobLine, 'id' | 'title' | 'company' | 'location' | 'state'>>(jobs: T[], f: JobFilter): T[] {
   const words = f.text.toLowerCase().split(/\s+/).filter((w) => w !== '');
   return jobs.filter((j) => {
     if (f.state === 'saved' && j.state !== 'saved') return false;
     if (f.state === 'new' && j.state === 'saved') return false;
+    if (f.only && !f.only.has(j.id)) return false;
     const hay = `${j.title} ${j.company ?? ''} ${j.location ?? ''}`.toLowerCase();
     return words.every((w) => hay.includes(w));
   });
@@ -86,4 +87,10 @@ export function stepId(ids: number[], current: number | null, dir: 1 | -1): numb
 /** "3 selected" style label for the bulk bar. */
 export function selectedText(n: number): string {
   return `${n} selected`;
+}
+
+/** The ids of the jobs that fit one job type, or null for "all job types". */
+export function jobsOfType(matches: { job: number; job_type: number }[], jobType: number | null): Set<number> | null {
+  if (jobType == null) return null;
+  return new Set(matches.filter((m) => m.job_type === jobType).map((m) => m.job));
 }

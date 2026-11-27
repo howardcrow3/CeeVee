@@ -72,8 +72,8 @@ import { filterJobs } from './jobs';
 
 describe('filterJobs', () => {
   const jobs = [
-    { title: 'Product Manager', company: 'Acme', location: 'Denver', state: 'new' },
-    { title: 'Designer', company: 'Globex', location: null, state: 'saved' }
+    { id: 1, title: 'Product Manager', company: 'Acme', location: 'Denver', state: 'new' },
+    { id: 2, title: 'Designer', company: 'Globex', location: null, state: 'saved' }
   ];
   it('keeps everything with no filter', () => {
     expect(filterJobs(jobs, { state: 'all', text: '' })).toHaveLength(2);
@@ -113,4 +113,21 @@ describe('selection', () => {
     expect(stepId([], 1, 1)).toBeNull();
   });
   it('labels the bulk bar', () => expect(selectedText(3)).toBe('3 selected'));
+});
+
+import { jobsOfType } from './jobs';
+
+describe('by job type', () => {
+  const jobs = [
+    { id: 1, title: 'PM', company: 'A', location: null, state: 'new' },
+    { id: 2, title: 'Designer', company: 'B', location: null, state: 'new' }
+  ];
+  const matches = [{ job: 1, job_type: 10 }, { job: 2, job_type: 20 }];
+  it('keeps only the jobs of the chosen type', () => {
+    expect(filterJobs(jobs, { state: 'all', text: '', only: jobsOfType(matches, 20) }).map((j) => j.id)).toEqual([2]);
+  });
+  it('shows everything for all job types', () => {
+    expect(jobsOfType(matches, null)).toBeNull();
+    expect(filterJobs(jobs, { state: 'all', text: '', only: null })).toHaveLength(2);
+  });
 });

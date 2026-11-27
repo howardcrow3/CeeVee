@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { commands, type JobDraft, type JobLine, type KnownLine } from '$lib/bindings';
-  import { byMatch, filterJobs, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
+  import { commands, type CategoryLine, type JobDraft, type JobLine, type JobTypeMatch, type KnownLine } from '$lib/bindings';
+  import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
@@ -12,7 +12,10 @@
   let stateFilter = $state<'all' | 'new' | 'saved'>('all');
   let text = $state('');
   let openId = $state<number | null>(null);
-  const shown = $derived(byMatch(filterJobs(jobs, { state: stateFilter, text })));
+  let types = $state<CategoryLine[]>([]);
+  let matches = $state<JobTypeMatch[]>([]);
+  let typeId = $state<number | null>(null);
+  const shown = $derived(byMatch(filterJobs(jobs, { state: stateFilter, text, only: jobsOfType(matches, typeId) })));
   const open = $derived(jobs.find((j) => j.id === openId) ?? null);
   const chips: { value: 'all' | 'new' | 'saved'; label: string }[] = [
     { value: 'all', label: 'All' },
@@ -118,6 +121,9 @@
       const r = await commands.listJobs();
       if (r.status === 'ok') jobs = r.data;
       else error = r.error;
+      const [t, m] = await Promise.all([commands.listCategories(), commands.listJobTypeMatches()]);
+      if (t.status === 'ok') types = t.data;
+      if (m.status === 'ok') matches = m.data;
     } catch (e) {
       error = `Running outside the desktop app: ${String(e)}`;
     } finally {
@@ -170,6 +176,12 @@
         <button class:on={stateFilter === c.value} aria-pressed={stateFilter === c.value} onclick={() => (stateFilter = c.value)}>{c.label}</button>
       {/each}
     </div>
+    {#if types.length > 0}
+      <select aria-label="Job type" value={typeId ?? ''} onchange={(e) => (typeId = e.currentTarget.value === '' ? null : Number(e.currentTarget.value))}>
+        <option value="">All job types</option>
+        {#each types as t (t.id)}<option value={t.id}>{t.name}</option>{/each}
+      </select>
+    {/if}
     <input class="find" aria-label="Filter jobs" placeholder="Filter by title, company or place" bind:value={text} />
     <span class="count note">{shown.length} of {jobs.length}</span>
   </div>

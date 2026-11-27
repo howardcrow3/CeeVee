@@ -63,6 +63,31 @@ pub struct JobLine {
     pub known: u32,
 }
 
+/// A job that fits a job type well enough to be listed under it.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct JobTypeMatch {
+    pub job: u32,
+    pub job_type: u32,
+}
+
+/// Which jobs fit which job types (a stored score of 50 or more).
+#[tauri::command]
+#[specta::specta]
+pub async fn list_job_type_matches(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<JobTypeMatch>, String> {
+    let rows = ceevee_search::categories::matches(&db, 50.0)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(job, job_type)| JobTypeMatch {
+            job: job as u32,
+            job_type: job_type as u32,
+        })
+        .collect())
+}
+
 /// Jobs found by searches that you have not dismissed, newest first.
 #[tauri::command]
 #[specta::specta]
