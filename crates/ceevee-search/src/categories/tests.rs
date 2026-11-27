@@ -158,3 +158,40 @@ async fn a_category_can_be_renamed_and_removed() {
     assert_eq!(list(&db).await.unwrap().len(), 1);
     assert_eq!(list(&db).await.unwrap()[0].id, other.id);
 }
+
+#[tokio::test]
+async fn matches_lists_only_postings_that_fit() {
+    let db = Db::open_in_memory().await.unwrap();
+    let pm = create(&db, "PM", &crit()).await.unwrap();
+    let design = create(
+        &db,
+        "Design",
+        &Criteria {
+            titles: vec!["designer".into()],
+            ..Criteria::default()
+        },
+    )
+    .await
+    .unwrap();
+    let Ingest::New(id) = postings::ingest(
+        &db,
+        &NewPosting {
+            source: "x".into(),
+            url: "https://a/9".into(),
+            company: "Acme".into(),
+            title: "Product Manager".into(),
+            location: Some("Columbus".into()),
+            body: Some("saas roadmap".into()),
+            ..NewPosting::default()
+        },
+        "2026-11-01T10:00:00Z",
+    )
+    .await
+    .unwrap() else {
+        panic!()
+    };
+    score_posting(&db, id).await.unwrap();
+    assert_eq!(matches(&db, 50.0).await.unwrap(), vec![(id, pm.id)]);
+    let all = matches(&db, 0.0).await.unwrap();
+    assert!(all.contains(&(id, design.id)));
+}

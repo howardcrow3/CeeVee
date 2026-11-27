@@ -220,6 +220,23 @@ pub async fn delete(db: &Db, id: i64) -> Result<()> {
     Ok(())
 }
 
+/// Which postings fit which categories: (posting id, category id) for every stored score at or
+/// above `min_score`.
+pub async fn matches(db: &Db, min_score: f64) -> Result<Vec<(i64, i64)>> {
+    let rows = sqlx::query(
+        "SELECT posting_id, category_id FROM posting_category WHERE score >= ? \
+         ORDER BY category_id, posting_id",
+    )
+    .bind(min_score)
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    Ok(rows
+        .iter()
+        .map(|r| (r.get("posting_id"), r.get("category_id")))
+        .collect())
+}
+
 /// Score a posting against every active category, store the rows in `posting_category`, and set
 /// the posting's own score to the best one. Returns each category's score.
 pub async fn score_posting(db: &Db, posting_id: i64) -> Result<Vec<(i64, Score)>> {
