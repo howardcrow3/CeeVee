@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
 - Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.
 - Chat can add a job type or switch one off when you ask (for example, "add a job type for product managers"). It tells you what it changed.
 - An Ask CeeVee button on Jobs and Applications opens the chat beside the list. It knows which job you have open.

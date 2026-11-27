@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type JobDraft, type JobLine, type KnownLine } from '$lib/bindings';
-  import { byMatch, filterJobs, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, statusWord } from '$lib/jobs';
+  import { byMatch, filterJobs, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
@@ -19,11 +19,35 @@
     { value: 'new', label: 'New' },
     { value: 'saved', label: 'Saved' }
   ];
+  let picked = $state<Set<number>>(new Set());
+  const allPicked = $derived(shown.length > 0 && shown.every((j) => picked.has(j.id)));
+
   function onRowKey(e: KeyboardEvent, id: number) {
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       openId = id;
+    } else if (e.key === 'ArrowDown' || e.key === 'j' || e.key === 'ArrowUp' || e.key === 'k') {
+      e.preventDefault();
+      const next = stepId(shown.map((j) => j.id), id, e.key === 'ArrowDown' || e.key === 'j' ? 1 : -1);
+      if (next != null) (document.querySelector(`[data-job="${next}"]`) as HTMLElement | null)?.focus();
+    } else if (e.key === 'x') {
+      e.preventDefault();
+      picked = toggleId(picked, id);
     }
+  }
+
+  async function dismissPicked() {
+    applyError = '';
+    for (const id of picked) {
+      const r = await commands.dismissJob(id);
+      if (r.status !== 'ok') {
+        applyError = r.error;
+        break;
+      }
+    }
+    picked = new Set();
+    openId = null;
+    await load();
   }
   let error = $state('');
 
@@ -149,15 +173,23 @@
     <input class="find" aria-label="Filter jobs" placeholder="Filter by title, company or place" bind:value={text} />
     <span class="count note">{shown.length} of {jobs.length}</span>
   </div>
+  {#if picked.size > 0}
+    <div class="bulk" role="region" aria-label="Selected jobs">
+      <b>{selectedText(picked.size)}</b>
+      <button class="ghost" onclick={dismissPicked}>Dismiss selected</button>
+      <button class="ghost" onclick={() => (picked = new Set())}>Clear</button>
+    </div>
+  {/if}
   <div class="split" class:with-detail={open}>
     <div class="plate">
       <table>
         <thead>
-          <tr><th>Role</th><th>Company</th><th>Place</th><th>Status</th><th class="n">Match</th></tr>
+          <tr><th class="pick"><input type="checkbox" aria-label="Select all shown" checked={allPicked} onchange={() => (picked = toggleAllIds(picked, shown.map((j) => j.id)))} /></th><th>Role</th><th>Company</th><th>Place</th><th>Status</th><th class="n">Match</th></tr>
         </thead>
         <tbody>
           {#each shown as j (j.id)}
-            <tr class="jr" class:sel={openId === j.id} tabindex="0" onclick={() => (openId = j.id)} onkeydown={(e) => onRowKey(e, j.id)}>
+            <tr class="jr" class:sel={openId === j.id} data-job={j.id} tabindex="0" onclick={() => (openId = j.id)} onkeydown={(e) => onRowKey(e, j.id)}>
+              <td class="pick" onclick={(e) => e.stopPropagation()}><input type="checkbox" aria-label={`Select ${j.title}`} checked={picked.has(j.id)} onchange={() => (picked = toggleId(picked, j.id))} /></td>
               <td class="t"><b>{j.title}</b></td>
               <td class="t">{j.company ?? 'Company not listed'}</td>
               <td class="t">{placeText(j)}</td>
@@ -165,7 +197,7 @@
               <td class="n">{matchText(j.score)}</td>
             </tr>
           {:else}
-            <tr><td colspan="5" class="none">No jobs match this filter.</td></tr>
+            <tr><td colspan="6" class="none">No jobs match this filter.</td></tr>
           {/each}
         </tbody>
       </table>
@@ -218,6 +250,8 @@
   .jr.sel { background: var(--selected); }
   .jr:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
   .none { color: var(--muted); }
+  .pick { width: 28px; padding-right: 0; }
+  .bulk { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--selected); }
   b { color: var(--ink); font-weight: 500; }
   .n { font-variant-numeric: tabular-nums; text-align: right; }
   .detail { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
