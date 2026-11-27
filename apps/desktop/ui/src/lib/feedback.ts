@@ -16,14 +16,23 @@ export function feedbackReady(rating: number, message: string): boolean {
   return rating > 0 || message.trim().length > 0;
 }
 
-/** The command input: trimmed text, and nulls for what the user left empty. */
-export function feedbackInput(rating: number, category: FeedbackCategory, message: string, email: string) {
+/** The command input: trimmed text, and nulls for what the user left empty. Anonymous sends no email. */
+export function feedbackInput(rating: number, category: FeedbackCategory, message: string, email: string, anonymous = false) {
   return {
     rating: rating > 0 ? rating : null,
     category,
     message: message.trim(),
-    email: email.trim() || null
+    email: anonymous ? null : email.trim() || null,
+    anonymous
   };
+}
+
+const EMAIL_RE = /^[^\s@"<>()[\],;:\\]+@(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
+
+/** Blank, or an address in the shape the feedback service accepts (it checks again). */
+export function feedbackEmailOk(email: string): boolean {
+  const e = email.trim();
+  return !e || (e.length <= 254 && EMAIL_RE.test(e) && !/^\.|\.\.|\.@/.test(e));
 }
 
 /** Shown under the text box near the limit, empty otherwise. */

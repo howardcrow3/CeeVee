@@ -31,6 +31,12 @@ export const commands = {
 	/**  True when this build can send feedback (it carries a feedback key). */
 	feedbackAvailable: () => __TAURI_INVOKE<boolean>("feedback_available"),
 	sendFeedback: (input: FeedbackInput_Deserialize) => typedError<null, string>(__TAURI_INVOKE("send_feedback", { input })),
+	/**
+	 *  The address to prefill on the form: the profile's email, or else the first connected mail
+	 *  account. `None` when CeeVee knows neither. (Async commands that borrow state must return a
+	 *  `Result`; this one never fails.)
+	 */
+	feedbackEmail: () => typedError<string | null, string>(__TAURI_INVOKE("feedback_email")),
 	/**  Ask the update server whether a newer version exists. */
 	checkForUpdate: () => typedError<UpdateInfo_Serialize | null, string>(__TAURI_INVOKE("check_for_update")),
 	/**  Download, verify (signature) and install the newest version, then restart. */
@@ -300,6 +306,8 @@ export type FeedbackInput_Deserialize = {
 	category?: string | null,
 	/**  Only when the user wants a reply. */
 	email?: string | null,
+	/**  "Send anonymously": no email is sent, and the service keeps none. */
+	anonymous?: boolean,
 };
 
 /**  What the user filled in on the feedback form. */
@@ -311,6 +319,8 @@ export type FeedbackInput_Serialize = {
 	category: string | null,
 	/**  Only when the user wants a reply. */
 	email: string | null,
+	/**  "Send anonymously": no email is sent, and the service keeps none. */
+	anonymous: boolean,
 };
 
 /**  A job CeeVee started from an email, waiting for the user to keep or dismiss it. */
