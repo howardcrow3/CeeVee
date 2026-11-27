@@ -58,11 +58,13 @@
       error = r.error;
       return;
     }
+    // eslint-disable-next-line no-undef
     const url = URL.createObjectURL(new Blob([r.data], { type: 'text/calendar' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = 'meeting.ics';
     a.click();
+    // eslint-disable-next-line no-undef
     URL.revokeObjectURL(url);
   }
 
