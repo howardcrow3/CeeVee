@@ -54,7 +54,7 @@ export function buildPrompt(summary: string, history: Turn[], message: string): 
   const recent = history.slice(-MAX_TURNS).map((t) => `${t.role === 'user' ? 'Person' : 'CeeVee'}: ${clip(t.text)}`);
   return [
     'You are CeeVee, a private assistant that helps one person with their job search. Answer briefly and plainly.',
-    'Use only the facts below. If the answer is not there, say you do not know. You cannot change anything yet, so if asked to do something, say what the person can do in the app instead.',
+    'Use only the facts below. If the answer is not there, say you do not know. You cannot change anything in this answer. If asked to add or switch a job type, say to ask like "add a job type for product managers"; for anything else, say what the person can do in the app.',
     '',
     'Facts:',
     summary,
@@ -108,4 +108,18 @@ export async function loadChatContext(): Promise<ChatContext> {
   } catch {
     return empty;
   }
+}
+
+/** True when the message asks CeeVee to change a job type, so it goes to the agent, not the plain Q&A. */
+export function wantsAction(message: string): boolean {
+  const m = message.toLowerCase();
+  if (!/\bjob types?\b|\bsearch(es)? for\b|\blook(ing)? for\b/.test(m)) return false;
+  return /\b(add|create|make|new|start|turn|switch|enable|disable|stop|pause|resume)\b/.test(m);
+}
+
+/** What to show under a reply from the agent. */
+export function actionNotes(did: string[], waiting: number): string[] {
+  const notes = [...did];
+  if (waiting > 0) notes.push(`${waiting} ${waiting === 1 ? 'change is' : 'changes are'} waiting for your approval`);
+  return notes;
 }

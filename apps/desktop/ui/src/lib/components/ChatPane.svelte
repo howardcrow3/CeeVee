@@ -2,12 +2,12 @@
   import { onMount, tick } from 'svelte';
   import { resolve } from '$app/paths';
   import { commands } from '$lib/bindings';
-  import { buildPrompt, focusLine, loadChatContext, contextChip, contextSummary, friendlyError, suggestions, type ChatContext, type Turn } from '$lib/chat';
+  import { actionNotes, buildPrompt, wantsAction, focusLine, loadChatContext, contextChip, contextSummary, friendlyError, suggestions, type ChatContext, type Turn } from '$lib/chat';
   import { openSettings } from '$lib/settings-ui.svelte';
 
   let { focus = '', compact = false }: { focus?: string; compact?: boolean } = $props();
   let context = $state<ChatContext>({ jobs: [], applications: [], jobTypes: [], waiting: 0 });
-  let turns = $state<(Turn & { needsModel?: boolean })[]>([]);
+  let turns = $state<(Turn & { needsModel?: boolean; notes?: string[] })[]>([]);
   let draft = $state('');
   let thinking = $state(false);
   let list: HTMLDivElement | undefined = $state();
@@ -26,6 +26,17 @@
     await tick();
     list?.scrollTo({ top: list.scrollHeight });
     try {
+      if (wantsAction(message)) {
+        const a = await commands.chatAct(message);
+        if (a.status === 'ok') {
+          turns = [...turns, { role: 'assistant', text: a.data.reply, notes: actionNotes(a.data.did, a.data.waiting) }];
+          context = await loadChatContext();
+          return;
+        }
+        const f = friendlyError(a.error);
+        turns = [...turns, { role: 'assistant', text: f.text, needsModel: f.needsModel }];
+        return;
+      }
       const r = await commands.askModel(buildPrompt(contextSummary(context) + focusLine(focus), history, message));
       if (r.status === 'ok') turns = [...turns, { role: 'assistant', text: r.data.trim() || 'I have nothing to add.' }];
       else {
@@ -72,6 +83,7 @@
           <li class={t.role}>
             <span class="who">{t.role === 'user' ? 'You' : 'CeeVee'}</span>
             <p>{t.text}</p>
+            {#if t.notes}{#each t.notes as n (n)}<span class="note">{n}</span>{/each}{/if}
             {#if t.needsModel}<button class="link" onclick={() => openSettings('general')}>Download it in Settings</button>{/if}
           </li>
         {/each}

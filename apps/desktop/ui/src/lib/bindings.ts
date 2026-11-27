@@ -85,6 +85,8 @@ export const commands = {
 	cancelModelDownload: () => __TAURI_INVOKE<void>("cancel_model_download"),
 	/**  Ask the local model one question and wait for the whole answer. */
 	askModel: (prompt: string) => typedError<string, string>(__TAURI_INVOKE("ask_model", { prompt })),
+	/**  Run one chat message through the agent and return what it said and did. */
+	chatAct: (message: string) => typedError<ChatActResult, string>(__TAURI_INVOKE("chat_act", { message })),
 	listDocuments: () => typedError<DocLine[], string>(__TAURI_INVOKE("list_documents")),
 	getDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("get_document", { id })),
 	/**  Make a new document. Resumes must be valid JSON. */
@@ -228,6 +230,15 @@ export type CategoryLine = {
 	remote_ok: boolean,
 	avoid: string[],
 	active: boolean,
+};
+
+export type ChatActResult = {
+	/**  What CeeVee says back. */
+	reply: string,
+	/**  Plain sentences for each change that was made. */
+	did: string[],
+	/**  Changes that now wait for the person's approval. */
+	waiting: number,
 };
 
 /**  The outcome of asking the assistant to change a document. */
