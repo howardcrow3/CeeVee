@@ -47,6 +47,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             license_cmd::open_info_page,
             feedback_cmd::feedback_available,
             feedback_cmd::send_feedback,
+            feedback_cmd::feedback_email,
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
