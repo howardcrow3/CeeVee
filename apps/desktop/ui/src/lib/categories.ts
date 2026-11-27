@@ -39,3 +39,20 @@ export function describeCategory(c: CategoryLine): string {
   if (c.avoid.length) parts.push(`avoids: ${c.avoid.join(', ')}`);
   return parts.join('; ') || 'No rules yet';
 }
+
+/** Text for the edit form from a saved category. */
+export function formFrom(c: CategoryLine) {
+  return {
+    name: c.name,
+    titles: c.titles.join(', '),
+    keywords: c.keywords.join(', '),
+    locations: c.locations.join(', '),
+    avoid: c.avoid.join(', '),
+    remote_ok: c.remote_ok
+  };
+}
+
+/** The saved category with the edit form applied. Keeps its id and on/off state. */
+export function edited(c: CategoryLine, f: ReturnType<typeof formFrom>): CategoryLine {
+  return { ...newCategory(f), id: c.id, active: c.active };
+}

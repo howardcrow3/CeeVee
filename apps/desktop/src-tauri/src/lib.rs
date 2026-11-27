@@ -64,6 +64,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::apply_profile_changes,
             commands::list_categories,
             commands::create_category,
+            commands::update_category,
+            commands::delete_category,
             commands::set_category_active,
             commands::list_proposals,
             commands::skip_proposal,

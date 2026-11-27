@@ -68,6 +68,10 @@ export const commands = {
 	listCategories: () => typedError<CategoryLine[], string>(__TAURI_INVOKE("list_categories")),
 	/**  Add a kind of job to look for. The id in `line` is ignored. */
 	createCategory: (line: CategoryLine) => typedError<CategoryLine, string>(__TAURI_INVOKE("create_category", { line })),
+	/**  Change a job type's name and rules. */
+	updateCategory: (line: CategoryLine) => typedError<CategoryLine, string>(__TAURI_INVOKE("update_category", { line })),
+	/**  Remove a job type. The jobs already found stay. */
+	deleteCategory: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_category", { id })),
 	/**  Turn a category on or off. Off categories are not used to score jobs. */
 	setCategoryActive: (id: number, active: boolean) => typedError<null, string>(__TAURI_INVOKE("set_category_active", { id, active })),
 	/**  Everything waiting for your approval, oldest first. */
