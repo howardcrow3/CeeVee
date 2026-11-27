@@ -1,9 +1,10 @@
 <script lang="ts">
   /* global HTMLDialogElement */
-  // "Send feedback": stars, a category, the user's words and an optional reply address.
+  // "Send feedback": stars, a category, the user's words, an optional reply address (prefilled from the
+  // profile or a connected mail account) and "Send anonymously", which keeps the address from being sent.
   // The Rust side signs and sends it to the High Turtle feedback service.
   import { commands } from '$lib/bindings';
-  import { MAX_FEEDBACK, charsLeftText, feedbackCategories, feedbackInput, feedbackReady, type FeedbackCategory } from '$lib/feedback';
+  import { MAX_FEEDBACK, charsLeftText, feedbackCategories, feedbackEmailOk, feedbackInput, feedbackReady, type FeedbackCategory } from '$lib/feedback';
 
   let { open = $bindable(false) }: { open?: boolean } = $props();
 
@@ -12,6 +13,7 @@
   let category = $state<FeedbackCategory>('feature');
   let message = $state('');
   let email = $state('');
+  let anonymous = $state(false);
   let busy = $state(false);
   let error = $state('');
   let sent = $state(false);
@@ -22,19 +24,33 @@
       sent = false;
       error = '';
       dialog.showModal();
+      if (!email) prefillEmail();
     } else if (!open && dialog.open) dialog.close();
   });
 
-  async function send() {
-    busy = true;
-    error = '';
+  async function prefillEmail() {
     try {
-      const r = await commands.sendFeedback(feedbackInput(rating, category, message, email));
+      const r = await commands.feedbackEmail();
+      if (r.status === 'ok' && r.data && !email) email = r.data;
+    } catch {
+      // Older builds or no profile: leave it blank.
+    }
+  }
+
+  async function send() {
+    error = '';
+    if (!anonymous && !feedbackEmailOk(email)) {
+      error = 'That email address doesn’t look right. Fix it, clear it, or tick Send anonymously.';
+      return;
+    }
+    busy = true;
+    try {
+      const r = await commands.sendFeedback(feedbackInput(rating, category, message, email, anonymous));
       if (r.status === 'ok') {
         sent = true;
         rating = 0;
         message = '';
-        email = '';
+        anonymous = false;
       } else error = r.error;
     } catch (e) {
       error = String(e);
@@ -72,8 +88,9 @@
       placeholder="A feature you'd like, a problem you hit, or anything else"></textarea>
     {#if charsLeftText(message)}<p class="note">{charsLeftText(message)}</p>{/if}
 
-    <label class="label" for="fb-email">Email (optional, only if you'd like a reply)</label>
-    <input id="fb-email" type="email" autocomplete="email" bind:value={email} />
+    <label class="label" for="fb-email">Email (optional, so we can reply)</label>
+    <input id="fb-email" type="email" autocomplete="email" bind:value={email} disabled={anonymous} />
+    <label class="anon"><input type="checkbox" bind:checked={anonymous} /> Send anonymously (your email isn't sent)</label>
 
     {#if error}<p role="alert" class="err">{error}</p>{/if}
     <div class="actions">
@@ -100,6 +117,9 @@
   textarea, input[type='email'] { width: 100%; font: 400 14px/1.5 var(--font-text); color: var(--ink); background: var(--paper);
     border: 1px solid var(--border-control); border-radius: var(--r-sm); padding: 6px 10px; }
   textarea { resize: vertical; }
+  input[type='email']:disabled { opacity: 0.5; }
+  .anon { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
+  .anon input { accent-color: var(--ink); }
   .err { color: var(--danger); }
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
 </style>

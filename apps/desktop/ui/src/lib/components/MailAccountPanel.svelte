@@ -1,7 +1,8 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { commands, type MailAccountLine } from '$lib/bindings';
-  import { googleAccount, looksLikeAddress, syncSummary } from '$lib/inbox';
+  import { looksLikeAddress, syncSummary } from '$lib/inbox';
+  import GoogleSignIn from './GoogleSignIn.svelte';
 
   let accounts = $state<MailAccountLine[]>([]);
   let address = $state('');
@@ -9,7 +10,6 @@
   let port = $state(993);
   let password = $state('');
   let busy = $state(false);
-  let google = $state(false);
   let message = $state('');
   let error = $state('');
 
@@ -24,7 +24,6 @@
   const refresh = () => load().catch(() => {});
   onMount(() => {
     load().catch((e) => (error = `Running outside the desktop app: ${String(e)}`));
-    commands.googleAvailable().then((g) => (google = g)).catch(() => {});
     window.addEventListener('focus', refresh);
     timer = window.setInterval(() => {
       if (busy) refresh();
@@ -59,30 +58,6 @@
     message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
     await load();
   }
-
-  async function signInWithGoogle() {
-    busy = true;
-    error = message = '';
-    try {
-      const r = await commands.connectGoogle();
-      if (r.status !== 'ok') {
-        error = r.error;
-        return;
-      }
-      message = `Connected ${r.data.address}. Choose Check mail now to read your inbox.`;
-    } catch (e) {
-      error = `Google sign-in stopped unexpectedly: ${String(e)}`;
-    } finally {
-      busy = false;
-      await refresh();
-    }
-  }
-
-  async function cancelGoogle() {
-    await commands.cancelGoogleSignIn();
-  }
-
-  let signedIn = $derived(googleAccount(accounts));
 
   async function disconnect(a: MailAccountLine) {
     error = message = '';
@@ -124,30 +99,8 @@
   {#if accounts.length > 0}
     <div class="row"><button onclick={syncNow} disabled={busy}>{busy ? 'Checking' : 'Check mail now'}</button></div>
   {/if}
-  {#if google}
-    <div class="form">
-      <p class="note">
-        Sign in with Google and CeeVee can read replies from recruiters in your Gmail and keep your
-        applications up to date. CeeVee asks for read-only access: it cannot send, change or delete
-        anything. You can remove access at any time in your Google account.
-      </p>
-      {#if signedIn}
-        <p>
-          <b>Signed in with Google</b> as {signedIn.address}.
-          <button class="ghost" onclick={() => disconnect(signedIn!)} disabled={busy}>Sign out of Google</button>
-        </p>
-      {/if}
-      <div class="row">
-        {#if busy}
-          <span class="note">Waiting for Google. Finish in your browser, or cancel to start over.</span>
-          <button class="ghost" onclick={cancelGoogle}>Cancel</button>
-        {:else}
-          <button onclick={signInWithGoogle}>{signedIn ? 'Sign in with a different Google account' : 'Sign in with Google'}</button>
-        {/if}
-      </div>
-    </div>
-    <p class="note">Or connect any email account with an app password:</p>
-  {/if}
+  <GoogleSignIn onchange={load} />
+  <p class="note">Or connect any email account with an app password:</p>
   <div class="form">
     <input aria-label="Email address" placeholder="Email address" bind:value={address} onblur={fillServer} />
     <div class="row">

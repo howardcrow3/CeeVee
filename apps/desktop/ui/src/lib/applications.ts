@@ -27,3 +27,22 @@ export function groupByStatus(items: ApplicationLine[]): { status: string; items
 export function applicationName(a: ApplicationLine): string {
   return a.company ? `${a.title} at ${a.company}` : a.title;
 }
+
+const openStages = ['draft', 'sent', 'screening', 'interview', 'offer'] as const;
+
+export type BoardColumn = { key: string; label: string; total: number; cards: ApplicationLine[]; more: number };
+
+/**
+ * Board columns: one per open stage plus "Closed" for everything that ended.
+ * Each column shows at most `limit` cards (all of them when `expanded` has its key) and counts the rest.
+ */
+export function boardColumns(items: ApplicationLine[], limit = 5, expanded: ReadonlySet<string> = new Set()): BoardColumn[] {
+  const cols = [
+    ...openStages.map((s) => ({ key: s as string, label: statusLabel(s), all: items.filter((i) => i.status === s) })),
+    { key: 'closed', label: 'Closed', all: items.filter((i) => !(openStages as readonly string[]).includes(i.status)) }
+  ];
+  return cols.map((c) => {
+    const cards = expanded.has(c.key) ? c.all : c.all.slice(0, limit);
+    return { key: c.key, label: c.label, total: c.all.length, cards, more: c.all.length - cards.length };
+  });
+}
