@@ -49,3 +49,11 @@ describe('boardColumns', () => {
     expect(open.more).toBe(0);
   });
 });
+
+import { dropStatus } from './applications';
+
+describe('dropStatus', () => {
+  it('moves a card to the column it lands on', () => expect(dropStatus('interview', 'sent')).toBe('interview'));
+  it('ignores a drop on its own column', () => expect(dropStatus('sent', 'sent')).toBeNull());
+  it('does not drop on Closed, where the reason matters', () => expect(dropStatus('closed', 'sent')).toBeNull());
+});

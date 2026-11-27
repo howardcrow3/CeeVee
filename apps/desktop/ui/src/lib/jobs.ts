@@ -61,3 +61,29 @@ export function filterJobs<T extends Pick<JobLine, 'title' | 'company' | 'locati
     return words.every((w) => hay.includes(w));
   });
 }
+
+/** A new selection with `id` added, or removed when it was already there. */
+export function toggleId(selected: ReadonlySet<number>, id: number): Set<number> {
+  const next = new Set(selected);
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
+/** Select every id in `ids`, or none when they are all selected already. */
+export function toggleAllIds(selected: ReadonlySet<number>, ids: number[]): Set<number> {
+  return ids.length > 0 && ids.every((i) => selected.has(i)) ? new Set() : new Set(ids);
+}
+
+/** The id one step up or down the list from `current`; the first when nothing is current. */
+export function stepId(ids: number[], current: number | null, dir: 1 | -1): number | null {
+  if (ids.length === 0) return null;
+  const at = current == null ? -1 : ids.indexOf(current);
+  if (at === -1) return ids[dir === 1 ? 0 : ids.length - 1];
+  return ids[Math.min(ids.length - 1, Math.max(0, at + dir))];
+}
+
+/** "3 selected" style label for the bulk bar. */
+export function selectedText(n: number): string {
+  return `${n} selected`;
+}

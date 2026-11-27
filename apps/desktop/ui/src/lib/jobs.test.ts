@@ -87,3 +87,30 @@ describe('filterJobs', () => {
     expect(filterJobs(jobs, { state: 'all', text: 'acme tokyo' })).toHaveLength(0);
   });
 });
+
+import { selectedText, stepId, toggleAllIds, toggleId } from './jobs';
+
+describe('selection', () => {
+  it('adds and removes one id without changing the original', () => {
+    const a = new Set([1]);
+    const b = toggleId(a, 2);
+    expect([...b].sort()).toEqual([1, 2]);
+    expect([...a]).toEqual([1]);
+    expect([...toggleId(b, 1)]).toEqual([2]);
+  });
+  it('selects all, then none', () => {
+    const all = toggleAllIds(new Set(), [1, 2, 3]);
+    expect(all.size).toBe(3);
+    expect(toggleAllIds(all, [1, 2, 3]).size).toBe(0);
+    expect(toggleAllIds(new Set(), []).size).toBe(0);
+  });
+  it('steps through the list and stops at the ends', () => {
+    expect(stepId([4, 5, 6], null, 1)).toBe(4);
+    expect(stepId([4, 5, 6], null, -1)).toBe(6);
+    expect(stepId([4, 5, 6], 5, 1)).toBe(6);
+    expect(stepId([4, 5, 6], 6, 1)).toBe(6);
+    expect(stepId([4, 5, 6], 4, -1)).toBe(4);
+    expect(stepId([], 1, 1)).toBeNull();
+  });
+  it('labels the bulk bar', () => expect(selectedText(3)).toBe('3 selected'));
+});

@@ -46,3 +46,9 @@ export function boardColumns(items: ApplicationLine[], limit = 5, expanded: Read
     return { key: c.key, label: c.label, total: c.all.length, cards, more: c.all.length - cards.length };
   });
 }
+
+/** The status a card takes when dropped on a board column, or null when nothing should change. */
+export function dropStatus(columnKey: string, current: string): string | null {
+  if (!(openStages as readonly string[]).includes(columnKey)) return null;
+  return columnKey === current ? null : columnKey;
+}
