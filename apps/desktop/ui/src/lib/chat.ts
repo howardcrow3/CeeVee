@@ -1,4 +1,4 @@
-import type { ApplicationLine, JobLine } from './bindings';
+import { commands, type ApplicationLine, type JobLine } from './bindings';
 import { statusLabel } from './applications';
 
 export type Turn = { role: 'user' | 'assistant'; text: string };
@@ -54,7 +54,7 @@ export function buildPrompt(summary: string, history: Turn[], message: string): 
   const recent = history.slice(-MAX_TURNS).map((t) => `${t.role === 'user' ? 'Person' : 'CeeVee'}: ${clip(t.text)}`);
   return [
     'You are CeeVee, a private assistant that helps one person with their job search. Answer briefly and plainly.',
-    'Use only the facts below. If the answer is not there, say you do not know. You cannot change anything yet, so if asked to do something, say what the person can do in the app instead.',
+    'Use only the facts below. If the answer is not there, say you do not know. You cannot change anything in this answer. If asked to add or switch a job type, say to ask like "add a job type for product managers"; for anything else, say what the person can do in the app.',
     '',
     'Facts:',
     summary,
@@ -79,4 +79,47 @@ export function suggestions(c: ChatContext): string[] {
   if (c.waiting > 0) out.push('What is waiting for my approval?');
   out.push('What can you help me with?');
   return out;
+}
+
+/** What the person is looking at, appended to the facts so "this" has a meaning. */
+export function focusLine(focus: string): string {
+  const f = focus.trim();
+  return f ? `\nThe person is looking at: ${f}` : '';
+}
+
+/** One job, described for the assistant. */
+export function jobFocus(j: Pick<JobLine, 'title' | 'company' | 'score' | 'state'>): string {
+  const at = j.company ? ` at ${j.company}` : '';
+  const m = j.score != null ? `, ${Math.round(j.score)}% match` : '';
+  return `the job ${j.title}${at} (${j.state}${m})`;
+}
+
+/** The facts the chat needs, read from the app. Empty when running outside it. */
+export async function loadChatContext(): Promise<ChatContext> {
+  const empty: ChatContext = { jobs: [], applications: [], jobTypes: [], waiting: 0 };
+  try {
+    const [j, a, c, w] = await Promise.all([commands.listJobs(), commands.listApplications(), commands.listCategories(), commands.pendingApprovalCount()]);
+    return {
+      jobs: j.status === 'ok' ? j.data : [],
+      applications: a.status === 'ok' ? a.data : [],
+      jobTypes: c.status === 'ok' ? c.data.map((x) => ({ name: x.name, active: x.active })) : [],
+      waiting: w.status === 'ok' ? w.data : 0
+    };
+  } catch {
+    return empty;
+  }
+}
+
+/** True when the message asks CeeVee to change a job type, so it goes to the agent, not the plain Q&A. */
+export function wantsAction(message: string): boolean {
+  const m = message.toLowerCase();
+  if (!/\bjob types?\b|\bsearch(es)? for\b|\blook(ing)? for\b/.test(m)) return false;
+  return /\b(add|create|make|new|start|turn|switch|enable|disable|stop|pause|resume)\b/.test(m);
+}
+
+/** What to show under a reply from the agent. */
+export function actionNotes(did: string[], waiting: number): string[] {
+  const notes = [...did];
+  if (waiting > 0) notes.push(`${waiting} ${waiting === 1 ? 'change is' : 'changes are'} waiting for your approval`);
+  return notes;
 }

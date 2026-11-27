@@ -47,6 +47,8 @@ export const commands = {
 	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
 	/**  Jobs found by searches that you have not dismissed, newest first. */
 	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
+	/**  Which jobs fit which job types (a stored score of 50 or more). */
+	listJobTypeMatches: () => typedError<JobTypeMatch[], string>(__TAURI_INVOKE("list_job_type_matches")),
 	/**  People you know at the company that posted a job. */
 	peopleAtJob: (id: number) => typedError<KnownLine_Serialize[], string>(__TAURI_INVOKE("people_at_job", { id })),
 	/**  Hide a job you are not interested in. */
@@ -68,6 +70,10 @@ export const commands = {
 	listCategories: () => typedError<CategoryLine[], string>(__TAURI_INVOKE("list_categories")),
 	/**  Add a kind of job to look for. The id in `line` is ignored. */
 	createCategory: (line: CategoryLine) => typedError<CategoryLine, string>(__TAURI_INVOKE("create_category", { line })),
+	/**  Change a job type's name and rules. */
+	updateCategory: (line: CategoryLine) => typedError<CategoryLine, string>(__TAURI_INVOKE("update_category", { line })),
+	/**  Remove a job type. The jobs already found stay. */
+	deleteCategory: (id: number) => typedError<null, string>(__TAURI_INVOKE("delete_category", { id })),
 	/**  Turn a category on or off. Off categories are not used to score jobs. */
 	setCategoryActive: (id: number, active: boolean) => typedError<null, string>(__TAURI_INVOKE("set_category_active", { id, active })),
 	/**  Everything waiting for your approval, oldest first. */
@@ -85,6 +91,8 @@ export const commands = {
 	cancelModelDownload: () => __TAURI_INVOKE<void>("cancel_model_download"),
 	/**  Ask the local model one question and wait for the whole answer. */
 	askModel: (prompt: string) => typedError<string, string>(__TAURI_INVOKE("ask_model", { prompt })),
+	/**  Run one chat message through the agent and return what it said and did. */
+	chatAct: (message: string) => typedError<ChatActResult, string>(__TAURI_INVOKE("chat_act", { message })),
 	listDocuments: () => typedError<DocLine[], string>(__TAURI_INVOKE("list_documents")),
 	getDocument: (id: number) => typedError<DocView, string>(__TAURI_INVOKE("get_document", { id })),
 	/**  Make a new document. Resumes must be valid JSON. */
@@ -234,6 +242,15 @@ export type CategoryLine = {
 	remote_ok: boolean,
 	avoid: string[],
 	active: boolean,
+};
+
+export type ChatActResult = {
+	/**  What CeeVee says back. */
+	reply: string,
+	/**  Plain sentences for each change that was made. */
+	did: string[],
+	/**  Changes that now wait for the person's approval. */
+	waiting: number,
 };
 
 /**  The outcome of asking the assistant to change a document. */
@@ -454,6 +471,12 @@ export type JobLine_Serialize = {
 	url: string,
 	/**  How many of your LinkedIn connections currently work at this company. */
 	known: number,
+};
+
+/**  A job that fits a job type well enough to be listed under it. */
+export type JobTypeMatch = {
+	job: number,
+	job_type: number,
 };
 
 export type KnownLine = KnownLine_Serialize | KnownLine_Deserialize;

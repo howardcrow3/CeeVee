@@ -57,3 +57,33 @@ describe('chat', () => {
     expect(suggestions(ctx)).toHaveLength(4);
   });
 });
+
+import { focusLine, jobFocus } from './chat';
+
+describe('focus', () => {
+  it('adds nothing when nothing is open', () => expect(focusLine('  ')).toBe(''));
+  it('names what the person is looking at', () => expect(focusLine('the job PM')).toContain('looking at: the job PM'));
+  it('describes a job with company and match', () =>
+    expect(jobFocus({ title: 'PM', company: 'Acme', score: 89.6, state: 'new' })).toBe('the job PM at Acme (new, 90% match)'));
+  it('copes with a missing company and score', () =>
+    expect(jobFocus({ title: 'PM', company: null, score: null, state: 'saved' })).toBe('the job PM (saved)'));
+});
+
+import { actionNotes, wantsAction } from './chat';
+
+describe('actions', () => {
+  it('sends change requests to the agent', () => {
+    expect(wantsAction('Add a job type for product managers')).toBe(true);
+    expect(wantsAction('turn off my design job type')).toBe(true);
+    expect(wantsAction('Start looking for remote designer jobs')).toBe(true);
+  });
+  it('keeps questions on the plain path', () => {
+    expect(wantsAction('Which jobs match me best?')).toBe(false);
+    expect(wantsAction('What job types do I have?')).toBe(false);
+  });
+  it('lists what happened and what waits', () => {
+    expect(actionNotes(['Added the job type X'], 2)).toEqual(['Added the job type X', '2 changes are waiting for your approval']);
+    expect(actionNotes([], 0)).toEqual([]);
+    expect(actionNotes([], 1)).toEqual(['1 change is waiting for your approval']);
+  });
+});

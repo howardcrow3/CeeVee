@@ -4,6 +4,11 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Jobs can be narrowed to one job type with a menu above the list.
+- Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
+- Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.
+- Chat can add a job type or switch one off when you ask (for example, "add a job type for product managers"). It tells you what it changed.
+- An Ask CeeVee button on Jobs and Applications opens the chat beside the list. It knows which job you have open.
 - CeeVee now opens to a chat. Ask about your jobs and applications and the local AI answers from what CeeVee has found. It can only answer for now, not make changes, and conversations are not saved yet.
 - A clearer Sign in with Google button, shown in setup and in Settings under Accounts. It is optional, says it is read-only, and shows a waiting state with Cancel.
 - Applications is a board with a column for each stage (Draft, Applied, Screening, Interview, Offer, Closed), the top five cards in each and "+N more". A Table view is one click away, and items waiting on you sit in a strip at the top.

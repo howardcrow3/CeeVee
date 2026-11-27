@@ -1,8 +1,9 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type ApplicationLine, type ProposalLine } from '$lib/bindings';
-  import { applicationName, boardColumns, groupByStatus, statuses } from '$lib/applications';
+  import { applicationName, boardColumns, dropStatus, groupByStatus, statuses } from '$lib/applications';
   import { actionWords } from '$lib/approvals';
+  import ChatLayout from '$lib/components/ChatLayout.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let waiting = $state<ProposalLine[]>([]);
@@ -59,6 +60,22 @@
     } else error = r.error;
   }
 
+  let dragging = $state<ApplicationLine | null>(null);
+  let over = $state<string | null>(null);
+
+  function canDrop(key: string): boolean {
+    return dragging != null && dropStatus(key, dragging.status) !== null;
+  }
+
+  async function drop(key: string) {
+    const a = dragging;
+    dragging = null;
+    over = null;
+    if (!a) return;
+    const to = dropStatus(key, a.status);
+    if (to) await move(a.id, to);
+  }
+
   async function move(id: number, status: string) {
     error = '';
     const r = await commands.setApplicationStatus(id, status);
@@ -66,6 +83,7 @@
     if (r.status !== 'ok') error = r.error;
   }
 </script>
+<ChatLayout>
 
 <header class="head">
   <span class="label">Applications</span>
@@ -111,11 +129,18 @@
 {#if apps.length > 0 && view === 'board'}
   <div class="board">
     {#each columns as c (c.key)}
-      <section class="col" aria-label={c.label}>
+      <section
+        class="col"
+        class:over={over === c.key && canDrop(c.key)}
+        aria-label={c.label}
+        ondragover={(e) => { if (canDrop(c.key)) { e.preventDefault(); over = c.key; } }}
+        ondragleave={() => { if (over === c.key) over = null; }}
+        ondrop={(e) => { e.preventDefault(); drop(c.key); }}
+      >
         <h2>{c.label} <span class="note">{c.total}</span></h2>
         <ul class="cards">
           {#each c.cards as a (a.id)}
-            <li>
+            <li draggable="true" class:drag={dragging?.id === a.id} ondragstart={() => (dragging = a)} ondragend={() => { dragging = null; over = null; }}>
               <b>{a.title}</b>
               <span class="note">{a.company ?? 'Company not listed'}</span>
               <select aria-label={`Status of ${applicationName(a)}`} value={a.status} onchange={(e) => move(a.id, e.currentTarget.value)}>
@@ -148,6 +173,7 @@
 {#if waiting.length === 0 && apps.length === 0 && !error && !adding}
   <EmptyState title="No applications yet"><p>Applications you start appear here with their status. Press Add application to track one you applied to elsewhere.</p></EmptyState>
 {/if}
+</ChatLayout>
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; }
@@ -162,6 +188,9 @@
   .cards, .rows { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; }
   .cards li { border: 1px solid var(--line); background: var(--surface); border-radius: var(--r-sm); padding: 8px; display: flex; flex-direction: column; gap: 4px; }
   .cards select { width: 100%; }
+  .col.over { outline: 2px dashed var(--focus-ring); outline-offset: -2px; }
+  .cards li[draggable='true'] { cursor: grab; }
+  .cards li.drag { opacity: 0.5; }
   .more { width: 100%; margin-top: 6px; }
   .waiting { border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px; background: var(--surface); }
   .waiting .cards { flex-direction: row; flex-wrap: wrap; }

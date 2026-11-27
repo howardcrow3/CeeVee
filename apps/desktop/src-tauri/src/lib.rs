@@ -3,6 +3,7 @@
 
 mod analytics_cmd;
 mod apply_tool;
+mod chat_act;
 mod commands;
 mod deep_link;
 mod diagnostics;
@@ -53,6 +54,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::import_linkedin_connections,
             commands::export_resume_pdf,
             commands::list_jobs,
+            commands::list_job_type_matches,
             commands::people_at_job,
             commands::dismiss_job,
             commands::open_posting,
@@ -63,6 +65,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::apply_profile_changes,
             commands::list_categories,
             commands::create_category,
+            commands::update_category,
+            commands::delete_category,
             commands::set_category_active,
             commands::list_proposals,
             commands::skip_proposal,
@@ -72,6 +76,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             models::model_progress,
             models::cancel_model_download,
             models::ask_model,
+            chat_act::chat_act,
             commands::list_documents,
             commands::get_document,
             commands::create_document,

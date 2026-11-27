@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { commands, type CategoryLine } from '$lib/bindings';
-  import { describeCategory, newCategory } from '$lib/categories';
+  import { describeCategory, edited, formFrom, newCategory } from '$lib/categories';
   import Toggle from '$lib/components/Toggle.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -42,6 +42,35 @@
     await load();
   }
 
+  let editing = $state<number | null>(null);
+  let form = $state(formFrom({ id: 0, name: '', titles: [], keywords: [], locations: [], remote_ok: true, avoid: [], active: true }));
+  let removing = $state<number | null>(null);
+
+  function startEdit(c: CategoryLine) {
+    editing = c.id;
+    removing = null;
+    form = formFrom(c);
+  }
+
+  async function save(c: CategoryLine) {
+    error = '';
+    const r = await commands.updateCategory(edited(c, form));
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
+    editing = null;
+    await load();
+  }
+
+  async function remove(c: CategoryLine) {
+    error = '';
+    const r = await commands.deleteCategory(c.id);
+    removing = null;
+    if (r.status === 'ok') await load();
+    else error = r.error;
+  }
+
   async function setActive(c: CategoryLine, on: boolean) {
     const r = await commands.setCategoryActive(c.id, on);
     if (r.status === 'ok') await load();
@@ -75,12 +104,37 @@
 {:else if items.length > 0}
   <ul class="list" aria-label="Job types">
     {#each items as c (c.id)}
-      <li class:off={!c.active}>
-        <div class="text">
-          <b>{c.name}</b>
-          <span class="note">{describeCategory(c)}</span>
-        </div>
-        <Toggle checked={c.active} label={`${c.name} is on`} onchange={(v) => setActive(c, v)} />
+      <li class:off={!c.active && editing !== c.id} class:edit={editing === c.id}>
+        {#if editing === c.id}
+          <section class="form" aria-label={`Edit ${c.name}`}>
+            <label>Name<input bind:value={form.name} /></label>
+            <label>Job titles<input bind:value={form.titles} /></label>
+            <label>Words the posting should mention<input bind:value={form.keywords} /></label>
+            <label>Places<input bind:value={form.locations} /></label>
+            <label>Words to avoid<input bind:value={form.avoid} /></label>
+            <div class="line"><Toggle bind:checked={form.remote_ok} label="Remote jobs are fine" /><span>Remote jobs are fine</span></div>
+            <div class="row">
+              <button onclick={() => save(c)} disabled={form.name.trim() === ''}>Save</button>
+              <button class="ghost" onclick={() => (editing = null)}>Cancel</button>
+            </div>
+          </section>
+        {:else}
+          <div class="text">
+            <b>{c.name}</b>
+            <span class="note">{describeCategory(c)}</span>
+          </div>
+          <div class="acts">
+            {#if removing === c.id}
+              <span class="note">Remove it? Jobs already found stay.</span>
+              <button onclick={() => remove(c)}>Remove</button>
+              <button class="ghost" onclick={() => (removing = null)}>Keep</button>
+            {:else}
+              <button class="ghost" onclick={() => startEdit(c)}>Edit</button>
+              <button class="ghost" onclick={() => (removing = c.id)}>Remove</button>
+            {/if}
+            <Toggle checked={c.active} label={`${c.name} is on`} onchange={(v) => setActive(c, v)} />
+          </div>
+        {/if}
       </li>
     {/each}
   </ul>
@@ -93,6 +147,8 @@
   .list li { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
   .list li:last-child { border-bottom: 0; }
   .list li.off .text { opacity: 0.6; }
+  .list li.edit { display: block; }
+  .acts { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
   .text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   b { color: var(--ink); font-weight: 500; }
   .form { display: flex; flex-direction: column; gap: 8px; max-width: 520px; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); }

@@ -187,6 +187,56 @@ pub async fn set_active(db: &Db, id: i64, active: bool) -> Result<()> {
     Ok(())
 }
 
+/// Change a category's name and rules. Scores already stored are refreshed the next time a posting
+/// is scored.
+pub async fn update(db: &Db, id: i64, name: &str, criteria: &Criteria) -> Result<Category> {
+    if name.trim().is_empty() {
+        return Err(Error::Invalid("a category needs a name".into()));
+    }
+    get(db, id).await?;
+    sqlx::query("UPDATE job_category SET name = ?, criteria = ? WHERE id = ?")
+        .bind(name.trim())
+        .bind(serde_json::to_string(criteria).map_err(|e| Error::Other(e.to_string()))?)
+        .bind(id)
+        .execute(db.pool())
+        .await
+        .map_err(|e| match e {
+            sqlx::Error::Database(d) if d.is_unique_violation() => {
+                Error::Invalid(format!("a category named {name} already exists"))
+            }
+            other => db_err(other),
+        })?;
+    get(db, id).await
+}
+
+/// Remove a category and the scores that belong to it. Postings stay.
+pub async fn delete(db: &Db, id: i64) -> Result<()> {
+    get(db, id).await?;
+    sqlx::query("DELETE FROM job_category WHERE id = ?")
+        .bind(id)
+        .execute(db.pool())
+        .await
+        .map_err(db_err)?;
+    Ok(())
+}
+
+/// Which postings fit which categories: (posting id, category id) for every stored score at or
+/// above `min_score`.
+pub async fn matches(db: &Db, min_score: f64) -> Result<Vec<(i64, i64)>> {
+    let rows = sqlx::query(
+        "SELECT posting_id, category_id FROM posting_category WHERE score >= ? \
+         ORDER BY category_id, posting_id",
+    )
+    .bind(min_score)
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    Ok(rows
+        .iter()
+        .map(|r| (r.get("posting_id"), r.get("category_id")))
+        .collect())
+}
+
 /// Score a posting against every active category, store the rows in `posting_category`, and set
 /// the posting's own score to the best one. Returns each category's score.
 pub async fn score_posting(db: &Db, posting_id: i64) -> Result<Vec<(i64, Score)>> {

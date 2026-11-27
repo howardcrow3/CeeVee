@@ -63,6 +63,31 @@ pub struct JobLine {
     pub known: u32,
 }
 
+/// A job that fits a job type well enough to be listed under it.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct JobTypeMatch {
+    pub job: u32,
+    pub job_type: u32,
+}
+
+/// Which jobs fit which job types (a stored score of 50 or more).
+#[tauri::command]
+#[specta::specta]
+pub async fn list_job_type_matches(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<JobTypeMatch>, String> {
+    let rows = ceevee_search::categories::matches(&db, 50.0)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|(job, job_type)| JobTypeMatch {
+            job: job as u32,
+            job_type: job_type as u32,
+        })
+        .collect())
+}
+
 /// Jobs found by searches that you have not dismissed, newest first.
 #[tauri::command]
 #[specta::specta]
@@ -280,6 +305,42 @@ pub async fn create_category(
         .await
         .map_err(|e| e.to_string())?;
     Ok(category_line(c))
+}
+
+/// Change a job type's name and rules.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_category(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    line: CategoryLine,
+) -> Result<CategoryLine, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let criteria = ceevee_search::categories::Criteria {
+        titles: line.titles,
+        keywords: line.keywords,
+        locations: line.locations,
+        remote_ok: line.remote_ok,
+        avoid: line.avoid,
+    };
+    let c = ceevee_search::categories::update(&db, i64::from(line.id), &line.name, &criteria)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(category_line(c))
+}
+
+/// Remove a job type. The jobs already found stay.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_category(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_search::categories::delete(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
 }
 
 /// Turn a category on or off. Off categories are not used to score jobs.
