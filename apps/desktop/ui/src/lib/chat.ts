@@ -1,4 +1,4 @@
-import type { ApplicationLine, JobLine } from './bindings';
+import { commands, type ApplicationLine, type JobLine } from './bindings';
 import { statusLabel } from './applications';
 
 export type Turn = { role: 'user' | 'assistant'; text: string };
@@ -79,4 +79,33 @@ export function suggestions(c: ChatContext): string[] {
   if (c.waiting > 0) out.push('What is waiting for my approval?');
   out.push('What can you help me with?');
   return out;
+}
+
+/** What the person is looking at, appended to the facts so "this" has a meaning. */
+export function focusLine(focus: string): string {
+  const f = focus.trim();
+  return f ? `\nThe person is looking at: ${f}` : '';
+}
+
+/** One job, described for the assistant. */
+export function jobFocus(j: Pick<JobLine, 'title' | 'company' | 'score' | 'state'>): string {
+  const at = j.company ? ` at ${j.company}` : '';
+  const m = j.score != null ? `, ${Math.round(j.score)}% match` : '';
+  return `the job ${j.title}${at} (${j.state}${m})`;
+}
+
+/** The facts the chat needs, read from the app. Empty when running outside it. */
+export async function loadChatContext(): Promise<ChatContext> {
+  const empty: ChatContext = { jobs: [], applications: [], jobTypes: [], waiting: 0 };
+  try {
+    const [j, a, c, w] = await Promise.all([commands.listJobs(), commands.listApplications(), commands.listCategories(), commands.pendingApprovalCount()]);
+    return {
+      jobs: j.status === 'ok' ? j.data : [],
+      applications: a.status === 'ok' ? a.data : [],
+      jobTypes: c.status === 'ok' ? c.data.map((x) => ({ name: x.name, active: x.active })) : [],
+      waiting: w.status === 'ok' ? w.data : 0
+    };
+  } catch {
+    return empty;
+  }
 }

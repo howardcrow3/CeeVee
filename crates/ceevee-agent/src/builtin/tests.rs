@@ -81,3 +81,42 @@ async fn read_tools_flag_untrusted_output() {
         );
     }
 }
+
+#[tokio::test]
+async fn job_types_can_be_listed_created_and_switched_off() {
+    let (_db, r, _id) = setup().await;
+    let made = r
+        .call(
+            "jobtypes.create",
+            json!({"name": "Product", "titles": ["product manager"], "remote_ok": true}),
+        )
+        .await
+        .unwrap();
+    assert_eq!(made["name"], "Product");
+    assert_eq!(made["criteria"]["titles"][0], "product manager");
+    let id = made["id"].as_i64().unwrap();
+    let list = r.call("jobtypes.list", json!({})).await.unwrap();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    r.call("jobtypes.set_active", json!({"id": id, "active": false}))
+        .await
+        .unwrap();
+    let list = r.call("jobtypes.list", json!({})).await.unwrap();
+    assert_eq!(list[0]["active"], false);
+}
+
+#[tokio::test]
+async fn job_type_needs_a_name_and_unique() {
+    let (_db, r, _id) = setup().await;
+    assert!(r.call("jobtypes.create", json!({})).await.is_err());
+    assert!(r
+        .call("jobtypes.create", json!({"name": " "}))
+        .await
+        .is_err());
+    r.call("jobtypes.create", json!({"name": "A"}))
+        .await
+        .unwrap();
+    assert!(r
+        .call("jobtypes.create", json!({"name": "A"}))
+        .await
+        .is_err());
+}

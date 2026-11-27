@@ -3,6 +3,7 @@
   import { commands, type ApplicationLine, type ProposalLine } from '$lib/bindings';
   import { applicationName, boardColumns, groupByStatus, statuses } from '$lib/applications';
   import { actionWords } from '$lib/approvals';
+  import ChatLayout from '$lib/components/ChatLayout.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let waiting = $state<ProposalLine[]>([]);
@@ -66,6 +67,7 @@
     if (r.status !== 'ok') error = r.error;
   }
 </script>
+<ChatLayout>
 
 <header class="head">
   <span class="label">Applications</span>
@@ -148,6 +150,7 @@
 {#if waiting.length === 0 && apps.length === 0 && !error && !adding}
   <EmptyState title="No applications yet"><p>Applications you start appear here with their status. Press Add application to track one you applied to elsewhere.</p></EmptyState>
 {/if}
+</ChatLayout>
 
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; }
