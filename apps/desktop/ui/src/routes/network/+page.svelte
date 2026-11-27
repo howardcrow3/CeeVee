@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { commands, type DueLine, type PersonLine } from '$lib/bindings';
   import { importSummary, silenceText, tiers, workLine } from '$lib/people';
+  import MeetingsPanel from '$lib/components/MeetingsPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let people = $state<PersonLine[]>([]);
@@ -120,6 +121,8 @@
     {#if due.length > 5}<p class="muted">And {due.length - 5} more.</p>{/if}
   </section>
 {/if}
+
+<MeetingsPanel {people} />
 
 {#if people.length === 0 && !query && !tier && loaded && !error}
   <EmptyState title="Who you know">

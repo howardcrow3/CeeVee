@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Network: plan meetings with people, read a short prep note, add them to any calendar (.ics file) and mark them done to log them in the person's history.
 - Jobs can be narrowed to one job type with a menu above the list.
 - Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
 - Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.
