@@ -177,6 +177,12 @@ export const commands = {
 	importContacts: (fileName: string, text: string) => typedError<PeopleImport, string>(__TAURI_INVOKE("import_contacts", { fileName, text })),
 	/**  Move a person between close, warm and weak. */
 	setPersonTier: (id: number, tier: string) => typedError<null, string>(__TAURI_INVOKE("set_person_tier", { id, tier })),
+	/**  The people you are overdue to contact, most overdue first. */
+	peopleDue: () => typedError<DueLine[], string>(__TAURI_INVOKE("people_due")),
+	/**  Put a reminder off for `days` days. */
+	snoozePerson: (id: number, days: number) => typedError<null, string>(__TAURI_INVOKE("snooze_person", { id, days })),
+	/**  Record that you were in touch with someone just now (a message, call, meeting or email). */
+	logContact: (id: number, kind: string, summary: string) => typedError<null, string>(__TAURI_INVOKE("log_contact", { id, kind, summary })),
 };
 
 /* Types */
@@ -300,6 +306,19 @@ export type DownloadProgress = {
 	downloaded_mb: number,
 	total_mb: number,
 	error: string,
+};
+
+/**  Someone you are due to get in touch with. */
+export type DueLine = {
+	id: number,
+	name: string,
+	/**  Where they work, or empty. */
+	company: string,
+	/**  `close`, `warm` or `weak`. */
+	tier: string,
+	days_silent: number,
+	/**  True when you have not been in touch since adding them. */
+	never_contacted: boolean,
 };
 
 /**  Events published by feature crates. Variants are added as features land. */

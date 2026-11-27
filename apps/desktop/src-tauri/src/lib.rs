@@ -112,7 +112,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             mail_cmd::dismiss_found_job,
             commands::list_people,
             commands::import_contacts,
-            commands::set_person_tier
+            commands::set_person_tier,
+            commands::people_due,
+            commands::snooze_person,
+            commands::log_contact
         ])
         .typ::<ceevee_core::Event>()
 }

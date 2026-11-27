@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importSummary, tierLabel, workLine } from './people';
+import { importSummary, silenceText, tierLabel, workLine } from './people';
 
 describe('people', () => {
   it('labels tiers and falls back to the raw value', () => {
@@ -18,5 +18,12 @@ describe('people', () => {
     expect(importSummary({ added: 3, matched: 2, skipped: 1 })).toBe(
       'Added 3 people, filled in details for 2 you already had, skipped 1 with no name.'
     );
+  });
+
+  it('words how long it has been', () => {
+    expect(silenceText(5, true)).toBe('Not in touch since you added them');
+    expect(silenceText(45, false)).toBe('Last in touch 45 days ago');
+    expect(silenceText(95, false)).toBe('Last in touch about 3 months ago');
+    expect(silenceText(400, false)).toBe('Last in touch over a year ago');
   });
 });

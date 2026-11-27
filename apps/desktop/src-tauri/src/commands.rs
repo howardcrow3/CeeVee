@@ -1188,3 +1188,78 @@ pub async fn set_person_tier(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Someone you are due to get in touch with.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct DueLine {
+    pub id: u32,
+    pub name: String,
+    /// Where they work, or empty.
+    pub company: String,
+    /// `close`, `warm` or `weak`.
+    pub tier: String,
+    pub days_silent: u32,
+    /// True when you have not been in touch since adding them.
+    pub never_contacted: bool,
+}
+
+fn now_iso() -> String {
+    chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+}
+
+/// The people you are overdue to contact, most overdue first.
+#[tauri::command]
+#[specta::specta]
+pub async fn people_due(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<DueLine>, String> {
+    let rows = ceevee_network::reminders::due(&db, &now_iso(), 50)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|d| DueLine {
+            id: d.id as u32,
+            name: d.name,
+            company: d.company.unwrap_or_default(),
+            tier: d.tier.as_str().to_string(),
+            days_silent: d.days_silent.max(0) as u32,
+            never_contacted: d.never_contacted,
+        })
+        .collect())
+}
+
+/// Put a reminder off for `days` days.
+#[tauri::command]
+#[specta::specta]
+pub async fn snooze_person(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    days: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let until = (chrono::Utc::now() + chrono::Duration::days(i64::from(days.min(365))))
+        .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+    ceevee_network::reminders::snooze(&db, i64::from(id), Some(&until))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Record that you were in touch with someone just now (a message, call, meeting or email).
+#[tauri::command]
+#[specta::specta]
+pub async fn log_contact(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    kind: String,
+    summary: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let kind =
+        serde_json::from_value::<ceevee_network::people::Kind>(serde_json::Value::String(kind))
+            .map_err(|_| "Unknown kind of contact.".to_string())?;
+    ceevee_network::people::add_touch(&db, i64::from(id), kind, &summary, &now_iso())
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}

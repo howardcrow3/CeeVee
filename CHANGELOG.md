@@ -12,6 +12,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 - CeeVee now opens to a chat. Ask about your jobs and applications and the local AI answers from what CeeVee has found. It can only answer for now, not make changes, and conversations are not saved yet.
 - A clearer Sign in with Google button, shown in setup and in Settings under Accounts. It is optional, says it is read-only, and shows a waiting state with Cancel.
 - Applications is a board with a column for each stage (Draft, Applied, Screening, Interview, Offer, Closed), the top five cards in each and "+N more". A Table view is one click away, and items waiting on you sit in a strip at the top.
+- Network: reminders to get back in touch (close people after 30 days, warm after 90, weak after 180) with "I reached out" and "Not now".
 - Jobs is a compact list: one line per job, filters for New and Saved plus a text filter, and a detail panel on the right with the actions for the job you click.
 - Network: a people list you can search and sort into close, warm and weak, with contact import from vCard and CSV files (Google, Outlook, phone).
 - Job types in the sidebar: each job type is a saved search you can turn on or off with a switch. They replace Kinds of jobs in Settings.
