@@ -282,6 +282,42 @@ pub async fn create_category(
     Ok(category_line(c))
 }
 
+/// Change a job type's name and rules.
+#[tauri::command]
+#[specta::specta]
+pub async fn update_category(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    line: CategoryLine,
+) -> Result<CategoryLine, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let criteria = ceevee_search::categories::Criteria {
+        titles: line.titles,
+        keywords: line.keywords,
+        locations: line.locations,
+        remote_ok: line.remote_ok,
+        avoid: line.avoid,
+    };
+    let c = ceevee_search::categories::update(&db, i64::from(line.id), &line.name, &criteria)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(category_line(c))
+}
+
+/// Remove a job type. The jobs already found stay.
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_category(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_search::categories::delete(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Turn a category on or off. Off categories are not used to score jobs.
 #[tauri::command]
 #[specta::specta]

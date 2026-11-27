@@ -138,3 +138,23 @@ async fn scoring_a_posting_fills_the_category_rows_and_best_score() {
         .unwrap()
         .is_empty());
 }
+
+#[tokio::test]
+async fn a_category_can_be_renamed_and_removed() {
+    let db = Db::open_in_memory().await.unwrap();
+    let c = create(&db, "Product", &crit()).await.unwrap();
+    let other = create(&db, "Design", &Criteria::default()).await.unwrap();
+    let mut changed = crit();
+    changed.titles = vec!["designer".into()];
+    let u = update(&db, c.id, " Product jobs ", &changed).await.unwrap();
+    assert_eq!(u.name, "Product jobs");
+    assert_eq!(u.criteria.titles, vec!["designer".to_string()]);
+    assert!(update(&db, c.id, " ", &changed).await.is_err());
+    assert!(update(&db, c.id, "Design", &changed).await.is_err());
+    assert!(update(&db, 999, "X", &changed).await.is_err());
+    delete(&db, c.id).await.unwrap();
+    assert!(get(&db, c.id).await.is_err());
+    assert!(delete(&db, c.id).await.is_err());
+    assert_eq!(list(&db).await.unwrap().len(), 1);
+    assert_eq!(list(&db).await.unwrap()[0].id, other.id);
+}
