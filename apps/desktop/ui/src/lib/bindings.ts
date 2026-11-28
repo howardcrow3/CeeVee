@@ -145,7 +145,10 @@ export const commands = {
 	 *  job tracker. Nothing already tracked is changed.
 	 */
 	importApplications: (text: string) => typedError<ApplicationsImport, string>(__TAURI_INVOKE("import_applications", { text })),
-	/**  Five likely interview questions for a job, from the posting and your profile, using the local model. */
+	/**
+	 *  Five likely interview questions for a job, from the posting and your profile, using the local
+	 *  model.
+	 */
 	practiceQuestions: (id: number) => typedError<string[], string>(__TAURI_INVOKE("practice_questions", { id })),
 	/**  Coaching feedback on one practice answer. Nothing is saved. */
 	practiceFeedback: (id: number, question: string, answer: string) => typedError<string, string>(__TAURI_INVOKE("practice_feedback", { id, question, answer })),
@@ -749,6 +752,7 @@ export type PracticeNote = {
 	answer: string,
 	feedback: string,
 };
+
 /**  What happened when CeeVee filled in an application. */
 export type PrepareResult = PrepareResult_Serialize | PrepareResult_Deserialize;
 
