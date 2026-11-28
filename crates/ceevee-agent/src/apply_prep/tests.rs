@@ -164,3 +164,44 @@ async fn attaches_the_cover_letter_and_resume_saved_for_this_job() {
     let letter = std::fs::read(i.answers.cover_letter_pdf.unwrap()).unwrap();
     assert!(letter.starts_with(b"%PDF"));
 }
+
+#[tokio::test]
+async fn general_answers_need_no_posting_and_use_the_base_resume() {
+    let db = Db::open_in_memory().await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    assert!(gather_general(&db, dir.path(), Paper::UsLetter)
+        .await
+        .is_err());
+    set_basics(
+        &db,
+        &Basics {
+            full_name: "Ada Lovelace".into(),
+            email: Some("ada@example.com".into()),
+            ..Basics::default()
+        },
+    )
+    .await
+    .unwrap();
+    let a = gather_general(&db, dir.path(), Paper::UsLetter)
+        .await
+        .unwrap();
+    assert_eq!(a.email, "ada@example.com");
+    assert!(a.resume_pdf.is_none());
+    store::create(
+        &db,
+        DocKind::BaseResume,
+        "Base: Ada / Résumé",
+        None,
+        None,
+        r#"{"basics":{"name":"Ada Lovelace"}}"#,
+        "test",
+    )
+    .await
+    .unwrap();
+    let a = gather_general(&db, dir.path(), Paper::UsLetter)
+        .await
+        .unwrap();
+    assert!(std::fs::read(a.resume_pdf.unwrap())
+        .unwrap()
+        .starts_with(b"%PDF"));
+}

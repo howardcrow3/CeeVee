@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CeeVee</title>
+  <style>
+    body { font: 13px system-ui, sans-serif; width: 280px; margin: 0; padding: 14px; color: #111; }
+    h1 { font-size: 14px; margin: 0 0 6px; }
+    p { margin: 0 0 10px; color: #374151; }
+    button { background: #1f2937; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font: inherit; cursor: pointer; }
+    button[hidden] { display: none; }
+    @media (prefers-color-scheme: dark) { body { background: #111827; color: #f3f4f6; } p { color: #d1d5db; } button { background: #f3f4f6; color: #111827; } }
+  </style>
+</head>
+<body>
+  <h1>CeeVee</h1>
+  <p id="msg">Checking…</p>
+  <button id="connect" hidden>Connect to CeeVee</button>
+  <script src="popup.js"></script>
+</body>
+</html>

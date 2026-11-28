@@ -7,6 +7,7 @@ mod chat_act;
 mod commands;
 mod deep_link;
 mod diagnostics;
+mod extension_cmd;
 mod feedback_cmd;
 mod license_cmd;
 mod mail_cmd;
@@ -46,6 +47,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             diagnostics::dismiss_crash,
             diagnostics::open_log_folder,
             license_cmd::open_info_page,
+            extension_cmd::extension_status,
+            extension_cmd::extension_approve,
+            extension_cmd::extension_deny,
+            extension_cmd::extension_disconnect_all,
             feedback_cmd::feedback_available,
             feedback_cmd::send_feedback,
             feedback_cmd::feedback_email,
@@ -226,6 +231,7 @@ pub fn run() {
             app.manage(mail_cmd::GoogleSignIn::default());
             license_cmd::setup(app, db.clone());
             analytics_cmd::setup(app, db.clone());
+            extension_cmd::setup(app, db.clone());
             deep_link::setup(app);
             app.manage(db);
 

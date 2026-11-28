@@ -28,6 +28,13 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
+	extensionStatus: () => __TAURI_INVOKE<ExtensionView>("extension_status"),
+	/**  Let the browser that is asking connect. */
+	extensionApprove: (id: string) => typedError<null, string>(__TAURI_INVOKE("extension_approve", { id })),
+	/**  Turn the browser that is asking away. */
+	extensionDeny: (id: string) => __TAURI_INVOKE<void>("extension_deny", { id }),
+	/**  Disconnect every browser; each must be approved again. */
+	extensionDisconnectAll: () => __TAURI_INVOKE<void>("extension_disconnect_all"),
 	/**  True when this build can send feedback (always: requests are signed per install). */
 	feedbackAvailable: () => __TAURI_INVOKE<boolean>("feedback_available"),
 	sendFeedback: (input: FeedbackInput_Deserialize) => typedError<null, string>(__TAURI_INVOKE("send_feedback", { input })),
@@ -362,6 +369,17 @@ export type Event =
 { type: "task_due"; task: string } | 
 /**  A setting changed. */
 { type: "setting_changed"; key: string };
+
+/**  What the Browser tab shows. */
+export type ExtensionView = {
+	/**  True once the local connection is up. */
+	running: boolean,
+	/**  How many browsers are connected. */
+	connected: number,
+	/**  A browser asking to connect, waiting for approval: its id and name. Empty when none. */
+	pending_id: string,
+	pending_browser: string,
+};
 
 /**  What the user filled in on the feedback form. */
 export type FeedbackInput = FeedbackInput_Serialize | FeedbackInput_Deserialize;

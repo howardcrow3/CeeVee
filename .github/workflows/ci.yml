@@ -59,7 +59,7 @@ jobs:
         shell: bash
         run: |
           node scripts/bump-version.mjs --check
-          node --test scripts/scripts.test.mjs
+          node --test scripts/scripts.test.mjs extension/test/lib.test.mjs
 
       - name: cargo fmt
         run: cargo fmt --all --check

@@ -799,6 +799,7 @@ dependencies = [
  "ceevee-ai",
  "ceevee-analytics",
  "ceevee-apply",
+ "ceevee-bridge",
  "ceevee-core",
  "ceevee-db",
  "ceevee-docs",

@@ -6,6 +6,7 @@
   import BoardsPanel from './BoardsPanel.svelte';
   import MailAccountPanel from './MailAccountPanel.svelte';
   import AnalyticsPanel from './AnalyticsPanel.svelte';
+  import ExtensionPanel from './ExtensionPanel.svelte';
   import AboutPanel from './AboutPanel.svelte';
 
   let dialog: HTMLDivElement | undefined = $state();
@@ -44,6 +45,8 @@
           <BoardsPanel />
         {:else if settingsUi.tab === 'accounts'}
           <MailAccountPanel />
+        {:else if settingsUi.tab === 'browser'}
+          <ExtensionPanel />
         {:else if settingsUi.tab === 'privacy'}
           <AnalyticsPanel mode="settings" />
           <AboutPanel />

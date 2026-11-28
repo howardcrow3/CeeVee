@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Companion browser extension (Chrome, Edge, Brave, Firefox), first version: fills application forms on Greenhouse, Lever, Ashby, Workday and similar sites in your own browser, using your CeeVee profile over a connection that never leaves your computer. It never submits.
 - Network: a weekly goal for how many people to be in touch with, a 30 day summary of introductions asked, answered and referred, and a list of people who just changed jobs to congratulate.
 - Jobs: "Find an introduction" lists the people you know at a job's company (including people who used to work there), writes a short message to start from, and remembers who you asked.
 - A Downloads button at the top right shows a count while something is downloading. It opens a panel with filter, Ongoing and Completed, and progress, size, speed, time left, pause and cancel for each. The local AI download uses it, and failed downloads can be retried.
