@@ -1,6 +1,8 @@
 /* Turtlebox UX framework tokens, vendored from howardcrow3/turtlebox-ui (css/tokens.css).
    Components use role names, never raw hex. Light and dark are both first class. */
 @import './styles/turtlebox-tokens.css';
+@import './styles/turtlebox-progress.css';
+@import './styles/turtlebox-downloads.css';
 
 @font-face { font-family: 'Inter'; font-weight: 400; src: url('/fonts/Inter-Regular.woff2') format('woff2'); font-display: swap; }
 @font-face { font-family: 'Inter'; font-weight: 500; src: url('/fonts/Inter-Medium.woff2') format('woff2'); font-display: swap; }

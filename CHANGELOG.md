@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- A Downloads button at the top right shows a count while something is downloading. It opens a panel with filter, Ongoing and Completed, and progress, size, speed, time left, pause and cancel for each. The local AI download uses it, and failed downloads can be retried.
 - Jobs can be narrowed to one job type with a menu above the list.
 - Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
 - Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.

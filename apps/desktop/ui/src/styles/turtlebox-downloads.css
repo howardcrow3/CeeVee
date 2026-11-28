@@ -1,0 +1,34 @@
+/* Vendored from howardcrow3/turtlebox-ui (css/downloads.css). Do not edit by hand. */
+/* Turtlebox downloads panel (docs/DOWNLOADS.md). Role tokens only. Pairs with js/tb-downloads.js.
+ * Markup: .tb-dl-btn (toolbar button + .tb-dl-badge) opens .tb-dl (popover) holding a head, a filter,
+ * and .tb-dl-group sections of .tb-dl-item rows. Light and dark follow the tokens. */
+.tb-dl-anchor{position:relative;display:inline-block}
+.tb-dl-btn{position:relative;width:28px;height:28px;border-radius:var(--r-sm);border:0;background:transparent;color:var(--body);display:grid;place-items:center;cursor:pointer}
+.tb-dl-btn:hover,.tb-dl-btn[aria-expanded="true"]{background:var(--hover);color:var(--ink)}
+.tb-dl-btn svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tb-dl-badge{position:absolute;top:-3px;right:-3px;min-width:15px;height:15px;padding:0 4px;box-sizing:border-box;border-radius:var(--r-pill);background:var(--accent);color:var(--on-accent);font:600 10px/15px var(--sans);text-align:center;pointer-events:none}
+.tb-dl-btn[data-idle="true"]{display:none}
+.tb-dl{position:absolute;top:calc(100% + 6px);right:0;width:min(400px,calc(100vw - 24px));max-height:min(480px,calc(100vh - 80px));overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-pop);padding:10px 12px 8px;z-index:30;font:13px/1.4 var(--sans);color:var(--body)}
+.tb-dl-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.tb-dl-head h2{margin:0;font:600 14px/1.2 var(--sans);color:var(--ink)}
+.tb-dl-filter{width:100%;box-sizing:border-box;height:26px;padding:0 8px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);font:13px var(--sans)}
+.tb-dl-filter::placeholder{color:var(--muted)}
+.tb-dl-group{margin-top:10px}
+.tb-dl-glabel{display:flex;align-items:center;justify-content:space-between;font-size:11px;font-weight:500;color:var(--muted);padding:0 0 4px}
+.tb-dl-link{border:0;background:transparent;color:var(--muted);font:inherit;cursor:pointer;padding:0}
+.tb-dl-link:hover{color:var(--ink)}
+.tb-dl-item{display:grid;grid-template-columns:1fr auto;gap:2px 8px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.tb-dl-name{font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tb-dl-acts{display:flex;gap:4px;grid-row:1 / span 3;grid-column:2}
+.tb-dl-act{width:22px;height:22px;border-radius:var(--r-pill);border:0;background:var(--selected);color:var(--body);display:grid;place-items:center;cursor:pointer;padding:0}
+.tb-dl-act:hover{background:var(--hover);color:var(--ink)}
+.tb-dl-act svg{width:11px;height:11px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tb-dl-item .tb-progress{grid-column:1}
+.tb-dl-item[data-state="paused"] .tb-progress>i{background:var(--control)}
+.tb-dl-item[data-state="failed"] .tb-progress>i{background:var(--danger)}
+.tb-dl-meta{grid-column:1;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.tb-dl-item[data-state="failed"] .tb-dl-meta{color:var(--danger)}
+.tb-dl-empty{padding:14px 0 8px;color:var(--muted);font-size:12px}
+/* Inline card: the same row in a screen (onboarding, settings) instead of the popover. Same state, same words. */
+.tb-dl-card{border:1px solid var(--line);border-radius:var(--r-md);background:var(--surface);padding:0 12px}
+.tb-dl-card .tb-dl-item{border-top:0}

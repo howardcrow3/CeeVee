@@ -8,12 +8,16 @@
   import FeedbackDialog from './FeedbackDialog.svelte';
   import AccountMenu from './AccountMenu.svelte';
   import SettingsModal from './SettingsModal.svelte';
+  import DownloadsPanel from './DownloadsPanel.svelte';
+  import { modelDownload } from '$lib/downloads.svelte';
   import { onMount } from 'svelte';
   import { commands } from '$lib/bindings';
   let { children } = $props();
   let canFeedback = $state(false);
   let feedbackOpen = $state(false);
   onMount(async () => {
+    // Pick up a model download already running (started before this window opened).
+    void modelDownload.load();
     try {
       canFeedback = await commands.feedbackAvailable();
     } catch {
@@ -32,6 +36,7 @@
   </nav>
   <main class="content"><CrashNotice /><LicenseBanner /><AnalyticsPanel mode="ask" />{@render children()}</main>
 </div>
+<DownloadsPanel />
 <SettingsModal />
 {#if canFeedback}<FeedbackDialog bind:open={feedbackOpen} />{/if}
 

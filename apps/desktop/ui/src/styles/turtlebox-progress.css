@@ -1,0 +1,4 @@
+/* Excerpt of .tb-progress from howardcrow3/turtlebox-ui (css/extensions.css), used by the downloads panel. */
+.tb-progress{height:6px;border-radius:var(--r-pill);background:var(--selected);overflow:hidden}
+.tb-progress>i{display:block;height:100%;width:calc(var(--v,0)*100%);background:var(--accent);transition:width .15s ease-out}
+@media (prefers-reduced-motion: reduce){.tb-progress>i{transition:none}}
