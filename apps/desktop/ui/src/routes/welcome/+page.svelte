@@ -3,6 +3,7 @@
   import { resolve } from '$app/paths';
   import { commands, type ProfileChange } from '$lib/bindings';
   import { accepted, savedSummary } from '$lib/onboarding';
+  import ModelSetup from '$lib/components/ModelSetup.svelte';
   import GoogleSignIn from '$lib/components/GoogleSignIn.svelte';
 
   let text = $state('');
@@ -46,7 +47,8 @@
 <ol>
   <li>
     <h2>1. Download the local AI</h2>
-    <p>CeeVee reads your resume with an AI model that runs on this computer. <button class="link" onclick={() => openSettings('general')}>Download it in Settings</button>.</p>
+    <p>CeeVee reads your resume with an AI model that runs on this computer. It downloads once.</p>
+    <ModelSetup />
   </li>
   <li>
     <h2>2. Add your resume</h2>
