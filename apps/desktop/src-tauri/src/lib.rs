@@ -52,7 +52,6 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             updater::check_for_update,
             updater::install_update,
             commands::import_linkedin_connections,
-            commands::export_resume_pdf,
             commands::list_jobs,
             commands::list_job_type_matches,
             commands::people_at_job,

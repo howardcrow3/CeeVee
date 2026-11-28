@@ -29,26 +29,6 @@ pub async fn import_linkedin_connections(
     })
 }
 
-/// Render resume JSON to PDF and write it to `path`.
-#[tauri::command]
-#[specta::specta]
-pub async fn export_resume_pdf(resume_json: String, path: String, a4: bool) -> Result<(), String> {
-    let resume: serde_json::Value =
-        serde_json::from_str(&resume_json).map_err(|e| e.to_string())?;
-    let paper = if a4 {
-        ceevee_docs::render::Paper::A4
-    } else {
-        ceevee_docs::render::Paper::UsLetter
-    };
-    let pdf = tauri::async_runtime::spawn_blocking(move || {
-        ceevee_docs::render::resume_pdf(&resume, paper)
-    })
-    .await
-    .map_err(|e| e.to_string())?
-    .map_err(|e| e.to_string())?;
-    std::fs::write(path, pdf).map_err(|e| e.to_string())
-}
-
 /// One line of the jobs list.
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct JobLine {
