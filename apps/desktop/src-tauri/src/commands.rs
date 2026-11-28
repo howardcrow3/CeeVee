@@ -41,6 +41,10 @@ pub struct JobLine {
     pub url: String,
     /// How many of your LinkedIn connections currently work at this company.
     pub known: u32,
+    /// `strong`, `possible` or `skip`; empty when the job has not been scored.
+    pub fit: String,
+    /// One plain sentence that says why.
+    pub why: String,
 }
 
 /// A job that fits a job type well enough to be listed under it.
@@ -75,8 +79,12 @@ pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLin
     let rows = ceevee_search::postings::recent(&db, 200)
         .await
         .map_err(|e| e.to_string())?;
+    let explained = ceevee_search::categories::explanations(&db)
+        .await
+        .map_err(|e| e.to_string())?;
     let mut out = Vec::new();
     for r in rows {
+        let (fit, why) = explained.get(&r.id).cloned().unwrap_or_default();
         let known = match r.company_id {
             Some(c) => ceevee_network::linkedin::connections_at(&db, c)
                 .await
@@ -93,6 +101,8 @@ pub async fn list_jobs(db: tauri::State<'_, ceevee_db::Db>) -> Result<Vec<JobLin
             score: r.score,
             url: r.url,
             known,
+            fit,
+            why,
         });
     }
     Ok(out)
@@ -237,6 +247,10 @@ pub struct CategoryLine {
     pub locations: Vec<String>,
     pub remote_ok: bool,
     pub avoid: Vec<String>,
+    /// Lowest yearly pay in dollars; 0 for no floor.
+    pub min_pay: u32,
+    /// Only remote jobs.
+    pub remote_only: bool,
     pub active: bool,
 }
 
@@ -249,6 +263,8 @@ fn category_line(c: ceevee_search::categories::Category) -> CategoryLine {
         locations: c.criteria.locations,
         remote_ok: c.criteria.remote_ok,
         avoid: c.criteria.avoid,
+        min_pay: c.criteria.min_pay,
+        remote_only: c.criteria.remote_only,
         active: c.active,
     }
 }
@@ -280,6 +296,8 @@ pub async fn create_category(
         locations: line.locations,
         remote_ok: line.remote_ok,
         avoid: line.avoid,
+        min_pay: line.min_pay,
+        remote_only: line.remote_only,
     };
     let c = ceevee_search::categories::create(&db, &line.name, &criteria)
         .await
@@ -302,6 +320,8 @@ pub async fn update_category(
         locations: line.locations,
         remote_ok: line.remote_ok,
         avoid: line.avoid,
+        min_pay: line.min_pay,
+        remote_only: line.remote_only,
     };
     let c = ceevee_search::categories::update(&db, i64::from(line.id), &line.name, &criteria)
         .await

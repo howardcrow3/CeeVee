@@ -281,6 +281,10 @@ export type CategoryLine = {
 	locations: string[],
 	remote_ok: boolean,
 	avoid: string[],
+	/**  Lowest yearly pay in dollars; 0 for no floor. */
+	min_pay: number,
+	/**  Only remote jobs. */
+	remote_only: boolean,
 	active: boolean,
 };
 
@@ -522,6 +526,10 @@ export type JobLine_Deserialize = {
 	url: string,
 	/**  How many of your LinkedIn connections currently work at this company. */
 	known: number,
+	/**  `strong`, `possible` or `skip`; empty when the job has not been scored. */
+	fit: string,
+	/**  One plain sentence that says why. */
+	why: string,
 };
 
 /**  One line of the jobs list. */
@@ -535,6 +543,10 @@ export type JobLine_Serialize = {
 	url: string,
 	/**  How many of your LinkedIn connections currently work at this company. */
 	known: number,
+	/**  `strong`, `possible` or `skip`; empty when the job has not been scored. */
+	fit: string,
+	/**  One plain sentence that says why. */
+	why: string,
 };
 
 /**  A job that fits a job type well enough to be listed under it. */

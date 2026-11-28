@@ -8,6 +8,15 @@ export function splitList(text: string): string[] {
     .filter((t) => t !== '');
 }
 
+/** "120,000", "$120k" or "120 k" as dollars a year; 0 for blank or unreadable. */
+export function payNumber(text: string): number {
+  const t = text.toLowerCase().replace(/[$,\s]/g, '');
+  const m = t.match(/^(\d+(?:\.\d+)?)(k?)$/);
+  if (!m) return 0;
+  const n = parseFloat(m[1]) * (m[2] === 'k' ? 1000 : 1);
+  return n >= 1000 ? Math.round(n) : 0;
+}
+
 /** Build a new category from what was typed into the form. */
 export function newCategory(f: {
   name: string;
@@ -16,6 +25,8 @@ export function newCategory(f: {
   locations: string;
   avoid: string;
   remote_ok: boolean;
+  min_pay?: string;
+  remote_only?: boolean;
 }): CategoryLine {
   return {
     id: 0,
@@ -25,6 +36,8 @@ export function newCategory(f: {
     locations: splitList(f.locations),
     remote_ok: f.remote_ok,
     avoid: splitList(f.avoid),
+    min_pay: payNumber(f.min_pay ?? ''),
+    remote_only: f.remote_only ?? false,
     active: true
   };
 }
@@ -37,6 +50,8 @@ export function describeCategory(c: CategoryLine): string {
   const places = [...c.locations, ...(c.remote_ok ? ['remote'] : [])];
   if (places.length) parts.push(`places: ${places.join(', ')}`);
   if (c.avoid.length) parts.push(`avoids: ${c.avoid.join(', ')}`);
+  if (c.remote_only) parts.push('remote only');
+  if (c.min_pay > 0) parts.push(`pay at least $${c.min_pay.toLocaleString('en-US')}`);
   return parts.join('; ') || 'No rules yet';
 }
 
@@ -48,7 +63,9 @@ export function formFrom(c: CategoryLine) {
     keywords: c.keywords.join(', '),
     locations: c.locations.join(', '),
     avoid: c.avoid.join(', '),
-    remote_ok: c.remote_ok
+    remote_ok: c.remote_ok,
+    min_pay: c.min_pay > 0 ? String(c.min_pay) : '',
+    remote_only: c.remote_only
   };
 }
 

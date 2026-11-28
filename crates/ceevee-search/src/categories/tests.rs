@@ -8,6 +8,8 @@ fn crit() -> Criteria {
         locations: vec!["columbus".into()],
         remote_ok: true,
         avoid: vec!["intern".into()],
+        min_pay: 0,
+        remote_only: false,
     }
 }
 
@@ -194,4 +196,55 @@ async fn matches_lists_only_postings_that_fit() {
     assert_eq!(matches(&db, 50.0).await.unwrap(), vec![(id, pm.id)]);
     let all = matches(&db, 0.0).await.unwrap();
     assert!(all.contains(&(id, design.id)));
+}
+
+#[tokio::test]
+async fn hard_rules_rule_a_posting_out_and_the_reason_is_explained() {
+    let db = Db::open_in_memory().await.unwrap();
+    let c = create(
+        &db,
+        "PM",
+        &Criteria {
+            titles: vec!["product manager".into()],
+            remote_only: true,
+            min_pay: 120_000,
+            ..Criteria::default()
+        },
+    )
+    .await
+    .unwrap();
+    let mk = |url: &str, loc: &str, pay: &str| postings::NewPosting {
+        source: "greenhouse".into(),
+        url: url.into(),
+        company: "Acme".into(),
+        title: format!("Product Manager {url}"),
+        location: Some(loc.into()),
+        level: None,
+        pay: Some(pay.into()),
+        body: None,
+    };
+    let mut ids = Vec::new();
+    for p in [
+        mk("https://x/1", "Remote", "$130k - $160k"),
+        mk("https://x/2", "Remote", "$80k - $100k"),
+        mk("https://x/3", "Columbus", "$130k - $160k"),
+    ] {
+        match postings::ingest(&db, &p, "2026-11-15T00:00:00Z")
+            .await
+            .unwrap()
+        {
+            Ingest::New(id) => ids.push(id),
+            other => panic!("{other:?}"),
+        }
+    }
+    for id in &ids {
+        score_posting(&db, *id).await.unwrap();
+    }
+    let e = explanations(&db).await.unwrap();
+    assert_eq!(e[&ids[0]].0, "strong");
+    assert_eq!(e[&ids[1]].0, "skip");
+    assert!(e[&ids[1]].1.contains("below your $120,000 floor"));
+    assert_eq!(e[&ids[2]].0, "skip");
+    assert!(e[&ids[2]].1.contains("only want remote"));
+    let _ = c;
 }
