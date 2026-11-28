@@ -158,6 +158,14 @@ mod tests {
     }
 
     #[test]
+    fn a_pdf_with_absurd_nesting_is_refused_not_a_crash() {
+        // RUSTSEC-2026-0187: lopdf before 0.42 overflowed the stack on this.
+        let nest = "[".repeat(10_400) + &"]".repeat(10_400);
+        let pdf = format!("%PDF-1.4\n1 0 obj\n<< /Type /Catalog /X {nest} >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF\n");
+        assert!(text_from_file("bad.pdf", pdf.as_bytes()).is_err());
+    }
+
+    #[test]
     fn says_plainly_when_a_file_cannot_be_read() {
         assert!(text_from_file("cv.pdf", b"not a pdf")
             .unwrap_err()
