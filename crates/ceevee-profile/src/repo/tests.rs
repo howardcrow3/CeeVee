@@ -195,3 +195,47 @@ fn changes_read_as_plain_sentences() {
         "Add skill: SQL"
     );
 }
+
+#[tokio::test]
+async fn deleting_a_missing_entry_is_an_error_not_a_silent_success() {
+    let db = Db::open_in_memory().await.unwrap();
+    let err = delete_entry(&db, 999).await.unwrap_err();
+    assert!(matches!(err, Error::NotFound(_)), "{err}");
+}
+
+#[tokio::test]
+async fn skills_are_trimmed_and_blank_ones_refused() {
+    let db = Db::open_in_memory().await.unwrap();
+    assert!(add_skill(&db, "  Rust  ").await.unwrap());
+    assert!(!add_skill(&db, "rust").await.unwrap());
+    assert!(matches!(
+        add_skill(&db, "   ").await.unwrap_err(),
+        Error::Invalid(_)
+    ));
+    assert_eq!(list_skills(&db).await.unwrap(), vec!["Rust".to_string()]);
+}
+
+#[tokio::test]
+async fn entries_of_different_kinds_are_listed_apart_and_keep_their_bullets() {
+    let db = Db::open_in_memory().await.unwrap();
+    let mut j = job("Engineer", "Acme", "2020-01");
+    j.bullets = vec![
+        "Built café menus – 40% faster".into(),
+        "Led \"team\"".into(),
+    ];
+    add_entry(&db, &j).await.unwrap();
+    let mut school = job("BSc", "State U", "2014-09");
+    school.kind = EntryKind::Education;
+    add_entry(&db, &school).await.unwrap();
+
+    let jobs = list_entries(&db, EntryKind::Experience).await.unwrap();
+    assert_eq!(jobs.len(), 1);
+    assert_eq!(jobs[0].bullets, j.bullets);
+    let edu = list_entries(&db, EntryKind::Education).await.unwrap();
+    assert_eq!(edu.len(), 1);
+    assert_eq!(edu[0].title, "BSc");
+    assert!(list_entries(&db, EntryKind::Project)
+        .await
+        .unwrap()
+        .is_empty());
+}

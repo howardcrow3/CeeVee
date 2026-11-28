@@ -71,7 +71,12 @@ pub async fn download(
         tokio::fs::remove_file(&final_path).await?; // damaged: fetch again
     }
     let partial = dir.join(format!("{}.partial", entry.file));
-    let client = reqwest::Client::new();
+    // A stalled connection must not hang the download (or its cancel button) forever.
+    let client = reqwest::Client::builder()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .read_timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(net)?;
 
     // At most one restart from zero: a server that ignores Range, or a stale partial.
     for attempt in 0..2 {
