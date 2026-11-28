@@ -1,21 +1,26 @@
 import { describe, expect, it } from 'vitest';
-import { bannerText, canActivate, keyFromInput, statusText, type LicenseView } from './license';
+import { canActivate, keyFromInput, menuLicense, pillText, statusText, type LicenseView } from './license';
 
 const base: LicenseView = {
   state: 'trial', days_left: 10, ends_at: null, key_hint: null, seats: null, read_only: false, note: null
 };
 
 describe('license text', () => {
-  it('shows days left during the trial and stays quiet when licensed', () => {
-    expect(bannerText(base)).toBe('Trial: 10 days left.');
-    expect(bannerText({ ...base, state: 'licensed' })).toBeNull();
+  it('pill shows days left during the trial and Licensed once a key is saved', () => {
+    expect(pillText(null)).toBeNull();
+    expect(pillText(base)).toEqual({ text: 'Trial · 10 days left', tone: 'ok' });
+    expect(pillText({ ...base, days_left: 1 })).toEqual({ text: 'Trial · 1 day left', tone: 'soon' });
+    expect(pillText({ ...base, state: 'licensed' })).toEqual({ text: 'Licensed', tone: 'ok' });
   });
-  it('warns in the last days', () => {
-    expect(bannerText({ ...base, days_left: 3 })).toBe('Your trial ends in 3 days.');
-    expect(bannerText({ ...base, days_left: 1 })).toBe('Your trial ends today or tomorrow.');
+  it('pill says read-only when expired', () => {
+    expect(pillText({ ...base, state: 'expired', days_left: null, read_only: true })?.tone).toBe('ended');
+    expect(pillText({ ...base, state: 'expired', days_left: null })?.text).toMatch(/read-only/);
   });
-  it('says read-only when expired', () => {
-    expect(bannerText({ ...base, state: 'expired', days_left: null, read_only: true })).toMatch(/read-only/);
+  it('menu offers Buy during and after the trial, not once licensed', () => {
+    expect(menuLicense(null)).toBeNull();
+    expect(menuLicense(base)?.buy).toBe(true);
+    expect(menuLicense({ ...base, state: 'expired', days_left: null })).toMatchObject({ buy: true, tone: 'ended' });
+    expect(menuLicense({ ...base, state: 'licensed', seats: 2 })).toMatchObject({ buy: false, title: 'Licensed' });
   });
   it('status line covers each state', () => {
     expect(statusText({ ...base, days_left: 1 })).toBe('Trial: 1 day left. Everything is unlocked.');
