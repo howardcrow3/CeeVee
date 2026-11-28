@@ -61,6 +61,8 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::save_boards,
             commands::run_search,
             commands::preview_resume_import,
+            commands::read_resume_file,
+            commands::save_base_resume,
             commands::apply_profile_changes,
             commands::list_categories,
             commands::create_category,

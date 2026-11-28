@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import { commands, type ApplicationLine, type ProposalLine } from '$lib/bindings';
   import { applicationName, boardColumns, dropStatus, groupByStatus, statuses } from '$lib/applications';
@@ -171,7 +172,7 @@
   {/each}
 {/if}
 {#if waiting.length === 0 && apps.length === 0 && !error && !adding}
-  <EmptyState title="No applications yet"><p>Applications you start appear here with their status. Press Add application to track one you applied to elsewhere.</p></EmptyState>
+  <EmptyState title="No applications yet"><p>Applications you start appear here with their status. Press Add application to track one you applied to elsewhere, or <a href={resolve('/inbox')}>sign in with Gmail</a> and CeeVee finds the ones already in your mail.</p></EmptyState>
 {/if}
 </ChatLayout>
 

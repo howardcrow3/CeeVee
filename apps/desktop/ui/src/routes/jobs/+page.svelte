@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import { commands, type CategoryLine, type JobDraft, type JobLine, type JobTypeMatch, type KnownLine } from '$lib/bindings';
   import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
@@ -167,7 +168,7 @@
   <p role="alert">{error}</p>
 {:else if loaded && jobs.length === 0}
   <EmptyState title="Jobs CeeVee finds will appear here">
-    <p>Add companies to watch in Settings, then choose Search now.</p>
+    <p>Say what you want in a <a href={resolve('/job-types')}>job type</a>, add companies to watch in Settings, then choose Search now.</p>
   </EmptyState>
 {:else if jobs.length > 0}
   <div class="bar">

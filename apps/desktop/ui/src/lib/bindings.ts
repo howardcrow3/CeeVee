@@ -62,6 +62,16 @@ export const commands = {
 	 *  saved until you accept.
 	 */
 	previewResumeImport: (text: string) => typedError<ProfileChange[], string>(__TAURI_INVOKE("preview_resume_import", { text })),
+	/**
+	 *  Read the text out of a resume file (PDF, Word, text or Markdown) so it can be imported. Nothing
+	 *  is stored and nothing leaves this computer.
+	 */
+	readResumeFile: (name: string, bytes: number[]) => typedError<string, string>(__TAURI_INVOKE("read_resume_file", { name, bytes })),
+	/**
+	 *  Write the profile into the base resume in Documents: a new one the first time, a new version
+	 *  after that. Returns the document's id.
+	 */
+	saveBaseResume: () => typedError<number, string>(__TAURI_INVOKE("save_base_resume")),
 	/**  Save the changes you accepted. Returns how many were applied. */
 	applyProfileChanges: (changes: string[]) => typedError<number, string>(__TAURI_INVOKE("apply_profile_changes", { changes })),
 	/**  The kinds of job you are looking for, highest priority first. */
