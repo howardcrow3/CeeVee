@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Resume check: on a job, see which skills and tools the posting asks for and whether the resume that would be sent already shows them. Skills only in your profile are offered first, and skills you do not have are shown as questions, never added for you.
 - Explained matches: each job now says Strong, Possible or Skip with one plain sentence why (for example "Strong fit: title matches product manager, remote; does not mention sql"). Job types can have two hard rules, only remote jobs and a lowest yearly pay, and a job that breaks one is always Skip.
 - Companion browser extension (Chrome, Edge, Brave, Firefox), first version: fills application forms on Greenhouse, Lever, Ashby, Workday and similar sites in your own browser, using your CeeVee profile over a connection that never leaves your computer. It never submits.
 - Network: a weekly goal for how many people to be in touch with, a 30 day summary of introductions asked, answered and referred, and a list of people who just changed jobs to congratulate.

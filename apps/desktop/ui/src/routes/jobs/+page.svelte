@@ -6,6 +6,7 @@
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
+  import ResumeGapPanel from '$lib/components/ResumeGapPanel.svelte';
   import IntroPanel from '$lib/components/IntroPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -218,6 +219,7 @@
         <div class="note">{open.company ?? 'Company not listed'} · {placeText(open)}</div>
         <div class="note"><span class="dot" class:on={open.state === 'saved'}></span>{statusWord(open.state)} · {fitWord(open.fit)}</div>
         {#if open.why}<div class="note">{open.why}</div>{/if}
+        <ResumeGapPanel job={open.id} />
         <IntroPanel job={open.id} />
         <div class="acts">
           <button class="ghost" onclick={() => openPosting(open.url)}>Open posting</button>

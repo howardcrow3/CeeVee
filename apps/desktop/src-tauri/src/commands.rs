@@ -921,6 +921,59 @@ pub async fn draft_for_job(
     })
 }
 
+/// One skill or tool a posting asks for.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct GapTerm {
+    pub term: String,
+    /// `shown` (on the resume), `profile` (in your profile, not on the resume) or `missing`.
+    pub status: String,
+}
+
+/// What the resume check found for one job.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ResumeGap {
+    /// The resume that was checked; empty when there is none yet.
+    pub resume: String,
+    pub terms: Vec<GapTerm>,
+}
+
+/// Which skills a posting asks for, and whether the resume that would be sent already shows each.
+#[tauri::command]
+#[specta::specta]
+pub async fn resume_gap(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Result<ResumeGap, String> {
+    let (posting, _) = posting_text(&db, i64::from(id)).await?;
+    let Some((title, content)) = ceevee_agent::apply_prep::resume_for(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(ResumeGap {
+            resume: String::new(),
+            terms: Vec::new(),
+        });
+    };
+    let resume_text = match serde_json::from_str::<serde_json::Value>(&content) {
+        Ok(v) => ceevee_docs::fact_guard::text_of(&v),
+        Err(_) => content,
+    };
+    let profile = ceevee_mail::reply::profile_text(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let skills = ceevee_profile::repo::list_skills(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let terms = ceevee_docs::gap::analyze(&posting, &resume_text, &profile, &skills)
+        .into_iter()
+        .map(|t| GapTerm {
+            term: t.term,
+            status: t.status.as_str().to_string(),
+        })
+        .collect();
+    Ok(ResumeGap {
+        resume: title,
+        terms,
+    })
+}
+
 /// Save a draft you reviewed as a new document. Returns the document id.
 #[tauri::command]
 #[specta::specta]

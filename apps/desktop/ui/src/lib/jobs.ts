@@ -99,3 +99,9 @@ export function jobsOfType(matches: { job: number; job_type: number }[], jobType
   if (jobType == null) return null;
   return new Set(matches.filter((m) => m.job_type === jobType).map((m) => m.job));
 }
+
+/** The resume check split into what to add, what to ask yourself about, and what is covered. */
+export function gapGroups(terms: { term: string; status: string }[]) {
+  const pick = (s: string) => terms.filter((t) => t.status === s).map((t) => t.term);
+  return { add: pick('profile'), ask: pick('missing'), covered: pick('shown') };
+}
