@@ -236,6 +236,57 @@ async fn a_sync_downloads_only_employer_mail_and_does_not_repeat() {
 }
 
 #[tokio::test]
+async fn catching_up_after_a_gap_reads_the_oldest_mail_first() {
+    let messages: Vec<(u32, Vec<u8>)> = (1..=502)
+        .map(|i| {
+            (
+                i,
+                mail(
+                    "friend@gmail.com",
+                    "Dinner",
+                    "Free Friday?",
+                    &format!("d{i}@x"),
+                ),
+            )
+        })
+        .collect();
+    let server = serve(messages, "pw").await;
+    let db = Db::open_in_memory().await.unwrap();
+    let acct = store::add_account(&db, "imap", "me@example.org", &config(server.port), "k")
+        .await
+        .unwrap();
+    store::set_sync_state(
+        &db,
+        acct.id,
+        &serde_json::to_value(SyncState {
+            uid_validity: Some(7),
+            last_uid: Some(0),
+        })
+        .unwrap(),
+        "2026-11-01T00:00:00Z",
+    )
+    .await
+    .unwrap();
+    let s = sync::sync_imap(
+        &db,
+        acct.id,
+        "pw",
+        || None,
+        1_794_564_000,
+        "2026-11-13T10:00:00Z",
+    )
+    .await
+    .unwrap();
+    assert_eq!(s.seen, 500);
+    let state = store::get_account(&db, acct.id).await.unwrap().sync_state;
+    // The newest two are left for the next sync, not skipped.
+    assert_eq!(
+        serde_json::from_value::<SyncState>(state).unwrap().last_uid,
+        Some(500)
+    );
+}
+
+#[tokio::test]
 async fn a_wrong_password_gives_a_plain_message() {
     let server = serve(vec![], "right").await;
     let cfg: ImapConfig = serde_json::from_value(config(server.port)).unwrap();
