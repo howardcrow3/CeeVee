@@ -218,7 +218,6 @@
         <div class="note">{open.company ?? 'Company not listed'} · {placeText(open)}</div>
         <div class="note"><span class="dot" class:on={open.state === 'saved'}></span>{statusWord(open.state)} · Match {matchText(open.score)}</div>
         <IntroPanel job={open.id} />
-        {/if}
         <div class="acts">
           <button class="ghost" onclick={() => openPosting(open.url)}>Open posting</button>
           <button class="ghost" disabled={drafting !== null} onclick={() => writeDraft(open.id, 'cover_letter')}>{drafting === `${open.id}:cover_letter` ? 'Writing' : 'Write cover letter'}</button>
