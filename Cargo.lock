@@ -756,6 +756,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ceevee-bridge"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "ceevee-apply",
+ "getrandom 0.3.4",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "ceevee-core"
 version = "0.1.0"
 dependencies = [

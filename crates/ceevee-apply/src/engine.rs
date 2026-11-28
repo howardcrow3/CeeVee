@@ -175,7 +175,48 @@ pub async fn fill_application<D: BrowserDriver>(
         filled: Vec::new(),
         skipped: Vec::new(),
     };
-    for field in driver.fields().await? {
+    let fields = driver.fields().await?;
+    let plan = plan_fields(&fields, answers);
+    for step in &plan.steps {
+        match &step.action {
+            Action::Fill(value) => driver.fill(&step.field_id, value).await?,
+            Action::Upload(path) => driver.upload(&step.field_id, path).await?,
+        }
+    }
+    report.filled = plan.filled;
+    report.skipped = plan.skipped;
+    Ok(report)
+}
+
+/// One thing to do to a form: put a value in a field, or attach a document.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Action {
+    Fill(String),
+    /// A path to the document on this computer.
+    Upload(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Step {
+    pub field_id: String,
+    pub action: Action,
+}
+
+/// What to do with a form, decided without touching a browser. The same decisions serve the
+/// built-in browser and the companion extension.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Plan {
+    pub steps: Vec<Step>,
+    pub filled: Vec<Filled>,
+    pub skipped: Vec<Skipped>,
+}
+
+/// Decide which fields to fill, with what, and which to leave for the person.
+pub fn plan_fields(fields: &[FormField], answers: &Answers) -> Plan {
+    let mut steps: Vec<Step> = Vec::new();
+    let mut filled: Vec<Filled> = Vec::new();
+    let mut skipped: Vec<Skipped> = Vec::new();
+    for field in fields {
         let kind = classify_field(&field.label);
         let skip = |reason: &str| Skipped {
             label: field.label.clone(),
@@ -191,15 +232,18 @@ pub async fn fill_application<D: BrowserDriver>(
             };
             match path {
                 Some(p) => {
-                    driver.upload(&field.id, p).await?;
-                    report.filled.push(Filled {
+                    steps.push(Step {
+                        field_id: field.id.clone(),
+                        action: Action::Upload(p.to_string()),
+                    });
+                    filled.push(Filled {
                         label: field.label.clone(),
                         value: p.to_string(),
                         kind,
                         review: false,
                     });
                 }
-                None => report.skipped.push(skip("no document to upload")),
+                None => skipped.push(skip("no document to upload")),
             }
             continue;
         }
@@ -223,7 +267,7 @@ pub async fn fill_application<D: BrowserDriver>(
                 FieldKind::Unknown => "not recognised",
                 _ => "nothing saved for this",
             };
-            report.skipped.push(skip(why));
+            skipped.push(skip(why));
             continue;
         };
         // A dropdown only accepts one of its options.
@@ -231,20 +275,27 @@ pub async fn fill_application<D: BrowserDriver>(
             match pick_option(options, &value) {
                 Some(o) => value = o,
                 None => {
-                    report.skipped.push(skip("no matching choice in the list"));
+                    skipped.push(skip("no matching choice in the list"));
                     continue;
                 }
             }
         }
-        driver.fill(&field.id, &value).await?;
-        report.filled.push(Filled {
+        steps.push(Step {
+            field_id: field.id.clone(),
+            action: Action::Fill(value.clone()),
+        });
+        filled.push(Filled {
             label: field.label.clone(),
             value,
             kind,
             review,
         });
     }
-    Ok(report)
+    Plan {
+        steps,
+        filled,
+        skipped,
+    }
 }
 
 fn non_empty(s: &str) -> Option<String> {

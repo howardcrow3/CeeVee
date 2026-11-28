@@ -221,3 +221,49 @@ fn a_single_name_is_a_first_name_only() {
     let a = Answers::from_parts("Cher", None, None, None, &[], &[]);
     assert_eq!((a.first_name.as_str(), a.last_name.as_str()), ("Cher", ""));
 }
+
+#[test]
+fn a_plan_needs_no_browser_and_leaves_sensitive_and_unknown_fields_alone() {
+    let fields = vec![
+        field("e", "Email", Input::Text, true),
+        field("r", "Resume/CV", Input::File, true),
+        field(
+            "w",
+            "Are you authorized to work in the US?",
+            Input::Text,
+            true,
+        ),
+        field("s", "Will you require sponsorship?", Input::Text, true),
+        field("q", "Favourite colour", Input::Text, false),
+    ];
+    let p = plan_fields(&fields, &answers());
+    assert_eq!(
+        p.steps,
+        vec![
+            Step {
+                field_id: "e".into(),
+                action: Action::Fill("ada@example.com".into())
+            },
+            Step {
+                field_id: "r".into(),
+                action: Action::Upload("/tmp/resume.pdf".into())
+            },
+            Step {
+                field_id: "w".into(),
+                action: Action::Fill("Yes".into())
+            },
+        ]
+    );
+    // The saved answer is shown for review; the unanswered ones are left for the person.
+    assert!(p
+        .filled
+        .iter()
+        .any(|f| f.label.contains("authorized") && f.review));
+    assert_eq!(
+        p.skipped
+            .iter()
+            .map(|s| s.label.as_str())
+            .collect::<Vec<_>>(),
+        vec!["Will you require sponsorship?", "Favourite colour"]
+    );
+}
