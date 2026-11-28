@@ -2,18 +2,34 @@ import type { LicenseView_Serialize } from './bindings';
 
 export type LicenseView = LicenseView_Serialize;
 
-/** One line for the banner, or null when nothing needs saying. */
-export function bannerText(v: LicenseView): string | null {
+export type PillTone = 'ok' | 'soon' | 'ended';
+
+/** The short status under the account name in the bottom-left pill, or null until the license is known. */
+export function pillText(v: LicenseView | null): { text: string; tone: PillTone } | null {
+  if (!v) return null;
+  if (v.state === 'licensed') return { text: 'Licensed', tone: 'ok' };
+  if (v.state === 'expired') return { text: 'Trial ended · read-only', tone: 'ended' };
+  if (v.days_left === null) return { text: 'Trial starting', tone: 'ok' };
+  const text = `Trial · ${v.days_left} ${v.days_left === 1 ? 'day' : 'days'} left`;
+  return { text, tone: v.days_left <= 3 ? 'soon' : 'ok' };
+}
+
+/** The license block at the top of the account menu. `buy` says whether to offer the Buy button. */
+export function menuLicense(v: LicenseView | null): { title: string; detail: string; tone: PillTone; buy: boolean } | null {
+  if (!v) return null;
+  if (v.state === 'licensed') {
+    return { title: 'Licensed', detail: `Works on up to ${v.seats ?? 2} computers.`, tone: 'ok', buy: false };
+  }
   if (v.state === 'expired') {
-    return 'Your 14-day trial has ended. CeeVee is read-only: you can still look at and export everything.';
+    return {
+      title: 'Your 14-day trial has ended',
+      detail: 'CeeVee is read-only: you can still look at and export everything.',
+      tone: 'ended',
+      buy: true
+    };
   }
-  if (v.state === 'trial' && v.days_left !== null) {
-    if (v.days_left > 3) return `Trial: ${v.days_left} days left.`;
-    return v.days_left <= 1
-      ? 'Your trial ends today or tomorrow.'
-      : `Your trial ends in ${v.days_left} days.`;
-  }
-  return null;
+  const left = v.days_left === null ? 'Your 14-day trial is starting.' : `${v.days_left} ${v.days_left === 1 ? 'day' : 'days'} left in your free trial.`;
+  return { title: 'Free trial', detail: `${left} Everything is unlocked.`, tone: v.days_left !== null && v.days_left <= 3 ? 'soon' : 'ok', buy: true };
 }
 
 /** The status line shown in Settings. */

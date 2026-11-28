@@ -4,6 +4,8 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- The account button is now always at the bottom left of the window, however small. Opening it shows the license status (the trial countdown moved here from the top of the page), every settings section, feedback and the theme.
+
 - Jobs can be narrowed to one job type with a menu above the list.
 - Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.
 - Job types can be edited and removed from the Job types screen. Removing one keeps the jobs already found.
