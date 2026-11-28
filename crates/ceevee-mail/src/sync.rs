@@ -104,6 +104,9 @@ pub struct GmailState {
 /// Raise this whenever the rules for finding job mail change.
 pub const RULES_VERSION: u32 = 4;
 
+/// The most message IDs listed in one sync; at most `MAX_PER_SYNC` of them are read.
+const LIST_CAP: usize = 5000;
+
 /// Sync a Gmail account through the Gmail API. Headers are read first, and a whole message is
 /// downloaded only when the candidate filter wants it. A day of overlap covers mail that arrives
 /// late; storing a message twice is harmless.
@@ -135,7 +138,14 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
     };
     let own = account.address.to_ascii_lowercase();
     tracing::info!("gmail sync: started for account {account_id}");
-    let ids = api.list_ids(&query, MAX_PER_SYNC).await?;
+    // Gmail lists newest first. Work oldest first and, when there is more than one sync's worth,
+    // move the window forward only as far as the mail handled, so a long gap (a closed laptop)
+    // never drops the oldest messages.
+    let mut ids = api.list_ids(&query, LIST_CAP).await?;
+    ids.reverse();
+    let truncated = ids.len() > MAX_PER_SYNC;
+    ids.truncate(MAX_PER_SYNC);
+    let mut newest_handled: Option<i64> = None;
     let mut ctx = Context::load(db).await?;
     tracing::info!(
         "gmail sync: query \"{query}\" returned {} messages; {} company domains, {} company names, {} sent ids",
@@ -167,6 +177,7 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
             tracing::warn!("gmail sync: could not read the headers of a message");
             continue;
         };
+        newest_handled = newest_handled.max(m.sent_at);
         // Mail already stored, or already set aside as not about a job, is not fetched again.
         if let Some(mid) = &m.message_id {
             if store::is_seen(db, account_id, mid).await? {
@@ -226,12 +237,24 @@ pub async fn sync_gmail<A: ceevee_google::MailApi>(
         // Some messages could not be read; keep the old window so the next check tries them again.
         tracing::warn!("gmail sync: {failed} messages could not be read; they will be tried again");
     }
+    let after = if failed > 0 {
+        state.after
+    } else if truncated {
+        // The next query starts a day before this value, so it must be at least a day past the
+        // old one or a busy day could be listed forever.
+        let old = state
+            .after
+            .unwrap_or(now_secs - crate::imap::FIRST_SYNC_DAYS * 86_400);
+        Some(
+            newest_handled
+                .unwrap_or(now_secs)
+                .clamp(old + 86_401, now_secs.max(old + 86_401)),
+        )
+    } else {
+        Some(now_secs)
+    };
     let state = serde_json::to_value(GmailState {
-        after: if failed > 0 {
-            state.after
-        } else {
-            Some(now_secs)
-        },
+        after,
         rules: RULES_VERSION,
     })
     .unwrap_or_default();

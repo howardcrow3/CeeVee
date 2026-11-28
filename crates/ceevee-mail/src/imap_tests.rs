@@ -354,6 +354,42 @@ mod gmail {
     }
 
     #[tokio::test]
+    async fn a_gap_longer_than_one_sync_is_worked_through_oldest_first() {
+        // 501 messages, newest first as Gmail lists them: "m0" is the newest.
+        let mails: Vec<(String, Vec<u8>)> = (0..501)
+            .map(|i| {
+                (
+                    format!("g{i}"),
+                    mail(
+                        "news@example.org",
+                        "Weekly digest",
+                        "Nothing here.",
+                        &format!("m{i}@x"),
+                    ),
+                )
+            })
+            .collect();
+        let api = Fake {
+            mails,
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        let now = 1_794_564_000 + 10 * 86_400;
+        sync::sync_gmail(&db, acct.id, &api, || None, now, "2026-11-23T10:00:00Z")
+            .await
+            .unwrap();
+        // The oldest 500 were handled; the newest is left for the next sync.
+        assert!(store::is_seen(&db, acct.id, "m500@x").await.unwrap());
+        assert!(!store::is_seen(&db, acct.id, "m0@x").await.unwrap());
+        // The window moved only as far as the mail handled, not to "now".
+        let st = store::get_account(&db, acct.id).await.unwrap().sync_state;
+        assert_eq!(st["after"], 1_794_564_000_i64, "{st}");
+    }
+
+    #[tokio::test]
     async fn a_failed_download_does_not_cost_the_mail_already_handled() {
         use ceevee_search::tracking::{self, Status};
         let body = "We would like to interview you for the role at Acme Robotics.";
