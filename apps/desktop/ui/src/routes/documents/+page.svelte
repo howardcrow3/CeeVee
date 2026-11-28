@@ -4,6 +4,7 @@
   import { describeEdit, docKinds, isResume, kindLabel, starter } from '$lib/documents';
   import ResumeForm from '$lib/components/ResumeForm.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import ResumeImport from '$lib/components/ResumeImport.svelte';
 
   let docs = $state<DocLine[]>([]);
   let open = $state<DocView | null>(null);
@@ -117,7 +118,10 @@
 <div class="layout">
   <aside>
     {#if loaded && docs.length === 0 && !creating}
-      <EmptyState title="No documents yet"><p>Your resume and cover letters are kept here, with every earlier version.</p></EmptyState>
+      <EmptyState title="No documents yet">
+        <p>Your resume and cover letters are kept here, with every earlier version. Start with your resume.</p>
+        <ResumeImport showPaste={false} onsaved={loadList} />
+      </EmptyState>
     {/if}
     <ul>
       {#each docs as d (d.id)}

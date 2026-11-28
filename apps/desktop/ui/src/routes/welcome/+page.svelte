@@ -1,16 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
-  import { commands, type FoundJob, type MailAccountLine, type ProfileChange } from '$lib/bindings';
+  import { commands, type FoundJob, type MailAccountLine } from '$lib/bindings';
   import { googleAccount, foundTitle, foundStatusWord } from '$lib/inbox';
-  import {
-    accepted, savedSummary, stepStates, progressWord, companiesOf, foundCelebration, resumeFeedbackPrompt,
-    markOnboardingFinished, type StepId
-  } from '$lib/onboarding';
+  import { stepStates, progressWord, companiesOf, foundCelebration, markOnboardingFinished, type StepId } from '$lib/onboarding';
   import { chatPane, toggleChatPane } from '$lib/chat-ui.svelte';
-  import { friendlyError } from '$lib/chat';
   import ModelSetup from '$lib/components/ModelSetup.svelte';
   import GoogleSignIn from '$lib/components/GoogleSignIn.svelte';
+  import ResumeImport from '$lib/components/ResumeImport.svelte';
 
   let accounts = $state<MailAccountLine[]>([]);
   let modelInstalled = $state(false);
@@ -24,18 +21,6 @@
 
   // Step 2 payoff
   let chatOn = $state(false);
-
-  // Step 3
-  let text = $state('');
-  let changes = $state<ProfileChange[]>([]);
-  let ticked = $state<boolean[]>([]);
-  let reading = $state(false);
-  let resumeMsg = $state('');
-  let resumeError = $state('');
-  let feedback = $state('');
-  let reviewing = $state(false);
-  let feedbackError = $state('');
-  let needsModel = $state(false);
 
   const done = $derived<Record<StepId, boolean>>({
     gmail: googleAccount(accounts) !== undefined,
@@ -90,65 +75,6 @@
   function turnOnChat() {
     if (!chatPane.open) toggleChatPane();
     chatOn = true;
-  }
-
-  function onFile(e: { currentTarget: { files: ArrayLike<{ text(): Promise<string> }> | null } }) {
-    const file = e.currentTarget.files?.[0];
-    if (!file) return;
-    file.text().then((t) => (text = t)).catch(() => (resumeError = 'CeeVee could not read that file. Paste the text of your resume instead.'));
-  }
-
-  async function read() {
-    resumeError = resumeMsg = '';
-    reading = true;
-    try {
-      const r = await commands.previewResumeImport(text);
-      if (r.status === 'ok') {
-        changes = r.data;
-        ticked = r.data.map(() => true);
-        if (r.data.length === 0) {
-          resumeMsg = 'Your profile already has everything in this resume.';
-          resumeSaved = true;
-          await review();
-        }
-      } else resumeError = r.error;
-    } catch (e) {
-      resumeError = String(e);
-    } finally {
-      reading = false;
-    }
-  }
-
-  async function save() {
-    resumeError = '';
-    const r = await commands.applyProfileChanges(accepted(changes, ticked));
-    if (r.status === 'ok') {
-      resumeMsg = savedSummary(r.data);
-      changes = [];
-      ticked = [];
-      resumeSaved = true;
-      await review();
-    } else resumeError = r.error;
-  }
-
-  /** The step 3 payoff: ask the local AI how to make the resume better. */
-  async function review() {
-    reviewing = true;
-    feedbackError = '';
-    needsModel = false;
-    try {
-      const r = await commands.askModel(resumeFeedbackPrompt(text));
-      if (r.status === 'ok') feedback = r.data.trim();
-      else {
-        const f = friendlyError(r.error);
-        feedbackError = f.text;
-        needsModel = f.needsModel ?? false;
-      }
-    } catch (e) {
-      feedbackError = String(e);
-    } finally {
-      reviewing = false;
-    }
   }
 
   function finish() {
@@ -216,35 +142,9 @@
 
   <li class="step" data-state={stateOf('resume')}>
     <header><span class="num">{done.resume ? '✓' : '3'}</span><h2>Add your resume</h2></header>
-    <p>Choose a text file or paste your resume. CeeVee shows what it found and you pick what goes into your profile, then the AI gives you feedback on it.</p>
+    <p>Upload it and CeeVee shows what it found, you pick what goes into your profile, then the AI gives you feedback on it.</p>
     {#if !done.model}<p class="note">Reading your resume needs the local AI from step 2.</p>{/if}
-    <input type="file" accept=".txt,.md,text/plain,text/markdown" aria-label="Choose a resume file" onchange={onFile} />
-    <textarea aria-label="Resume text" rows="8" bind:value={text}></textarea>
-    <div class="row"><button onclick={read} disabled={reading || text.trim() === ''}>{reading ? 'Reading' : 'Read my resume'}</button></div>
-    {#if changes.length}
-      <ul class="plain">
-        {#each changes as c, i (i)}
-          <li><label><input type="checkbox" bind:checked={ticked[i]} /> {c.text}</label></li>
-        {/each}
-      </ul>
-      <div class="row"><button onclick={save}>Save the ticked changes</button></div>
-    {/if}
-    {#if resumeMsg}<p role="status">{resumeMsg}</p>{/if}
-    {#if resumeError}<p role="alert">{resumeError}</p>{/if}
-    {#if text.trim() !== '' && !changes.length && (resumeSaved || resumeMsg)}
-      <div class="row"><button class="ghost" onclick={review} disabled={reviewing}>Get resume feedback</button></div>
-    {/if}
-    {#if reviewing}<p role="status">The AI is reading your resume…</p>{/if}
-    {#if feedback}
-      <div class="payoff" role="status">
-        <strong>🎉 Here is how to make your resume stronger</strong>
-        <p class="feedback">{feedback}</p>
-      </div>
-    {/if}
-    {#if feedbackError}
-      <p role="alert">{feedbackError}</p>
-    {/if}
-    {#if needsModel}<p class="note">Finish step 2, then choose Get resume feedback.</p>{/if}
+    <ResumeImport onsaved={() => (resumeSaved = true)} />
   </li>
 </ol>
 
@@ -263,14 +163,12 @@
   header h2 { margin: 0; }
   .num { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--border-control); font-size: 12px; }
   .step[data-state='done'] .num { background: var(--selected); }
-  textarea { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); padding: 12px 16px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .foot { max-width: 760px; margin-top: 8px; }
   ul.plain { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
   ul.plain li { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
   .payoff { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: var(--r-md); padding: 12px 16px; background: var(--selected); }
   .payoff p { margin: 0; }
-  .feedback { white-space: pre-wrap; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip { height: 22px; line-height: 22px; padding: 0 10px; border-radius: var(--r-pill); background: var(--surface); border: 1px solid var(--line); font-size: 12px; }
 </style>

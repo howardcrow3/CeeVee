@@ -9,6 +9,7 @@
     type MessageView
   } from '$lib/bindings';
   import EmptyState from '$lib/components/EmptyState.svelte';
+  import GoogleSignIn from '$lib/components/GoogleSignIn.svelte';
   import {
     dateWord,
     filterInbox,
@@ -158,8 +159,9 @@
 
 {#if loaded && accounts === 0}
   <EmptyState title="Connect your email">
-    <p>CeeVee reads replies from employers and keeps your applications up to date. Connect an account in Settings.</p>
-    <p><button class="link" onclick={() => openSettings('accounts')}>Open Settings</button></p>
+    <p>CeeVee reads replies from employers and keeps your applications up to date. Sign in with Google to start.</p>
+    <GoogleSignIn onchange={() => load().then(check)} />
+    <p class="note">Prefer another account? <button class="link" onclick={() => openSettings('accounts')}>Add it in Settings</button>.</p>
   </EmptyState>
 {:else if loaded}
   {#if found.length > 0}
