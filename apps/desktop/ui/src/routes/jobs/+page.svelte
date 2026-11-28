@@ -6,6 +6,7 @@
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
+  import ResumeReview from '$lib/components/ResumeReview.svelte';
   import ResumeGapPanel from '$lib/components/ResumeGapPanel.svelte';
   import IntroPanel from '$lib/components/IntroPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -148,7 +149,9 @@
 {#if summary}<p role="status">{summary}</p>{/if}
 {#if applyError}<p role="alert">{applyError}</p>{/if}
 {#if draftMessage}<p role="status">{draftMessage}</p>{/if}
-{#if draft}
+{#if draft && draft.data.kind === 'tailored_resume' && draft.data.before !== ''}
+  <ResumeReview before={draft.data.before} after={draft.data.after} flagged={draft.data.flagged} bind:content={draft.data.content} onaccept={saveDraft} onthrow={() => (draft = null)} />
+{:else if draft}
   <section class="draft">
     <h2>Your {draftLabel(draft.data.kind)}</h2>
     <p class="note">{draftNote(draft.data.flagged)}</p>
