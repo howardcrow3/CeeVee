@@ -1,47 +1,17 @@
 <script lang="ts">
-  import { onDestroy, onMount } from 'svelte';
+  import { onMount } from 'svelte';
   import { commands } from '$lib/bindings';
-  import { percent, sizeText } from '$lib/models';
-  import type { ModelStatus, DownloadProgress } from '$lib/bindings';
+  import { sizeText } from '$lib/models';
+  import { modelDownload as md, view } from '$lib/downloads.svelte';
+  import DownloadRow from './DownloadRow.svelte';
 
-  let model = $state<ModelStatus | null>(null);
-  let progress = $state<DownloadProgress | null>(null);
-  let timer: number | undefined;
+  let model = $derived(md.model);
+  let progress = $derived(md.progress);
+  let item = $derived(view.items.find((i) => i.id === `model:${md.model?.id}`));
   let ask = $state('');
   let answer = $state('');
   let asking = $state(false);
   let error = $state('');
-
-  async function loadModel() {
-    try {
-      const m = await commands.modelStatus();
-      if (m.status === 'ok') model = m.data;
-      else error = m.error;
-    } catch (e) {
-      error = `Running outside the desktop app: ${String(e)}`;
-    }
-  }
-
-  async function poll() {
-    progress = await commands.modelProgress();
-    if (!progress.running) {
-      window.clearInterval(timer);
-      timer = undefined;
-      await loadModel();
-    }
-  }
-
-  async function startDownload() {
-    if (!model) return;
-    error = '';
-    const r = await commands.startModelDownload(model.id);
-    if (r.status !== 'ok') {
-      error = r.error;
-      return;
-    }
-    timer = window.setInterval(poll, 1000);
-    await poll();
-  }
 
   async function tryModel() {
     asking = true;
@@ -53,8 +23,13 @@
     asking = false;
   }
 
-  onDestroy(() => window.clearInterval(timer));
-  onMount(loadModel);
+  onMount(async () => {
+    try {
+      await md.load();
+    } catch (e) {
+      error = `Running outside the desktop app: ${String(e)}`;
+    }
+  });
 </script>
 
 <section>
@@ -71,15 +46,11 @@
         <button onclick={tryModel} disabled={asking || ask.trim() === ''}>{asking ? 'Thinking' : 'Ask'}</button>
       </div>
       {#if answer}<p role="status">{answer}</p>{/if}
-    {:else if progress?.running}
-      <p role="status">
-        Downloading {sizeText(progress.downloaded_mb)} of {sizeText(progress.total_mb)}
-        ({percent(progress.downloaded_mb, progress.total_mb)}%)
-      </p>
-      <div class="row"><button class="ghost" onclick={() => commands.cancelModelDownload()}>Cancel</button></div>
+    {:else if item && item.state !== 'done'}
+      <div class="tb-dl-card"><DownloadRow {item} /></div>
     {:else}
-      <div class="row"><button onclick={startDownload}>Download {model.name}</button></div>
-      {#if progress?.error}<p role="alert">{progress.error}</p>{/if}
+      <div class="row"><button onclick={() => md.start()}>Download {model.name}</button></div>
+      {#if progress?.error || md.loadError}<p role="alert">{progress?.error || md.loadError}</p>{/if}
     {/if}
   {/if}
 </section>
