@@ -1,0 +1,58 @@
+[
+ {
+  "name": "analyst questions",
+  "vars": {
+   "profile": "Maria Lopez, Columbus OH. Senior Analyst at Northfield Logistics since 2021: built Tableau dashboards, SQL reporting for 40 depots, cut report prep from two days to four hours. Analyst at Harbor Freight Co. 2018 to 2021: SQL reports. B.S. Industrial Engineering, Ohio State University, 2018. Skills: SQL, Tableau, Excel, Python.",
+   "posting": "Data Analyst at Acme Analytics, remote. Requirements: SQL, Tableau dashboards, clear written communication. Nice to have: Python."
+  },
+  "checks": [
+   {
+    "kind": "count",
+    "field": "questions",
+    "n": 5
+   }
+  ]
+ },
+ {
+  "name": "thin profile questions",
+  "vars": {
+   "profile": "Dev Patel, Seattle WA. Barista at Daily Grind Cafe since 2022. Student at Seattle Central College. Skills: customer service, espresso.",
+   "posting": "Junior Operations Associate at Brightpath, Seattle WA. Requirements: customer service, reliability, Excel basics."
+  },
+  "checks": [
+   {
+    "kind": "count",
+    "field": "questions",
+    "n": 5
+   }
+  ]
+ },
+ {
+  "name": "operations questions",
+  "vars": {
+   "profile": "Maria Lopez, Columbus OH. Senior Analyst at Northfield Logistics since 2021: built Tableau dashboards, SQL reporting for 40 depots, cut report prep from two days to four hours. Analyst at Harbor Freight Co. 2018 to 2021: SQL reports. B.S. Industrial Engineering, Ohio State University, 2018. Skills: SQL, Tableau, Excel, Python.",
+   "posting": "Operations Analyst at Lakeview Freight, Columbus OH. Requirements: SQL reporting, logistics experience, Excel."
+  },
+  "checks": [
+   {
+    "kind": "count",
+    "field": "questions",
+    "n": 5
+   }
+  ]
+ },
+ {
+  "name": "career changer questions",
+  "vars": {
+   "profile": "Sam Rivera, Austin TX. Marketing coordinator at Bluebird Media 2020 to present: email campaigns, HubSpot, weekly reports in Excel. B.A. Communications.",
+   "posting": "Marketing Analyst at Orbit Software, Austin TX. Requirements: HubSpot, Excel, reporting, SQL a plus."
+  },
+  "checks": [
+   {
+    "kind": "count",
+    "field": "questions",
+    "n": 5
+   }
+  ]
+ }
+]

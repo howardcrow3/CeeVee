@@ -82,7 +82,7 @@ Each type can be turned off, and notifications are batched so the user gets at m
 - `sqlx` with compile-time checked queries and embedded, numbered migrations. A backup copy is written before every migration.
 - FTS5 virtual tables over postings, applications, emails and notes for global search.
 - JSON columns for AI output (`extracted`, `match`, `score_reasons`, `email_label`) with a `*_with` column holding the prompt version that produced it.
-- Tables as listed in PLAN.md (20 core tables). Indexes: `posting(company_id)`, `posting_category(category_id, score)`, `posting_category(posting_id)`, `application(company_id)`, `application(category_id, status)`, `contact_role(company_id, is_current)`, `email_message(application_id)`, `email_message(thread_id)`.
+- Tables as listed in PLAN.md (37 core tables). Indexes: `posting(company_id)`, `posting_category(category_id, score)`, `posting_category(posting_id)`, `application(company_id)`, `application(category_id, status)`, `contact_role(company_id, is_current)`, `email_message(application_id)`, `email_message(thread_id)`.
 - Secrets (OAuth refresh tokens, IMAP app passwords, optional API keys) live in the OS keychain only. The database stores a reference.
 - Export and import: one JSON file with a schema version, plus a zip of rendered documents. Nightly local backup with 14-day retention.
 
@@ -330,7 +330,10 @@ How the option is built:
 - **Candidate filter** (no model): sender or reply-to domain matches a company's domains, known ATS sender domains, replies in threads the user started from CeeVee, and known job-alert senders.
 - **Labelling.** `label-email` assigns kind, application, suggested status and interview time. Alert emails go to the job-alert parsers instead.
 - **Sending.** `lettre` over SMTP with the same credentials; every send is a user click.
+- **Built (v1, ceevee-mail and ceevee-google).** Gmail reads through the Gmail API with `gmail.readonly` (headers first, whole message only for candidates), not IMAP XOAUTH2, because that route needs the broader `mail.google.com` scope. IMAP uses `async-imap` over rustls with polling every 10 minutes (IDLE is not used yet). The pipeline stores, labels (model, with keyword rules as the fallback), links (thread, then company domain or name, then job title; ambiguous mail stays unlinked), changes status by the `application.status` policy (offers and rejections wait for a click unless the policy says otherwise), sets `next_interview_at` from an ISO time in the mail, and drafts a reply for mail that needs one. Replies are drafts only: the Inbox copies text out, nothing is sent. Not built yet: Microsoft OAuth, SMTP sending, `.ics` files, job-alert parsing.
 - **Calendar.** Interview times from email produce `.ics` files with the `ics` crate; calendar sync is v2.
+
+**Finding jobs in any mail (added 2026-11-24).** Every inbox message not sent by the account is read, because a recruiter can write from any address (Gmail skips its Promotions, Social and Forums tabs). `ceevee-mail::detect` scores the subject, sender and the start of the body with plain phrase lists: a low score drops the mail (its ID goes in `mail_seen`, nothing else is kept), a middling score is decided by the local model (and dropped when there is none), a high score is accepted on the rules alone. `label_email` (v2) also returns `inquiry`/`not_job`, the job title and the place; `extract` fills in company, title and place with rules when there is no model or it leaves them blank. If the mail matches no existing application, `create::from_mail` makes a posting (source `email`) and an application with `origin = 'email'`, `review = 'pending'`; the user confirms or dismisses it, and a dismissed job is never recreated. Mail that matches an existing application updates it through the usual status policy.
 
 ## 12. Network (connections)
 
@@ -392,7 +395,7 @@ GitHub Actions matrix: `windows-latest` (x64) and `macos-14` (arm64). Each pull 
 | Platform | First install | Updater artifact | Signing |
 | --- | --- | --- | --- |
 | Windows 11 x64 | `CeeVee_x.y.z_x64-setup.exe` (NSIS, `installMode: currentUser`, WebView2 from the OS) | The same `-setup.exe` plus `.sig` | Azure Trusted Signing on the app binary and the installer, through `bundle.windows.signCommand` |
-| macOS 13+ arm64 | `CeeVee_x.y.z_aarch64.dmg` | `CeeVee.app.tar.gz` plus `.sig` | Developer ID Application certificate, hardened runtime, notarized with `notarytool` (App Store Connect API key) and stapled |
+| macOS 13+ arm64 | `CeeVee_x.y.z_aarch64.dmg` | `CeeVee.app.tar.gz` plus `.sig` | Developer ID Application certificate, hardened runtime, notarized with `notarytool` (Apple ID, app-specific password, team ID; same as Backer) and stapled |
 
 - `bundle.createUpdaterArtifacts: true` makes Tauri write the `.sig` files, signed with the Tauri updater key (minisign Ed25519) from `TAURI_SIGNING_PRIVATE_KEY`.
 - MSI is not built in v1: per-machine MSI installs need an administrator for every update. Add it later only if IT-managed customers ask.
@@ -486,7 +489,7 @@ s3://turtlebox-dl/ceevee/
 | Tauri updater key (minisign) | Signing app updates | `release` environment secret + two offline encrypted backups | Existing installs can never verify another update; users must reinstall by hand. Rotation: ship a build with the new public key, signed with the old key |
 | Content key (Ed25519) | Signing adapter and model manifests | `content` environment secret + offline backup | Rotate by shipping a release that trusts both old and new keys, then retire the old |
 | License key (Ed25519) | Signing license files and trial tokens | AWS KMS or Secrets Manager (section 14) | Same rotation pattern; never in CI |
-| Apple Developer ID cert and App Store Connect API key | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
+| Apple Developer ID cert, Apple ID app-specific password and team ID | macOS signing and notarization | `release` environment | Reissue from Apple; old builds stay valid |
 | Azure Trusted Signing | Windows signing | Azure account; CI signs in through OIDC federation where supported, otherwise a client secret in `release` | Reissue in Azure |
 
 Release and content jobs run only on tags from `main`, with environment protection rules, and the AWS role can write only under `ceevee/`.

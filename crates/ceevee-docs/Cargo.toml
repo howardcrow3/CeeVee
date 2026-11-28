@@ -1,0 +1,26 @@
+[package]
+name = "ceevee-docs"
+description = "CeeVee: resume and cover letter rendering (Typst), DOCX export, themes"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ceevee-ai.workspace = true
+ceevee-core.workspace = true
+ceevee-db.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sqlx.workspace = true
+typst = "0.15.1"
+typst-kit = { version = "0.15.1", features = ["embedded-fonts"] }
+typst-layout = "0.15.1"
+typst-pdf = "0.15.1"
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

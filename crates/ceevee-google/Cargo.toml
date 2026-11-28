@@ -1,0 +1,25 @@
+[package]
+name = "ceevee-google"
+description = "CeeVee: optional Google sign-in (OAuth 2 with PKCE) and read-only Gmail access"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+ceevee-core.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+base64 = "0.22"
+getrandom = "0.3"
+tokio = { workspace = true, features = ["net", "io-util", "time", "sync"] }
+tracing.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+
+[lints]
+workspace = true

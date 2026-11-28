@@ -1,0 +1,7 @@
+Fonts self-hosted in the app (Latin subsets, WOFF2):
+
+Inter
+Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter)
+
+Licensed under the SIL Open Font License, Version 1.1.
+The full license text and FAQ are at https://openfontlicense.org

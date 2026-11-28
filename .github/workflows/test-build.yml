@@ -1,0 +1,121 @@
+name: Test build
+
+# A Developer ID signed, notarized and stapled macOS (Apple silicon) .dmg built from main, for
+# hands-on testing. It installs like any Mac app: double-click, no right-click Open, no Terminal.
+# The download is the "CeeVee-test-macos" artifact of the run, and also a GitHub pre-release named
+# "Test build N" (tag test-build-N). These are test builds only, never real releases; the newest
+# five pre-releases are kept. The real release workflow is release.yml and is not touched here.
+# Uses the same secrets and steps as release.yml (environment release-build, which only allows main),
+# so run it from main: Actions, Test build, "Run workflow", branch main.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    environment: release-build
+    env:
+      # Public half of the license signing key. Without it the app cannot activate a key.
+      CEEVEE_LICENSE_PUBKEY: ${{ vars.CEEVEE_LICENSE_PUBKEY || '425825fea3f127966fe6038b40d17779aac03560a6c9501fb95ba0d55435472a' }}
+      CEEVEE_GOOGLE_CLIENT_ID: ${{ secrets.CEEVEE_GOOGLE_CLIENT_ID || vars.CEEVEE_GOOGLE_CLIENT_ID }}
+      CEEVEE_GOOGLE_CLIENT_SECRET: ${{ secrets.CEEVEE_GOOGLE_CLIENT_SECRET }}
+      # Anonymous usage analytics (opt-in in the app). The measurement ID is public, so it is the default here; without the API secret the build sends nothing.
+      CEEVEE_GA4_MEASUREMENT_ID: ${{ vars.CEEVEE_GA4_MEASUREMENT_ID || 'G-EEQ718X660' }}
+      CEEVEE_GA4_API_SECRET: ${{ secrets.CEEVEE_GA4_API_SECRET }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Build number
+        run: |
+          # Counts every commit on this branch, so it only ever goes up between builds.
+          n=$(git rev-list --count HEAD)
+          echo "CEEVEE_BUILD_NUMBER=$n" >> "$GITHUB_ENV"
+          echo "CEEVEE_BUILD_SHA=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+      - uses: dtolnay/rust-toolchain@stable
+        with: { targets: aarch64-apple-darwin }
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+        with: { version: 10 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: apps/desktop/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: apps/desktop
+      - name: Import Developer ID certificate
+        run: |
+          for n in APPLE_CERTIFICATE APPLE_CERTIFICATE_PASSWORD APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            [ -n "${!n}" ] || { echo "::error::missing secret $n"; exit 1; }
+          done
+          KC="$RUNNER_TEMP/build.keychain-db"; KP="$(uuidgen)"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KP" "$KC"
+          security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "$KP" "$KC"
+          security import "$RUNNER_TEMP/cert.p12" -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k "$KC"
+          security import .github/signing/developer-id.cer -k "$KC" -A || echo "developer-id.cer already in the .p12; continuing"
+          security set-key-partition-list -S apple-tool:,apple: -k "$KP" "$KC"
+          security list-keychains -d user -s "$KC" login.keychain-db
+          ID=$(security find-identity -p codesigning "$KC" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)".*/\1/')
+          [ -n "$ID" ] || { echo "::error::No usable Developer ID Application identity"; exit 1; }
+          echo "APPLE_SIGNING_IDENTITY=$ID" >> "$GITHUB_ENV"
+      - name: Build, sign and notarize
+        working-directory: apps/desktop
+        run: env -u APPLE_CERTIFICATE -u APPLE_CERTIFICATE_PASSWORD pnpm tauri build --ci --bundles app,dmg --target aarch64-apple-darwin --features llama
+      - name: Verify (Developer ID, notarized, Gatekeeper, launches)
+        run: scripts/verify-mac-dmg.sh target/aarch64-apple-darwin/release/bundle/dmg/*.dmg --require-notarized
+      - name: Collect
+        run: |
+          mkdir -p out
+          v=$(grep -m1 '^version = ' Cargo.toml | sed -E 's/.*"(.*)"/\1/')
+          cp target/aarch64-apple-darwin/release/bundle/dmg/*.dmg "out/CeeVee_${v}_build${CEEVEE_BUILD_NUMBER}_${CEEVEE_BUILD_SHA}_aarch64.dmg"
+          ls -la out
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CeeVee-test-macos-build${{ env.CEEVEE_BUILD_NUMBER }}
+          path: out/*.dmg
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    # Publishes the build as a GitHub pre-release so there is one place to find the latest test build.
+    needs: macos
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: CeeVee-test-macos-build*
+          path: out
+          merge-multiple: true
+      - name: Publish pre-release
+        run: |
+          set -euo pipefail
+          dmg=$(ls out/*.dmg | head -1)
+          n=$(basename "$dmg" | sed -E 's/.*_build([0-9]+)_.*/\1/')
+          tag="test-build-$n"
+          notes="TEST BUILD, not a release. Developer ID signed and notarized macOS (Apple silicon) build of commit ${GITHUB_SHA::7} from ${GITHUB_REF_NAME}, for hands-on testing only. Open the .dmg and drag CeeVee to Applications."
+          gh release delete "$tag" --cleanup-tag --yes 2>/dev/null || true
+          gh release create "$tag" "$dmg" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "Test build $n" --notes "$notes"
+      - name: Keep only the newest five test builds
+        run: |
+          gh release list --limit 100 --json tagName,createdAt \
+            --jq '[.[] | select(.tagName | startswith("test-build-"))] | sort_by(.createdAt) | reverse | .[5:] | .[].tagName' |
+            while read -r t; do gh release delete "$t" --cleanup-tag --yes; done

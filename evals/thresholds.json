@@ -1,0 +1,27 @@
+{
+  "note": "Pass/fail floors per model and task, as a mean score from 0 to 1: the score in run 43575198648 (2026-11-14, first complete run) minus 0.10. Howard approved this rule on 2026-11-15. The report shows the outcome but never fails a build. Raise a floor when a model improves; consider gating later.",
+  "default": {},
+  "models": {
+    "qwen3-0.6b-q8": {
+      "extract_posting": 0.6,
+      "import_resume": 0.44,
+      "score_match": 0.28,
+      "tailor_resume": 0.84,
+      "write_cover_letter": 0.49
+    },
+    "qwen3-4b-q4km": {
+      "extract_posting": 0.72,
+      "import_resume": 0.8,
+      "score_match": 0.65,
+      "tailor_resume": 0.9,
+      "write_cover_letter": 0.77
+    },
+    "qwen3-8b-q4km": {
+      "extract_posting": 0.69,
+      "import_resume": 0.88,
+      "score_match": 0.9,
+      "tailor_resume": 0.9,
+      "write_cover_letter": 0.84
+    }
+  }
+}
