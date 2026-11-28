@@ -22,7 +22,16 @@ pub fn file_stem(title: &str) -> String {
     let joined = words.join(" ");
     let short: String = joined.chars().take(80).collect();
     if short.is_empty() {
-        "document".to_string()
+        return "document".to_string();
+    }
+    // Windows cannot create a file called CON.pdf, NUL.pdf, COM1.pdf and so on.
+    let first = short.split(' ').next().unwrap_or("").to_ascii_uppercase();
+    let reserved = matches!(first.as_str(), "CON" | "PRN" | "AUX" | "NUL")
+        || ((first.starts_with("COM") || first.starts_with("LPT"))
+            && first.len() == 4
+            && first.as_bytes()[3].is_ascii_digit());
+    if reserved && !short.contains(' ') {
+        format!("{short} document")
     } else {
         short
     }
