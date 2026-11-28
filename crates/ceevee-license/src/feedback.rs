@@ -1,61 +1,84 @@
 //! "Send feedback": posts the user's rating and words to the High Turtle feedback service
-//! (`https://feedback.turtlebox.studio/v1/feedback`, see howardcrow3/highturtle `feedback/README.md`).
+//! (`https://feedback.turtlebox.studio/v1/feedback`, see docs/FEEDBACK_API.md).
 //!
-//! Each request carries `x-ht-app`, `x-ht-timestamp` (unix seconds) and `x-ht-signature`: hex
-//! HMAC-SHA256 with this app's key over `"<timestamp>.<raw body>"`. The key is compiled in from the
-//! `FEEDBACK_KEY` build variable (a GitHub Actions secret) and is never committed.
+//! There is no secret in the app. Each install makes its own Ed25519 key the first time it sends
+//! feedback and keeps it in the OS keychain. Every request carries `x-ht-install` (the public key,
+//! hex), `x-ht-timestamp` (unix seconds) and `x-ht-signature` (hex Ed25519 signature over
+//! [`signing_input`]). The signature shows that the request came from the holder of that install
+//! key and was not altered; the service rate-limits per install and per address.
 
-use sha2::{Digest, Sha256};
+use ed25519_dalek::{Signer, SigningKey};
 
 pub const FEEDBACK_URL: &str = "https://feedback.turtlebox.studio/v1/feedback";
 pub const APP_ID: &str = "ceevee";
 
-/// Baked in at build time. Local builds without it hide the feedback form.
-pub const KEY: Option<&str> = option_env!("FEEDBACK_KEY");
-
+/// Feedback needs no build-time secret, so every build can send it.
 pub fn available() -> bool {
-    KEY.is_some_and(|k| !k.trim().is_empty())
+    true
 }
 
 fn hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn unhex(s: &str) -> Option<Vec<u8>> {
+/// The exact text that is signed: app id, install id, timestamp and the raw body, so a signature
+/// cannot be reused for another app, another install, another moment or another message.
+pub fn signing_input(install: &str, timestamp: i64, body: &str) -> String {
+    format!("{APP_ID}.{install}.{timestamp}.{body}")
+}
+
+/// `(install id, signature)` for one request, both hex.
+pub fn sign(key: &SigningKey, timestamp: i64, body: &str) -> (String, String) {
+    let install = hex(key.verifying_key().as_bytes());
+    let sig = key.sign(signing_input(&install, timestamp, body).as_bytes());
+    (install, hex(&sig.to_bytes()))
+}
+
+#[cfg(any(windows, target_os = "macos"))]
+const KEY_ACCOUNT: &str = "feedback-install-key";
+
+/// This install's key: read from the keychain, or made and saved on first use. Where there is no
+/// keychain (or it refuses) a key lasts only until the app closes, which still works but means
+/// the service sees a new install next time.
+fn install_key() -> SigningKey {
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        if let Ok(entry) = keyring::Entry::new("studio.turtlebox.ceevee", KEY_ACCOUNT) {
+            if let Some(seed) = entry.get_password().ok().and_then(|h| unhex_seed(&h)) {
+                return SigningKey::from_bytes(&seed);
+            }
+            let key = new_key();
+            if let Err(e) = entry.set_password(&hex(&key.to_bytes())) {
+                tracing::warn!("could not save the feedback key to the keychain: {e}");
+            }
+            return key;
+        }
+    }
+    new_key()
+}
+
+fn new_key() -> SigningKey {
+    let mut seed = [0u8; 32];
+    // The system random source failing is not recoverable; fall back to a time based seed rather
+    // than losing feedback (it only identifies the install to the service).
+    if getrandom::fill(&mut seed).is_err() {
+        let t = chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0);
+        seed[..8].copy_from_slice(&t.to_le_bytes());
+    }
+    SigningKey::from_bytes(&seed)
+}
+
+#[allow(dead_code)]
+fn unhex_seed(s: &str) -> Option<[u8; 32]> {
     let s = s.trim();
-    if s.len() % 2 != 0 {
+    if s.len() != 64 {
         return None;
     }
-    (0..s.len())
-        .step_by(2)
-        .map(|i| u8::from_str_radix(s.get(i..i + 2)?, 16).ok())
-        .collect()
-}
-
-/// Plain HMAC-SHA256 (RFC 2104), hex encoded.
-pub fn hmac_sha256_hex(key: &[u8], msg: &[u8]) -> String {
-    const BLOCK: usize = 64;
-    let mut k = [0u8; BLOCK];
-    if key.len() > BLOCK {
-        k[..32].copy_from_slice(&Sha256::digest(key));
-    } else {
-        k[..key.len()].copy_from_slice(key);
+    let mut out = [0u8; 32];
+    for (i, b) in out.iter_mut().enumerate() {
+        *b = u8::from_str_radix(s.get(i * 2..i * 2 + 2)?, 16).ok()?;
     }
-    let mut inner = Sha256::new();
-    inner.update(k.map(|b| b ^ 0x36));
-    inner.update(msg);
-    let mut outer = Sha256::new();
-    outer.update(k.map(|b| b ^ 0x5c));
-    outer.update(inner.finalize());
-    hex(&outer.finalize())
-}
-
-/// The signature header value for one request. `key_hex` is the app key as stored by the service.
-pub fn sign(key_hex: &str, timestamp: i64, body: &str) -> Option<String> {
-    Some(hmac_sha256_hex(
-        &unhex(key_hex)?,
-        format!("{timestamp}.{body}").as_bytes(),
-    ))
+    Some(out)
 }
 
 /// A sensible-looking email address, matching the service's own check: one `@`, no spaces, a dotted
@@ -135,12 +158,8 @@ pub fn body(
 
 /// Signs and sends a body made by [`body`]. Errors are worded for the user.
 pub async fn send(payload: String) -> Result<(), String> {
-    let key = KEY
-        .filter(|k| !k.trim().is_empty())
-        .ok_or("Feedback isn't set up in this build of CeeVee.")?;
     let ts = chrono::Utc::now().timestamp();
-    let sig = sign(key, ts, &payload)
-        .ok_or("Feedback isn't set up correctly in this build of CeeVee.")?;
+    let (install, sig) = sign(&install_key(), ts, &payload);
     let http = reqwest::Client::builder()
         .timeout(std::time::Duration::from_secs(20))
         .user_agent(concat!("CeeVee/", env!("CARGO_PKG_VERSION")))
@@ -150,6 +169,7 @@ pub async fn send(payload: String) -> Result<(), String> {
         .post(FEEDBACK_URL)
         .header("content-type", "application/json")
         .header("x-ht-app", APP_ID)
+        .header("x-ht-install", install)
         .header("x-ht-timestamp", ts.to_string())
         .header("x-ht-signature", sig)
         .body(payload)
@@ -179,36 +199,55 @@ pub async fn send(payload: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn hmac_matches_rfc4231() {
-        assert_eq!(
-            hmac_sha256_hex(b"Jefe", b"what do ya want for nothing?"),
-            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
-        );
-        assert_eq!(
-            hmac_sha256_hex(
-                &[0xaa; 131],
-                b"Test Using Larger Than Block-Size Key - Hash Key First"
-            ),
-            "60e431591ee0b67f0d8a26aacbf5b77f8e0bc6213728c5140546040f0ee37f54"
-        );
+    fn key(seed: u8) -> SigningKey {
+        SigningKey::from_bytes(&[seed; 32])
     }
 
     #[test]
-    fn signature_matches_the_service() {
-        // Value computed by the service's own signer (feedback/src/core.mjs signBody) for these inputs.
-        let sig = sign(
-            &"ab".repeat(32),
-            1_795_694_400,
-            r#"{"app":"backer","rating":5}"#,
-        )
-        .unwrap();
-        assert_eq!(
-            sig,
-            "d2523b2c438bb71b1a763eaf45b3eeea2041afaf961bdf15c202c045455d54df"
-        );
-        assert!(sign("not hex", 1, "{}").is_none());
-        assert!(sign("abc", 1, "{}").is_none());
+    fn a_request_is_signed_by_the_install_key_and_verifies() {
+        use ed25519_dalek::{Signature, Verifier};
+        let k = key(7);
+        let (install, sig) = sign(&k, 1_795_694_400, r#"{"app":"ceevee","rating":5}"#);
+        // The install id is the public key, so the service needs no shared secret to check it.
+        assert_eq!(install, hex(k.verifying_key().as_bytes()));
+        let sig_bytes: [u8; 64] = (0..64)
+            .map(|i| u8::from_str_radix(&sig[i * 2..i * 2 + 2], 16).unwrap())
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+        let msg = signing_input(&install, 1_795_694_400, r#"{"app":"ceevee","rating":5}"#);
+        assert!(k
+            .verifying_key()
+            .verify(msg.as_bytes(), &Signature::from_bytes(&sig_bytes))
+            .is_ok());
+        // Any change to the body, time or install breaks it.
+        for other in [
+            signing_input(&install, 1_795_694_401, r#"{"app":"ceevee","rating":5}"#),
+            signing_input(&install, 1_795_694_400, r#"{"app":"ceevee","rating":1}"#),
+            signing_input("other", 1_795_694_400, r#"{"app":"ceevee","rating":5}"#),
+        ] {
+            assert!(k
+                .verifying_key()
+                .verify(other.as_bytes(), &Signature::from_bytes(&sig_bytes))
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn installs_have_different_ids_and_signing_is_deterministic() {
+        let (a, sa) = sign(&key(1), 10, "{}");
+        let (b, _) = sign(&key(2), 10, "{}");
+        assert_ne!(a, b);
+        assert_eq!(sign(&key(1), 10, "{}"), (a, sa));
+        assert!(available());
+    }
+
+    #[test]
+    fn saved_keys_round_trip_and_junk_is_ignored() {
+        let k = key(9);
+        assert_eq!(unhex_seed(&hex(&k.to_bytes())), Some(k.to_bytes()));
+        assert_eq!(unhex_seed("nope"), None);
+        assert_eq!(unhex_seed(&"zz".repeat(32)), None);
     }
 
     #[test]

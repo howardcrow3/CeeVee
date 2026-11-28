@@ -33,3 +33,12 @@ fn resumes_render_and_bad_json_is_refused() {
     assert!(ok.starts_with(b"%PDF"));
     assert!(pdf_for(DocKind::BaseResume, "nope", Paper::A4).is_err());
 }
+
+#[test]
+fn file_stem_avoids_windows_reserved_names() {
+    assert_eq!(file_stem("con"), "con document");
+    assert_eq!(file_stem("NUL"), "NUL document");
+    assert_eq!(file_stem("com1"), "com1 document");
+    assert_eq!(file_stem("Console"), "Console");
+    assert_eq!(file_stem("CON report"), "CON report");
+}

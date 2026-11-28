@@ -818,6 +818,7 @@ dependencies = [
  "ceevee-db",
  "chrono",
  "ed25519-dalek",
+ "getrandom 0.3.4",
  "keyring",
  "machine-uid",
  "rand_core 0.6.4",

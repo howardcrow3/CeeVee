@@ -206,7 +206,14 @@ where
         .collect();
     uids.sort_unstable();
     if uids.len() > MAX_PER_SYNC {
-        uids = uids.split_off(uids.len() - MAX_PER_SYNC);
+        if reset {
+            // A first sync starts with the newest mail.
+            uids = uids.split_off(uids.len() - MAX_PER_SYNC);
+        } else {
+            // Catching up after a gap works oldest first and remembers where it stopped, so
+            // the rest is read on the next sync instead of being skipped.
+            uids.truncate(MAX_PER_SYNC);
+        }
     }
 
     let last_uid = match uids.last() {

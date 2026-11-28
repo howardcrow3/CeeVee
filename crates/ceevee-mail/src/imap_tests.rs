@@ -236,6 +236,57 @@ async fn a_sync_downloads_only_employer_mail_and_does_not_repeat() {
 }
 
 #[tokio::test]
+async fn catching_up_after_a_gap_reads_the_oldest_mail_first() {
+    let messages: Vec<(u32, Vec<u8>)> = (1..=502)
+        .map(|i| {
+            (
+                i,
+                mail(
+                    "friend@gmail.com",
+                    "Dinner",
+                    "Free Friday?",
+                    &format!("d{i}@x"),
+                ),
+            )
+        })
+        .collect();
+    let server = serve(messages, "pw").await;
+    let db = Db::open_in_memory().await.unwrap();
+    let acct = store::add_account(&db, "imap", "me@example.org", &config(server.port), "k")
+        .await
+        .unwrap();
+    store::set_sync_state(
+        &db,
+        acct.id,
+        &serde_json::to_value(SyncState {
+            uid_validity: Some(7),
+            last_uid: Some(0),
+        })
+        .unwrap(),
+        "2026-11-01T00:00:00Z",
+    )
+    .await
+    .unwrap();
+    let s = sync::sync_imap(
+        &db,
+        acct.id,
+        "pw",
+        || None,
+        1_794_564_000,
+        "2026-11-13T10:00:00Z",
+    )
+    .await
+    .unwrap();
+    assert_eq!(s.seen, 500);
+    let state = store::get_account(&db, acct.id).await.unwrap().sync_state;
+    // The newest two are left for the next sync, not skipped.
+    assert_eq!(
+        serde_json::from_value::<SyncState>(state).unwrap().last_uid,
+        Some(500)
+    );
+}
+
+#[tokio::test]
 async fn a_wrong_password_gives_a_plain_message() {
     let server = serve(vec![], "right").await;
     let cfg: ImapConfig = serde_json::from_value(config(server.port)).unwrap();
@@ -351,6 +402,42 @@ mod gmail {
             tracking::get(&db, app.id).await.unwrap().status,
             Status::Interview
         );
+    }
+
+    #[tokio::test]
+    async fn a_gap_longer_than_one_sync_is_worked_through_oldest_first() {
+        // 501 messages, newest first as Gmail lists them: "m0" is the newest.
+        let mails: Vec<(String, Vec<u8>)> = (0..501)
+            .map(|i| {
+                (
+                    format!("g{i}"),
+                    mail(
+                        "news@example.org",
+                        "Weekly digest",
+                        "Nothing here.",
+                        &format!("m{i}@x"),
+                    ),
+                )
+            })
+            .collect();
+        let api = Fake {
+            mails,
+            ..Default::default()
+        };
+        let db = Db::open_in_memory().await.unwrap();
+        let acct = store::add_account(&db, "gmail", "me@gmail.com", &json!({}), "k")
+            .await
+            .unwrap();
+        let now = 1_794_564_000 + 10 * 86_400;
+        sync::sync_gmail(&db, acct.id, &api, || None, now, "2026-11-23T10:00:00Z")
+            .await
+            .unwrap();
+        // The oldest 500 were handled; the newest is left for the next sync.
+        assert!(store::is_seen(&db, acct.id, "m500@x").await.unwrap());
+        assert!(!store::is_seen(&db, acct.id, "m0@x").await.unwrap());
+        // The window moved only as far as the mail handled, not to "now".
+        let st = store::get_account(&db, acct.id).await.unwrap().sync_state;
+        assert_eq!(st["after"], 1_794_564_000_i64, "{st}");
     }
 
     #[tokio::test]

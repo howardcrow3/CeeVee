@@ -10,6 +10,7 @@ pub enum Refusal {
     ZipRecruiterOneClick,
     AccountCreation,
     Captcha,
+    NotWebAddress,
 }
 
 impl Refusal {
@@ -21,6 +22,7 @@ impl Refusal {
             Self::ZipRecruiterOneClick => "CeeVee never automates ZipRecruiter 1-Click",
             Self::AccountCreation => "creating accounts is left to you",
             Self::Captcha => "CAPTCHA pages are left to you",
+            Self::NotWebAddress => "only web addresses (http or https) can be opened",
         }
     }
 }
@@ -32,6 +34,12 @@ fn host_is(host: &str, domain: &str) -> bool {
 /// `Err` when automation must not go to this page. `page_text` is optional visible text, used to
 /// spot CAPTCHA and sign-up pages.
 pub fn check_navigation(url: &str, page_text: Option<&str>) -> Result<(), Refusal> {
+    // Posting addresses come from job feeds and emails, so they are not trusted: anything that is
+    // not a plain web address (file:, javascript:, chrome:, or text that is not an address) is out.
+    match Url::parse(url) {
+        Ok(u) if matches!(u.scheme(), "http" | "https") && u.host_str().is_some() => {}
+        _ => return Err(Refusal::NotWebAddress),
+    }
     if let Ok(u) = Url::parse(url) {
         let host = u.host_str().unwrap_or("").to_ascii_lowercase();
         let path = u.path().to_ascii_lowercase();
@@ -114,6 +122,25 @@ mod tests {
             ),
             Err(Refusal::Captcha)
         );
+    }
+
+    #[test]
+    fn only_web_addresses_are_opened() {
+        for bad in [
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "chrome://settings",
+            "about:blank",
+            "not a url",
+            "",
+        ] {
+            assert_eq!(
+                check_navigation(bad, None),
+                Err(Refusal::NotWebAddress),
+                "{bad}"
+            );
+        }
+        assert_eq!(check_navigation("HTTP://jobs.acme.com/1", None), Ok(()));
     }
 
     #[test]

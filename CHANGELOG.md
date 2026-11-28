@@ -4,6 +4,8 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- The account button is now always at the bottom left of the window, however small. Opening it shows the license status (the trial countdown moved here from the top of the page), every settings section, feedback and the theme.
+
 - Network: plan meetings with people, read a short prep note, add them to any calendar (.ics file) and mark them done to log them in the person's history.
 - Jobs can be narrowed to one job type with a menu above the list.
 - Jobs: tick several rows and dismiss them together; arrow keys or j and k move between rows, x ticks one. Applications: drag a card to another column to change its status.

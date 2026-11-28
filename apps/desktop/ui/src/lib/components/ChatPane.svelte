@@ -4,6 +4,7 @@
   import { commands } from '$lib/bindings';
   import { actionNotes, buildPrompt, wantsAction, focusLine, loadChatContext, contextChip, contextSummary, friendlyError, suggestions, type ChatContext, type Turn } from '$lib/chat';
   import { openSettings } from '$lib/settings-ui.svelte';
+  import ModelSetup from './ModelSetup.svelte';
 
   let { focus = '', compact = false }: { focus?: string; compact?: boolean } = $props();
   let context = $state<ChatContext>({ jobs: [], applications: [], jobTypes: [], waiting: 0 });
@@ -11,6 +12,8 @@
   let draft = $state('');
   let thinking = $state(false);
   let list: HTMLDivElement | undefined = $state();
+  /** On the empty home page the box sits at the top; once the talk starts it moves to the bottom. */
+  let atTop = $derived(!compact && turns.length === 0 && !thinking);
 
   onMount(async () => {
     context = await loadChatContext();
@@ -60,8 +63,20 @@
   }
 </script>
 
-<div class="chat" class:compact>
+{#snippet composerBox()}
+<div class="composer">
+  <textarea aria-label="Message CeeVee" rows="2" placeholder={focus ? 'Ask about this' : 'Ask about your jobs and applications'} bind:value={draft} onkeydown={onKey}></textarea>
+  <div class="bar">
+    <span class="note">{contextChip(context)}. Conversations are not saved yet.</span>
+    <button onclick={() => send(draft)} disabled={thinking || draft.trim() === ''}>Send</button>
+  </div>
+</div>
+<ModelSetup />
+{/snippet}
+
+<div class="chat" class:compact class:top={atTop}>
   {#if !compact}<span class="label">Chat</span>{/if}
+  {#if atTop}{@render composerBox()}{/if}
   <div class="scroll" bind:this={list}>
     {#if turns.length === 0}
       <div class="hello">
@@ -91,22 +106,18 @@
       </ol>
     {/if}
   </div>
-  <div class="composer">
-    <textarea aria-label="Message CeeVee" rows="2" placeholder={focus ? 'Ask about this' : 'Ask about your jobs and applications'} bind:value={draft} onkeydown={onKey}></textarea>
-    <div class="bar">
-      <span class="note">{contextChip(context)}. Conversations are not saved yet.</span>
-      <button onclick={() => send(draft)} disabled={thinking || draft.trim() === ''}>Send</button>
-    </div>
-  </div>
+  {#if !atTop}{@render composerBox()}{/if}
 </div>
 
 <style>
   .chat { display: flex; flex-direction: column; height: calc(100vh - 48px); min-height: 360px; gap: 12px; }
+  .chat.top { height: auto; min-height: 0; }
+  .chat.top .scroll { flex: none; overflow: visible; }
   .chat.compact { height: calc(100vh - 120px); gap: 8px; }
   .compact .hello { margin-top: 24px; }
   .compact .turns p { max-width: 100%; }
   .scroll { flex: 1; overflow-y: auto; min-height: 0; }
-  .hello { max-width: 560px; margin: 12vh auto 0; display: flex; flex-direction: column; gap: 12px; }
+  .hello { max-width: 720px; margin: 16px auto 0; display: flex; flex-direction: column; gap: 12px; }
   .hello h1 { margin: 0; }
   .hello p { margin: 0; }
   .chips { display: flex; flex-wrap: wrap; gap: 6px; }

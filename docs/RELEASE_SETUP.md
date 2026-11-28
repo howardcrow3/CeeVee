@@ -63,4 +63,4 @@ Usage analytics are opt-in in the app and send nothing unless the build has both
 
 ## Send feedback
 
-The Send feedback form is hidden unless the build has `FEEDBACK_KEY`. Copy CeeVee's key from AWS Systems Manager, Parameter Store, `/highturtle/feedback/app-keys` (the `ceevee` value; region us-east-2), and add it as a repository secret `FEEDBACK_KEY` (Settings -> Secrets and variables -> Actions). The release and test-build workflows pass it to the build. The service is described in howardcrow3/highturtle `feedback/README.md`.
+The Send feedback form needs no key or secret in the build: each install signs its own requests (see [FEEDBACK_API.md](FEEDBACK_API.md)). The old `FEEDBACK_KEY` repository secret is no longer used and can be deleted once the feedback service accepts install signatures.

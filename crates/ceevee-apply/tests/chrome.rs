@@ -5,6 +5,26 @@
 use ceevee_apply::chrome::ChromeDriver;
 use ceevee_apply::engine::{fill_application, Answers, BrowserDriver};
 
+/// Serve `body` as a web page from a free local port, for as long as the test runs.
+fn serve(body: &'static str) -> String {
+    use std::io::{Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}/form.html", listener.local_addr().unwrap());
+    std::thread::spawn(move || {
+        for stream in listener.incoming().flatten() {
+            let mut stream = stream;
+            let mut buf = [0u8; 2048];
+            let _ = stream.read(&mut buf);
+            let reply = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: text/html; charset=utf-8\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            let _ = stream.write_all(reply.as_bytes());
+        }
+    });
+    url
+}
+
 const FORM: &str = r#"<!doctype html><html><body>
 <form id="f" onsubmit="return false">
   <label for="fn">First Name *</label><input id="fn" required>
@@ -32,8 +52,6 @@ async fn fills_a_real_form_and_never_submits() {
     };
     let dir = std::env::temp_dir().join(format!("ceevee-chrome-test-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
-    let page = dir.join("form.html");
-    std::fs::write(&page, FORM).unwrap();
     let resume = dir.join("resume.pdf");
     std::fs::write(&resume, b"%PDF-1.4 test").unwrap();
 
@@ -48,7 +66,8 @@ async fn fills_a_real_form_and_never_submits() {
         ..Answers::default()
     };
     a.saved.insert("authorized to work".into(), "Yes".into());
-    let url = url::Url::from_file_path(&page).unwrap().to_string();
+    // The page is served from 127.0.0.1: the engine only opens http(s) addresses.
+    let url = serve(FORM);
     let report = fill_application(&mut d, &url, &a).await.unwrap();
 
     assert_eq!(report.filled.len(), 5, "{report:?}");

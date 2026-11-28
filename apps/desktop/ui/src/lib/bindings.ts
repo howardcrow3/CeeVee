@@ -28,7 +28,7 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
-	/**  True when this build can send feedback (it carries a feedback key). */
+	/**  True when this build can send feedback (always: requests are signed per install). */
 	feedbackAvailable: () => __TAURI_INVOKE<boolean>("feedback_available"),
 	sendFeedback: (input: FeedbackInput_Deserialize) => typedError<null, string>(__TAURI_INVOKE("send_feedback", { input })),
 	/**
@@ -43,8 +43,6 @@ export const commands = {
 	installUpdate: () => typedError<null, string>(__TAURI_INVOKE("install_update")),
 	/**  Import the text of LinkedIn's Connections.csv. */
 	importLinkedinConnections: (csvText: string) => typedError<LinkedInImport, string>(__TAURI_INVOKE("import_linkedin_connections", { csvText })),
-	/**  Render resume JSON to PDF and write it to `path`. */
-	exportResumePdf: (resumeJson: string, path: string, a4: boolean) => typedError<null, string>(__TAURI_INVOKE("export_resume_pdf", { resumeJson, path, a4 })),
 	/**  Jobs found by searches that you have not dismissed, newest first. */
 	listJobs: () => typedError<JobLine_Serialize[], string>(__TAURI_INVOKE("list_jobs")),
 	/**  Which jobs fit which job types (a stored score of 50 or more). */

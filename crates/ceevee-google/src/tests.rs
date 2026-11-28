@@ -370,3 +370,32 @@ async fn the_browser_only_says_connected_after_the_app_has_saved_the_sign_in() {
     let page = page.lock().unwrap().clone();
     assert!(!page.contains("Google is connected"), "{page}");
 }
+
+#[tokio::test]
+async fn a_silent_connection_to_the_sign_in_port_does_not_block_the_real_redirect() {
+    let reply = format!("{{\"access_token\":\"AT\",\"refresh_token\":\"RT\",\"expires_in\":3600,\"scope\":\"openid\",\"id_token\":\"{}\"}}", id_token("me@gmail.com"));
+    let (base, _) = http(vec![("/token", 200, reply)]).await;
+    let mut c = OAuthClient::google("cid", None);
+    c.token_url = format!("{base}/token");
+    let t = c
+        .sign_in_cancellable(
+            &["openid"],
+            |url| {
+                let url = url.to_string();
+                tokio::spawn(async move {
+                    let q = url.split_once('?').unwrap().1.to_string();
+                    let redirect = decode(&query_param(&q, "redirect_uri").unwrap());
+                    let state = query_param(&q, "state").unwrap();
+                    // Something connects and never sends a byte.
+                    let addr = redirect.trim_start_matches("http://").to_string();
+                    let _idle = tokio::net::TcpStream::connect(addr).await.unwrap();
+                    let _ = reqwest::get(format!("{redirect}/?code=C&state={state}")).await;
+                });
+            },
+            &tokio::sync::Notify::new(),
+            std::time::Duration::from_secs(30),
+        )
+        .await
+        .unwrap();
+    assert_eq!(t.access_token, "AT");
+}
