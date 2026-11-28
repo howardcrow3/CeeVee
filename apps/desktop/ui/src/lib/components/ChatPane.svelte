@@ -4,6 +4,7 @@
   import { commands } from '$lib/bindings';
   import { actionNotes, buildPrompt, wantsAction, focusLine, loadChatContext, contextChip, contextSummary, friendlyError, suggestions, type ChatContext, type Turn } from '$lib/chat';
   import { openSettings } from '$lib/settings-ui.svelte';
+  import ModelSetup from './ModelSetup.svelte';
 
   let { focus = '', compact = false }: { focus?: string; compact?: boolean } = $props();
   let context = $state<ChatContext>({ jobs: [], applications: [], jobTypes: [], waiting: 0 });
@@ -91,6 +92,7 @@
       </ol>
     {/if}
   </div>
+  <ModelSetup />
   <div class="composer">
     <textarea aria-label="Message CeeVee" rows="2" placeholder={focus ? 'Ask about this' : 'Ask about your jobs and applications'} bind:value={draft} onkeydown={onKey}></textarea>
     <div class="bar">
