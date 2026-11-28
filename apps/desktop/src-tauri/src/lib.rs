@@ -99,6 +99,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::list_applications,
             commands::add_application,
             commands::import_applications,
+            commands::interview_calendar_file,
             commands::set_application_status,
             commands::pending_approval_count,
             mail_cmd::imap_preset,

@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import { commands, type ApplicationLine, type ProposalLine } from '$lib/bindings';
-  import { applicationName, boardColumns, dropStatus, groupByStatus, importedText, statuses } from '$lib/applications';
+  import { applicationName, boardColumns, dropStatus, groupByStatus, importedText, interviewText, statuses } from '$lib/applications';
   import { actionWords } from '$lib/approvals';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -14,6 +14,22 @@
   let importFiles = $state<FileList | null>(null);
   let importResult = $state('');
   let importing = $state(false);
+
+  async function calendar(id: number) {
+    const r = await commands.interviewCalendarFile(id);
+    if (r.status !== 'ok') {
+      error = r.error;
+      return;
+    }
+    // eslint-disable-next-line no-undef
+    const url = URL.createObjectURL(new Blob([r.data], { type: 'text/calendar' }));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'interview.ics';
+    a.click();
+    // eslint-disable-next-line no-undef
+    URL.revokeObjectURL(url);
+  }
 
   async function importList() {
     const file = importFiles?.[0];
@@ -171,6 +187,7 @@
             <li draggable="true" class:drag={dragging?.id === a.id} ondragstart={() => (dragging = a)} ondragend={() => { dragging = null; over = null; }}>
               <b>{a.title}</b>
               <span class="note">{a.company ?? 'Company not listed'}</span>
+              {#if a.interview_at}<span class="note">{interviewText(a.interview_at)} · <button class="link" onclick={() => calendar(a.id)}>Add to calendar</button></span>{/if}
               <select aria-label={`Status of ${applicationName(a)}`} value={a.status} onchange={(e) => move(a.id, e.currentTarget.value)}>
                 {#each statuses as st (st.value)}<option value={st.value}>{st.label}</option>{/each}
               </select>
@@ -189,6 +206,7 @@
         {#each g.items as a (a.id)}
           <li>
             <b>{applicationName(a)}</b>
+            {#if a.interview_at}<span class="note">{interviewText(a.interview_at)} · <button class="link" onclick={() => calendar(a.id)}>Add to calendar</button></span>{/if}
             <select aria-label="Status" value={a.status} onchange={(e) => move(a.id, e.currentTarget.value)}>
               {#each statuses as st (st.value)}<option value={st.value}>{st.label}</option>{/each}
             </select>
@@ -207,6 +225,7 @@
   .head { display: flex; align-items: center; justify-content: space-between; }
   .tools { display: flex; gap: 8px; align-items: center; }
   .button { display: inline-block; }
+  .link { background: none; border: 0; padding: 0; height: auto; color: inherit; text-decoration: underline; cursor: pointer; font: inherit; }
   .disabled { opacity: 0.5; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
   .seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 0; background: transparent; color: var(--body); font-size: 12.5px; }

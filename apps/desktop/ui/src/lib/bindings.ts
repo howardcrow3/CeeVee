@@ -145,6 +145,8 @@ export const commands = {
 	 *  job tracker. Nothing already tracked is changed.
 	 */
 	importApplications: (text: string) => typedError<ApplicationsImport, string>(__TAURI_INVOKE("import_applications", { text })),
+	/**  A calendar file (.ics) for an application's interview, with a reminder an hour before. */
+	interviewCalendarFile: (id: number) => typedError<string, string>(__TAURI_INVOKE("interview_calendar_file", { id })),
 	/**  Move an application to a new status, for example after you submit it. */
 	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
@@ -262,6 +264,8 @@ export type ApplicationLine_Deserialize = {
 	url?: string | null,
 	status: string,
 	applied_at?: string | null,
+	/**  When the interview is, as `YYYY-MM-DDTHH:MM` from the invitation; empty when none is known. */
+	interview_at: string,
 };
 
 export type ApplicationLine_Serialize = {
@@ -271,6 +275,8 @@ export type ApplicationLine_Serialize = {
 	url: string | null,
 	status: string,
 	applied_at: string | null,
+	/**  When the interview is, as `YYYY-MM-DDTHH:MM` from the invitation; empty when none is known. */
+	interview_at: string,
 };
 
 /**  What an application import did. */
