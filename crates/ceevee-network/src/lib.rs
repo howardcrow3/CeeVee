@@ -6,4 +6,5 @@ pub mod intros;
 pub mod linkedin;
 pub mod meetings;
 pub mod people;
+pub mod progress;
 pub mod reminders;

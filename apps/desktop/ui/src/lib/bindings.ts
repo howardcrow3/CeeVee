@@ -212,6 +212,10 @@ export const commands = {
 	introDraft: (job: number, person: number, ask: string) => typedError<string, string>(__TAURI_INVOKE("intro_draft", { job, person, ask })),
 	/**  Record that you sent someone a message about a job's company. */
 	recordIntroAsk: (job: number, person: number, message: string) => typedError<null, string>(__TAURI_INVOKE("record_intro_ask", { job, person, message })),
+	/**  The weekly goal, the introduction results and people to congratulate. */
+	networkProgress: () => typedError<ProgressView, string>(__TAURI_INVOKE("network_progress")),
+	/**  Set how many people to be in touch with each week. */
+	setNetworkGoal: (goal: number) => typedError<null, string>(__TAURI_INVOKE("set_network_goal", { goal })),
 };
 
 /* Types */
@@ -633,6 +637,17 @@ export type ModelStatus = {
 	installed: boolean,
 };
 
+/**  Someone who changed jobs recently. */
+export type MoveLine = {
+	id: number,
+	name: string,
+	/**  Where they were, or empty. */
+	from_company: string,
+	/**  Where they are now, or empty. */
+	to_company: string,
+	to_title: string,
+};
+
 /**  What an import of contacts did. */
 export type PeopleImport = {
 	added: number,
@@ -684,6 +699,20 @@ export type ProfileChange = {
 	change: string,
 	/**  What it does, in one sentence. */
 	text: string,
+};
+
+/**  How networking is going. */
+export type ProgressView = {
+	/**  People to be in touch with each week. */
+	goal: number,
+	/**  People you were in touch with in the last 7 days. */
+	this_week: number,
+	/**  Introductions asked for in the last 30 days, and how many got an answer or a referral. */
+	asked: number,
+	replied: number,
+	referred: number,
+	/**  People who changed jobs in the last 30 days: a reason to say congratulations. */
+	moves: MoveLine[],
 };
 
 export type ProposalLine = {

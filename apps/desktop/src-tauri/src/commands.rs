@@ -1498,3 +1498,71 @@ pub async fn record_intro_ask(
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+/// Someone who changed jobs recently.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct MoveLine {
+    pub id: u32,
+    pub name: String,
+    /// Where they were, or empty.
+    pub from_company: String,
+    /// Where they are now, or empty.
+    pub to_company: String,
+    pub to_title: String,
+}
+
+/// How networking is going.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ProgressView {
+    /// People to be in touch with each week.
+    pub goal: u32,
+    /// People you were in touch with in the last 7 days.
+    pub this_week: u32,
+    /// Introductions asked for in the last 30 days, and how many got an answer or a referral.
+    pub asked: u32,
+    pub replied: u32,
+    pub referred: u32,
+    /// People who changed jobs in the last 30 days: a reason to say congratulations.
+    pub moves: Vec<MoveLine>,
+}
+
+/// The weekly goal, the introduction results and people to congratulate.
+#[tauri::command]
+#[specta::specta]
+pub async fn network_progress(db: tauri::State<'_, ceevee_db::Db>) -> Result<ProgressView, String> {
+    let p = ceevee_network::progress::summary(&db, &now_iso())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(ProgressView {
+        goal: p.goal as u32,
+        this_week: p.this_week as u32,
+        asked: p.asked as u32,
+        replied: p.replied as u32,
+        referred: p.referred as u32,
+        moves: p
+            .moves
+            .into_iter()
+            .map(|c| MoveLine {
+                id: c.contact_id as u32,
+                name: c.full_name,
+                from_company: c.from_company.unwrap_or_default(),
+                to_company: c.to_company.unwrap_or_default(),
+                to_title: c.to_title.unwrap_or_default(),
+            })
+            .collect(),
+    })
+}
+
+/// Set how many people to be in touch with each week.
+#[tauri::command]
+#[specta::specta]
+pub async fn set_network_goal(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    goal: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_network::progress::set_weekly_goal(&db, i64::from(goal))
+        .await
+        .map_err(|e| e.to_string())
+}

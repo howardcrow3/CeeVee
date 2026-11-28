@@ -125,7 +125,9 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::meeting_calendar_file,
             commands::intro_paths,
             commands::intro_draft,
-            commands::record_intro_ask
+            commands::record_intro_ask,
+            commands::network_progress,
+            commands::set_network_goal
         ])
         .typ::<ceevee_core::Event>()
 }

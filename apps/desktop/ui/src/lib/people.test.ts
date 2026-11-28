@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importSummary, localToUtc, silenceText, tierLabel, workLine } from './people';
+import { funnelText, goalText, importSummary, moveText, localToUtc, silenceText, tierLabel, workLine } from './people';
 
 describe('people', () => {
   it('labels tiers and falls back to the raw value', () => {
@@ -30,5 +30,18 @@ describe('people', () => {
   it('turns a local time into UTC without milliseconds', () => {
     expect(localToUtc('2026-12-03T17:00')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/);
     expect(localToUtc('nonsense')).toBe('');
+  });
+
+  it('words the weekly goal', () => {
+    expect(goalText(1, 3)).toBe('1 of 3 this week');
+    expect(goalText(3, 3)).toBe('Goal met: 3 people this week.');
+    expect(goalText(1, 1)).toBe('Goal met: 1 person this week.');
+  });
+
+  it('words the funnel and moves', () => {
+    expect(funnelText(0, 0, 0)).toBe('');
+    expect(funnelText(4, 2, 1)).toBe('Last 30 days: asked 4, 2 answered, 1 referred.');
+    expect(moveText('Acme', 'Globex', 'Engineer')).toBe('Moved from Acme to Globex as Engineer');
+    expect(moveText('', 'Globex', '')).toBe('Moved to Globex');
   });
 });
