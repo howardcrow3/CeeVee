@@ -56,7 +56,7 @@ pub async fn feedback(
     profile_text: &str,
     posting_text: &str,
 ) -> Result<String> {
-    if answer.trim().split_whitespace().count() < 5 {
+    if answer.split_whitespace().count() < 5 {
         return Err(Error::Invalid(
             "Write a few sentences first, then ask for feedback.".into(),
         ));
