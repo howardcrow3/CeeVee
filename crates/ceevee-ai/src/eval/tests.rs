@@ -37,6 +37,8 @@ fn built_in_cases_parse_and_use_fields_the_schema_defines() {
         "write_cover_letter",
         "tailor_resume",
         "label_email",
+        "interview_questions",
+        "interview_feedback",
     ] {
         let spec = builtin_task(id).unwrap();
         let schema = spec.schema_value().unwrap();
@@ -142,6 +144,8 @@ fn expected_values_satisfy_the_task_schema_and_names_are_unique() {
         ("write_cover_letter", 4),
         ("tailor_resume", 4),
         ("label_email", 10),
+        ("interview_questions", 4),
+        ("interview_feedback", 4),
     ];
     for (id, min) in minimum {
         let schema = builtin_task(id).unwrap().schema_value().unwrap();

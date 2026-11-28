@@ -990,6 +990,116 @@ pub async fn resume_gap(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Result<
     })
 }
 
+/// A saved practice answer with its feedback.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct PracticeNote {
+    pub id: u32,
+    pub question: String,
+    pub answer: String,
+    pub feedback: String,
+}
+
+/// Five likely interview questions for a job, from the posting and your profile, using the local
+/// model.
+#[tauri::command]
+#[specta::specta]
+pub async fn practice_questions(
+    app: tauri::AppHandle,
+    engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<Vec<String>, String> {
+    let (posting, _) = posting_text(&db, i64::from(id)).await?;
+    let profile = ceevee_mail::reply::profile_text(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let worker = crate::models::worker_for(&app, &engine)?;
+    ceevee_docs::practice::questions(&worker, &profile, &posting)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Coaching feedback on one practice answer. Nothing is saved.
+#[tauri::command]
+#[specta::specta]
+pub async fn practice_feedback(
+    app: tauri::AppHandle,
+    engine: tauri::State<'_, std::sync::Arc<crate::models::Engine>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    question: String,
+    answer: String,
+) -> Result<String, String> {
+    let (posting, _) = posting_text(&db, i64::from(id)).await?;
+    let profile = ceevee_mail::reply::profile_text(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let worker = crate::models::worker_for(&app, &engine)?;
+    ceevee_docs::practice::feedback(&worker, &question, &answer, &profile, &posting)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Keep an answered question and its feedback with the application for this job.
+#[tauri::command]
+#[specta::specta]
+pub async fn practice_save(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    question: String,
+    answer: String,
+    feedback: String,
+) -> Result<u32, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let application = track_posting(&db, i64::from(id)).await?;
+    let note = ceevee_docs::practice::save_note(&db, application, &question, &answer, &feedback)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(note as u32)
+}
+
+/// The practice notes kept for a job's application, oldest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn practice_notes(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<Vec<PracticeNote>, String> {
+    let all = ceevee_search::tracking::list(&db, &ceevee_search::tracking::Filter::default())
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(a) = all.iter().find(|a| a.posting_id == Some(i64::from(id))) else {
+        return Ok(Vec::new());
+    };
+    let notes = ceevee_docs::practice::notes(&db, a.id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(notes
+        .into_iter()
+        .map(|n| PracticeNote {
+            id: n.id as u32,
+            question: n.question,
+            answer: n.answer,
+            feedback: n.feedback,
+        })
+        .collect())
+}
+
+/// Remove one practice note.
+#[tauri::command]
+#[specta::specta]
+pub async fn practice_delete(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_docs::practice::delete_note(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
 /// Save a draft you reviewed as a new document. Returns the document id.
 #[tauri::command]
 #[specta::specta]

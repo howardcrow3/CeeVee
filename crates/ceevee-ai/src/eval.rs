@@ -448,6 +448,8 @@ pub fn builtin_cases(task_id: &str) -> Option<&'static str> {
         "write_cover_letter" => Some(include_str!("../evals/write_cover_letter.json")),
         "tailor_resume" => Some(include_str!("../evals/tailor_resume.json")),
         "label_email" => Some(include_str!("../evals/label_email.json")),
+        "interview_questions" => Some(include_str!("../evals/interview_questions.json")),
+        "interview_feedback" => Some(include_str!("../evals/interview_feedback.json")),
         _ => None,
     }
 }
@@ -461,6 +463,8 @@ pub fn builtin_task(task_id: &str) -> Option<&'static TaskSpec> {
         "write_cover_letter" => Some(&crate::task::WRITE_COVER_LETTER),
         "tailor_resume" => Some(&crate::task::TAILOR_RESUME),
         "label_email" => Some(&crate::task::LABEL_EMAIL),
+        "interview_questions" => Some(&crate::task::INTERVIEW_QUESTIONS),
+        "interview_feedback" => Some(&crate::task::INTERVIEW_FEEDBACK),
         _ => None,
     }
 }

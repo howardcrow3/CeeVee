@@ -204,5 +204,25 @@ pub const TAILOR_RESUME: TaskSpec = TaskSpec {
     temperature: 0.0,
 };
 
+/// Five likely interview questions for a job, grounded in the posting and the profile.
+pub const INTERVIEW_QUESTIONS: TaskSpec = TaskSpec {
+    id: "interview_questions",
+    version: 1,
+    prompt: include_str!("../prompts/interview_questions.md"),
+    schema: include_str!("../prompts/interview_questions.schema.json"),
+    max_tokens: 400,
+    temperature: 0.4,
+};
+
+/// Short coaching feedback on one practice answer. Advice only; nothing is saved by the task.
+pub const INTERVIEW_FEEDBACK: TaskSpec = TaskSpec {
+    id: "interview_feedback",
+    version: 1,
+    prompt: include_str!("../prompts/interview_feedback.md"),
+    schema: include_str!("../prompts/interview_feedback.schema.json"),
+    max_tokens: 450,
+    temperature: 0.3,
+};
+
 #[cfg(test)]
 mod tests;
