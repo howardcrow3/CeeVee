@@ -39,7 +39,7 @@ pub async fn feedback_email(db: tauri::State<'_, ceevee_db::Db>) -> Result<Optio
     Ok(accounts.into_iter().map(|a| a.address).find_map(usable))
 }
 
-/// True when this build can send feedback (it carries a feedback key).
+/// True when this build can send feedback (always: requests are signed per install).
 #[tauri::command]
 #[specta::specta]
 pub fn feedback_available() -> bool {
