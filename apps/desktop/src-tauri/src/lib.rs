@@ -116,7 +116,13 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::set_person_tier,
             commands::people_due,
             commands::snooze_person,
-            commands::log_contact
+            commands::log_contact,
+            commands::list_meetings,
+            commands::plan_meeting,
+            commands::finish_meeting,
+            commands::cancel_meeting,
+            commands::meeting_prep,
+            commands::meeting_calendar_file
         ])
         .typ::<ceevee_core::Event>()
 }

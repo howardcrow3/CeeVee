@@ -3,5 +3,6 @@
 
 pub mod import;
 pub mod linkedin;
+pub mod meetings;
 pub mod people;
 pub mod reminders;

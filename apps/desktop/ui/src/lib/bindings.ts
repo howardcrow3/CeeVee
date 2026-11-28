@@ -191,6 +191,18 @@ export const commands = {
 	snoozePerson: (id: number, days: number) => typedError<null, string>(__TAURI_INVOKE("snooze_person", { id, days })),
 	/**  Record that you were in touch with someone just now (a message, call, meeting or email). */
 	logContact: (id: number, kind: string, summary: string) => typedError<null, string>(__TAURI_INVOKE("log_contact", { id, kind, summary })),
+	/**  Meetings still to be held, soonest first. */
+	listMeetings: () => typedError<MeetingLine[], string>(__TAURI_INVOKE("list_meetings")),
+	/**  Plan a meeting with a person. `starts_at` is `YYYY-MM-DDTHH:MM:SSZ` in UTC. */
+	planMeeting: (person: number, title: string, startsAt: string, minutes: number) => typedError<null, string>(__TAURI_INVOKE("plan_meeting", { person, title, startsAt, minutes })),
+	/**  Mark a meeting held, with optional notes. It goes into the person's timeline. */
+	finishMeeting: (id: number, notes: string) => typedError<null, string>(__TAURI_INVOKE("finish_meeting", { id, notes })),
+	/**  Remove a planned meeting. */
+	cancelMeeting: (id: number) => typedError<null, string>(__TAURI_INVOKE("cancel_meeting", { id })),
+	/**  A short note to read before a meeting. */
+	meetingPrep: (id: number) => typedError<string, string>(__TAURI_INVOKE("meeting_prep", { id })),
+	/**  The text of a calendar file (.ics) for a meeting. */
+	meetingCalendarFile: (id: number) => typedError<string, string>(__TAURI_INVOKE("meeting_calendar_file", { id })),
 };
 
 /* Types */
@@ -553,6 +565,16 @@ export type MailAccountLine_Serialize = {
 	provider: string,
 	address: string,
 	last_synced_at: string | null,
+};
+
+/**  A planned meeting. */
+export type MeetingLine = {
+	id: number,
+	person: string,
+	title: string,
+	/**  ISO-8601 UTC. */
+	starts_at: string,
+	minutes: number,
 };
 
 export type MessageView = MessageView_Serialize | MessageView_Deserialize;

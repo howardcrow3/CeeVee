@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { importSummary, silenceText, tierLabel, workLine } from './people';
+import { importSummary, localToUtc, silenceText, tierLabel, workLine } from './people';
 
 describe('people', () => {
   it('labels tiers and falls back to the raw value', () => {
@@ -25,5 +25,10 @@ describe('people', () => {
     expect(silenceText(45, false)).toBe('Last in touch 45 days ago');
     expect(silenceText(95, false)).toBe('Last in touch about 3 months ago');
     expect(silenceText(400, false)).toBe('Last in touch over a year ago');
+  });
+
+  it('turns a local time into UTC without milliseconds', () => {
+    expect(localToUtc('2026-12-03T17:00')).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:00:00Z$/);
+    expect(localToUtc('nonsense')).toBe('');
   });
 });

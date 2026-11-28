@@ -1294,3 +1294,109 @@ pub async fn log_contact(
         .map(|_| ())
         .map_err(|e| e.to_string())
 }
+
+/// A planned meeting.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct MeetingLine {
+    pub id: u32,
+    pub person: String,
+    pub title: String,
+    /// ISO-8601 UTC.
+    pub starts_at: String,
+    pub minutes: u32,
+}
+
+/// Meetings still to be held, soonest first.
+#[tauri::command]
+#[specta::specta]
+pub async fn list_meetings(
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<Vec<MeetingLine>, String> {
+    let rows = ceevee_network::meetings::open(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|m| MeetingLine {
+            id: m.id as u32,
+            person: m.person,
+            title: m.title,
+            starts_at: m.starts_at,
+            minutes: m.minutes as u32,
+        })
+        .collect())
+}
+
+/// Plan a meeting with a person. `starts_at` is `YYYY-MM-DDTHH:MM:SSZ` in UTC.
+#[tauri::command]
+#[specta::specta]
+pub async fn plan_meeting(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    person: u32,
+    title: String,
+    starts_at: String,
+    minutes: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_network::meetings::schedule(
+        &db,
+        i64::from(person),
+        &title,
+        &starts_at,
+        i64::from(minutes),
+    )
+    .await
+    .map(|_| ())
+    .map_err(|e| e.to_string())
+}
+
+/// Mark a meeting held, with optional notes. It goes into the person's timeline.
+#[tauri::command]
+#[specta::specta]
+pub async fn finish_meeting(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+    notes: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_network::meetings::finish(&db, i64::from(id), &notes)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Remove a planned meeting.
+#[tauri::command]
+#[specta::specta]
+pub async fn cancel_meeting(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    ceevee_network::meetings::cancel(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// A short note to read before a meeting.
+#[tauri::command]
+#[specta::specta]
+pub async fn meeting_prep(db: tauri::State<'_, ceevee_db::Db>, id: u32) -> Result<String, String> {
+    ceevee_network::meetings::prep(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// The text of a calendar file (.ics) for a meeting.
+#[tauri::command]
+#[specta::specta]
+pub async fn meeting_calendar_file(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<String, String> {
+    ceevee_network::meetings::ics(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())
+}
