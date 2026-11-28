@@ -1,11 +1,12 @@
 <script lang="ts">
   import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
-  import { commands, type CategoryLine, type JobDraft, type JobLine, type JobTypeMatch, type KnownLine } from '$lib/bindings';
-  import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, knownText, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
+  import { commands, type CategoryLine, type JobDraft, type JobLine, type JobTypeMatch } from '$lib/bindings';
+  import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
+  import IntroPanel from '$lib/components/IntroPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
   let jobs = $state<JobLine[]>([]);
@@ -71,13 +72,6 @@
     } finally {
       preparing = null;
     }
-  }
-
-  let who = $state<{ job: number; people: KnownLine[] } | null>(null);
-  async function showPeople(id: number) {
-    const r = await commands.peopleAtJob(id);
-    if (r.status === 'ok') who = { job: id, people: r.data };
-    else applyError = r.error;
   }
 
   let draft = $state<{ job: number; data: JobDraft } | null>(null);
@@ -223,12 +217,7 @@
         </div>
         <div class="note">{open.company ?? 'Company not listed'} · {placeText(open)}</div>
         <div class="note"><span class="dot" class:on={open.state === 'saved'}></span>{statusWord(open.state)} · Match {matchText(open.score)}</div>
-        {#if open.known > 0}
-          <button class="link" onclick={() => showPeople(open.id)}>{knownText(open.known)}</button>
-          {#if who && who.job === open.id}
-            <ul class="people">{#each who.people as p (p.name)}<li>{p.name}{p.title ? `, ${p.title}` : ''}</li>{/each}</ul>
-          {/if}
-        {/if}
+        <IntroPanel job={open.id} />
         <div class="acts">
           <button class="ghost" onclick={() => openPosting(open.url)}>Open posting</button>
           <button class="ghost" disabled={drafting !== null} onclick={() => writeDraft(open.id, 'cover_letter')}>{drafting === `${open.id}:cover_letter` ? 'Writing' : 'Write cover letter'}</button>
@@ -273,5 +262,4 @@
   .draft { display: flex; flex-direction: column; gap: 12px; max-width: 760px; margin: 16px 0; }
   .draft textarea { font: inherit; background: var(--paper); color: var(--ink); border: 1px solid var(--border-control); border-radius: var(--r-sm); padding: 8px 12px; }
   .row { display: flex; gap: 8px; }
-  .people { margin: 4px 0 0; padding-left: 16px; }
 </style>

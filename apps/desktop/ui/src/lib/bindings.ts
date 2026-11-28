@@ -203,6 +203,15 @@ export const commands = {
 	meetingPrep: (id: number) => typedError<string, string>(__TAURI_INVOKE("meeting_prep", { id })),
 	/**  The text of a calendar file (.ics) for a meeting. */
 	meetingCalendarFile: (id: number) => typedError<string, string>(__TAURI_INVOKE("meeting_calendar_file", { id })),
+	/**  The people you know who could help with a job's company, best first. */
+	introPaths: (job: number) => typedError<IntroLine[], string>(__TAURI_INVOKE("intro_paths", { job })),
+	/**
+	 *  A short message to start from when asking `person` about a job's company. `ask` is
+	 *  `referral` or `chat`. Nothing is sent.
+	 */
+	introDraft: (job: number, person: number, ask: string) => typedError<string, string>(__TAURI_INVOKE("intro_draft", { job, person, ask })),
+	/**  Record that you sent someone a message about a job's company. */
+	recordIntroAsk: (job: number, person: number, message: string) => typedError<null, string>(__TAURI_INVOKE("record_intro_ask", { job, person, message })),
 };
 
 /* Types */
@@ -452,6 +461,19 @@ export type InboxLine_Serialize = {
 	application_id: number | null,
 	/**  `Company, Job title` of the linked application. */
 	application: string | null,
+};
+
+/**  Someone who could introduce you at a job's company. */
+export type IntroLine = {
+	id: number,
+	name: string,
+	title: string,
+	/**  `close`, `warm` or `weak`. */
+	tier: string,
+	/**  True when they used to work there rather than working there now. */
+	former: boolean,
+	/**  `asked`, `replied`, `referred`, or empty when you have not asked yet. */
+	asked: string,
 };
 
 /**  A cover letter or tailored resume written for one job, not saved yet. */
