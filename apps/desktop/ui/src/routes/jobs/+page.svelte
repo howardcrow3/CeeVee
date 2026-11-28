@@ -8,6 +8,7 @@
   import { jobFocus } from '$lib/chat';
   import ResumeReview from '$lib/components/ResumeReview.svelte';
   import ResumeGapPanel from '$lib/components/ResumeGapPanel.svelte';
+  import PracticePanel from '$lib/components/PracticePanel.svelte';
   import IntroPanel from '$lib/components/IntroPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -224,6 +225,7 @@
         {#if open.why}<div class="note">{open.why}</div>{/if}
         <ResumeGapPanel job={open.id} />
         <IntroPanel job={open.id} />
+        <PracticePanel job={open.id} />
         <div class="acts">
           <button class="ghost" onclick={() => openPosting(open.url)}>Open posting</button>
           <button class="ghost" disabled={drafting !== null} onclick={() => writeDraft(open.id, 'cover_letter')}>{drafting === `${open.id}:cover_letter` ? 'Writing' : 'Write cover letter'}</button>

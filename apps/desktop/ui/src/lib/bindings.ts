@@ -145,6 +145,19 @@ export const commands = {
 	 *  job tracker. Nothing already tracked is changed.
 	 */
 	importApplications: (text: string) => typedError<ApplicationsImport, string>(__TAURI_INVOKE("import_applications", { text })),
+	/**
+	 *  Five likely interview questions for a job, from the posting and your profile, using the local
+	 *  model.
+	 */
+	practiceQuestions: (id: number) => typedError<string[], string>(__TAURI_INVOKE("practice_questions", { id })),
+	/**  Coaching feedback on one practice answer. Nothing is saved. */
+	practiceFeedback: (id: number, question: string, answer: string) => typedError<string, string>(__TAURI_INVOKE("practice_feedback", { id, question, answer })),
+	/**  Keep an answered question and its feedback with the application for this job. */
+	practiceSave: (id: number, question: string, answer: string, feedback: string) => typedError<number, string>(__TAURI_INVOKE("practice_save", { id, question, answer, feedback })),
+	/**  The practice notes kept for a job's application, oldest first. */
+	practiceNotes: (id: number) => typedError<PracticeNote[], string>(__TAURI_INVOKE("practice_notes", { id })),
+	/**  Remove one practice note. */
+	practiceDelete: (id: number) => typedError<null, string>(__TAURI_INVOKE("practice_delete", { id })),
 	/**  A calendar file (.ics) for an application's interview, with a reminder an hour before. */
 	interviewCalendarFile: (id: number) => typedError<string, string>(__TAURI_INVOKE("interview_calendar_file", { id })),
 	/**  Move an application to a new status, for example after you submit it. */
@@ -730,6 +743,14 @@ export type PersonLine = {
 	tier: string,
 	/**  The date you last were in touch, or empty. */
 	last_contacted: string,
+};
+
+/**  A saved practice answer with its feedback. */
+export type PracticeNote = {
+	id: number,
+	question: string,
+	answer: string,
+	feedback: string,
 };
 
 /**  What happened when CeeVee filled in an application. */

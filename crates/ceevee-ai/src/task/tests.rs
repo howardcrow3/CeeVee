@@ -208,3 +208,24 @@ fn email_tasks_are_well_formed_and_cannot_name_an_action() {
     let bad = ok.replace("interview\"", "send_resume\"");
     assert!(parse_output::<Value>(&label, &bad).is_err());
 }
+
+#[test]
+fn interview_tasks_are_well_formed() {
+    for spec in [&INTERVIEW_QUESTIONS, &INTERVIEW_FEEDBACK] {
+        assert!(spec.grammar().unwrap().contains("root ::="), "{}", spec.id);
+    }
+    let vars = [
+        ("profile", "P"),
+        ("posting", "J"),
+        ("question", "Q"),
+        ("answer", "A"),
+    ];
+    for spec in [&INTERVIEW_QUESTIONS, &INTERVIEW_FEEDBACK] {
+        let text = render(spec.prompt, &vars).unwrap();
+        assert!(!text.contains("{{"), "{}", spec.id);
+    }
+    let q = INTERVIEW_QUESTIONS.schema_value().unwrap();
+    let five = r#"{"questions":["Why this role at Acme?","How have you used SQL?","Tell me about Tableau.","Describe a project.","Tell me about a conflict."]}"#;
+    assert!(parse_output::<Value>(&q, five).is_ok());
+    assert!(parse_output::<Value>(&q, r#"{"questions":["Why this role at Acme?"]}"#).is_err());
+}
