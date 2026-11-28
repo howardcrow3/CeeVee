@@ -129,13 +129,29 @@ pub fn export_bindings() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// Show and focus the one main window. If it was somehow destroyed, rebuild it
+/// from the config so there is still exactly one window.
 pub(crate) fn show_main_window(app: &AppHandle) {
-    if let Some(w) = app.get_webview_window("main") {
+    let window = app.get_webview_window(MAIN_WINDOW).or_else(|| {
+        let cfg = app
+            .config()
+            .app
+            .windows
+            .iter()
+            .find(|c| c.label == MAIN_WINDOW)?;
+        tauri::WebviewWindowBuilder::from_config(app, cfg)
+            .and_then(|b| b.build())
+            .map_err(|e| tracing::warn!("could not recreate main window: {e}"))
+            .ok()
+    });
+    if let Some(w) = window {
         let _ = w.show();
         let _ = w.unminimize();
         let _ = w.set_focus();
     }
 }
+
+const MAIN_WINDOW: &str = "main";
 
 /// Launch at login is on by default; the first run switches it on and records
 /// that it did, so a later "off" in Settings sticks.
@@ -221,12 +237,15 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building CeeVee");
 
-    app.run(|_app, event| {
-        if let RunEvent::ExitRequested {
+    app.run(|app, event| match event {
+        RunEvent::ExitRequested {
             code: None, api, ..
-        } = event
-        {
-            api.prevent_exit(); // keep running in the tray
+        } => api.prevent_exit(), // keep running in the tray
+        // Clicking the Dock icon while the window is hidden (macOS).
+        #[cfg(target_os = "macos")]
+        RunEvent::Reopen { .. } => show_main_window(app),
+        _ => {
+            let _ = app;
         }
     });
 }
@@ -246,4 +265,18 @@ pub fn bindings_are_current() -> Result<bool, Box<dyn std::error::Error>> {
         eprintln!("----- generated bindings.ts -----\n{generated}\n----- end -----");
     }
     Ok(current)
+}
+
+#[cfg(test)]
+mod window_tests {
+    /// The app is built around exactly one window; Dock, taskbar, tray and a
+    /// second launch all show that window, so the config must not add another.
+    #[test]
+    fn config_declares_exactly_one_main_window() {
+        let conf: serde_json::Value =
+            serde_json::from_str(include_str!("../tauri.conf.json")).unwrap();
+        let windows = conf["app"]["windows"].as_array().unwrap();
+        assert_eq!(windows.len(), 1);
+        assert_eq!(windows[0]["label"], super::MAIN_WINDOW);
+    }
 }
