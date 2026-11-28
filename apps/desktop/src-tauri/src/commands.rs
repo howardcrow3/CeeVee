@@ -381,6 +381,57 @@ pub async fn preview_resume_import(
         .collect()
 }
 
+/// Read the text out of a resume file (PDF, Word, text or Markdown) so it can be imported. Nothing
+/// is stored and nothing leaves this computer.
+#[tauri::command]
+#[specta::specta]
+pub async fn read_resume_file(name: String, bytes: Vec<u8>) -> Result<String, String> {
+    tokio::task::spawn_blocking(move || ceevee_profile::extract::text_from_file(&name, &bytes))
+        .await
+        .map_err(|_| "CeeVee could not read that file.".to_string())?
+}
+
+/// Write the profile into the base resume in Documents: a new one the first time, a new version
+/// after that. Returns the document's id.
+#[tauri::command]
+#[specta::specta]
+pub async fn save_base_resume(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+) -> Result<u32, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let resume = ceevee_profile::resume_json::profile_resume(&db)
+        .await
+        .map_err(|e| e.to_string())?;
+    let content = serde_json::to_string_pretty(&resume).map_err(|e| e.to_string())?;
+    let existing =
+        ceevee_docs::store::list(&db, Some(ceevee_docs::store::DocKind::BaseResume), None)
+            .await
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .next();
+    let id = match existing {
+        Some(d) => {
+            ceevee_docs::store::add_version(&db, d.id, &content, "profile_import", None)
+                .await
+                .map_err(|e| e.to_string())?;
+            d.id
+        }
+        None => ceevee_docs::store::create(
+            &db,
+            ceevee_docs::store::DocKind::BaseResume,
+            "Base resume",
+            None,
+            None,
+            &content,
+            "profile_import",
+        )
+        .await
+        .map_err(|e| e.to_string())?,
+    };
+    Ok(id as u32)
+}
+
 /// Save the changes you accepted. Returns how many were applied.
 #[tauri::command]
 #[specta::specta]

@@ -22,3 +22,26 @@ export function setupView(
   if (loadError || progress?.error) return 'failed';
   return model ? 'offer' : 'checking';
 }
+
+export type Intent = 'none' | 'pause' | 'cancel';
+
+/**
+ * The shared-download item for the local AI model, from what the backend reports.
+ * Returns null when there is nothing to show yet (no download started and not installed from one).
+ * `seen` is true once a download ran in this session, so an already-installed model is not listed as "done".
+ */
+export function modelItem(
+  model: { id: string; name: string; installed: boolean } | null,
+  progress: { running: boolean; downloaded_mb: number; total_mb: number; error: string } | null,
+  intent: Intent,
+  seen: boolean
+): { id: string; name: string; note: string; total: number; done: number; state: 'running' | 'paused' | 'failed' | 'canceled' | 'done'; error: string } | null {
+  if (!model || !progress) return null;
+  const base = { id: `model:${model.id}`, name: model.name, note: 'local AI', total: progress.total_mb * 1e6, done: progress.downloaded_mb * 1e6, error: '' };
+  if (progress.running) return { ...base, state: 'running' };
+  if (model.installed) return seen ? { ...base, done: base.total, state: 'done' } : null;
+  if (intent === 'pause') return { ...base, state: 'paused' };
+  if (intent === 'cancel') return { ...base, state: 'canceled' };
+  if (progress.error) return { ...base, state: 'failed', error: progress.error };
+  return seen ? { ...base, state: 'failed', error: 'The download stopped' } : null;
+}

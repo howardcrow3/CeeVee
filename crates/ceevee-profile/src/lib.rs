@@ -5,8 +5,10 @@
 //! never writes to it directly: an import is turned into [`Change`]s, the user reviews them, and
 //! only accepted changes are applied.
 
+pub mod extract;
 pub mod import;
 pub mod repo;
+pub mod resume_json;
 
 pub use import::{plan_import, ResumeDraft};
 pub use repo::{describe, Basics, Change, Entry, EntryKind, Fact};

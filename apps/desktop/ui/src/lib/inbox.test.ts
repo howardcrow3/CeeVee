@@ -8,8 +8,7 @@ import {
   labelWord,
   looksLikeAddress,
   syncSummary,
-  googleAccount
-} from './inbox';
+  googleAccount, needsSignIn } from './inbox';
 
 const line = (o: Partial<InboxLine>): InboxLine => ({
   id: 1,
@@ -78,5 +77,17 @@ describe('googleAccount', () => {
     expect(googleAccount([imap])).toBeUndefined();
     expect(googleAccount([imap, gmail])).toBe(gmail);
     expect(googleAccount([])).toBeUndefined();
+  });
+});
+
+describe('needsSignIn', () => {
+  it('spots a lost or expired sign-in', () => {
+    expect(needsSignIn('The saved sign-in for a@b.com is missing from the keychain. Connect the account again.')).toBe(true);
+    expect(needsSignIn('Google sign-in: invalid_grant. Connect Google again in Settings.')).toBe(true);
+    expect(needsSignIn('The mail server refused the sign-in. Check the address.')).toBe(true);
+  });
+  it('leaves other failures alone', () => {
+    expect(needsSignIn('Network is unreachable')).toBe(false);
+    expect(needsSignIn('')).toBe(false);
   });
 });

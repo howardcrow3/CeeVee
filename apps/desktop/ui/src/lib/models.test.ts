@@ -35,3 +35,27 @@ describe('setupView', () => {
     expect(setupView(null, null, '')).toBe('checking');
   });
 });
+
+import { modelItem } from './models';
+
+describe('modelItem', () => {
+  const m = { id: 'q', name: 'Qwen', installed: false };
+  const p = (o = {}) => ({ running: false, downloaded_mb: 0, total_mb: 0, error: '', ...o });
+  it('shows nothing before a download', () => expect(modelItem(m, p(), 'none', false)).toBeNull());
+  it('runs in bytes', () => {
+    const i = modelItem(m, p({ running: true, downloaded_mb: 100, total_mb: 400 }), 'none', true);
+    expect(i).toMatchObject({ state: 'running', done: 100e6, total: 400e6, id: 'model:q' });
+  });
+  it('pause and cancel follow the user intent', () => {
+    expect(modelItem(m, p({ downloaded_mb: 5, total_mb: 9 }), 'pause', true)?.state).toBe('paused');
+    expect(modelItem(m, p({ downloaded_mb: 5, total_mb: 9 }), 'cancel', true)?.state).toBe('canceled');
+  });
+  it('reports a failure with the reason', () => {
+    expect(modelItem(m, p({ error: 'disk full' }), 'none', true)).toMatchObject({ state: 'failed', error: 'disk full' });
+  });
+  it('lists done only after a download this session', () => {
+    const done = { ...m, installed: true };
+    expect(modelItem(done, p({ total_mb: 9, downloaded_mb: 9 }), 'none', false)).toBeNull();
+    expect(modelItem(done, p({ total_mb: 9, downloaded_mb: 9 }), 'none', true)?.state).toBe('done');
+  });
+});
