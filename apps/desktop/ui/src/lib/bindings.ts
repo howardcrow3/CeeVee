@@ -519,6 +519,10 @@ export type JobDraft = {
 	content: string,
 	/**  Things the draft says that your profile and the posting do not. Review these before saving. */
 	flagged: string[],
+	/**  For a tailored resume: the base resume's text, one line per item. Empty for a letter. */
+	before: string,
+	/**  For a tailored resume: the draft's text in the same form, to compare with `before`. */
+	after: string,
 };
 
 /**  One line of the jobs list. */

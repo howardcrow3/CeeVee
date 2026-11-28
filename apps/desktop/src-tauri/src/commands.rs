@@ -845,6 +845,10 @@ pub struct JobDraft {
     pub content: String,
     /// Things the draft says that your profile and the posting do not. Review these before saving.
     pub flagged: Vec<String>,
+    /// For a tailored resume: the base resume's text, one line per item. Empty for a letter.
+    pub before: String,
+    /// For a tailored resume: the draft's text in the same form, to compare with `before`.
+    pub after: String,
 }
 
 async fn posting_text(db: &ceevee_db::Db, id: i64) -> Result<(String, String), String> {
@@ -889,6 +893,7 @@ pub async fn draft_for_job(
 ) -> Result<JobDraft, String> {
     let (posting, _) = posting_text(&db, i64::from(id)).await?;
     let worker = crate::models::worker_for(&app, &engine)?;
+    let mut before = String::new();
     let draft = match kind.as_str() {
         "cover_letter" => {
             let profile = ceevee_mail::reply::profile_text(&db)
@@ -909,15 +914,26 @@ pub async fn draft_for_job(
                 .map_err(|e| e.to_string())?;
             let json: serde_json::Value = serde_json::from_str(&cur.content)
                 .map_err(|e| format!("Your base resume is not valid JSON: {e}"))?;
+            before = ceevee_docs::fact_guard::text_of(&json);
             ceevee_docs::draft::draft_tailored_resume(&worker, &json, &posting).await
         }
         other => return Err(format!("Cannot draft a \"{other}\".")),
     }
     .map_err(|e| e.to_string())?;
+    let after = serde_json::from_str::<serde_json::Value>(&draft.content)
+        .map(|v| ceevee_docs::fact_guard::text_of(&v))
+        .unwrap_or_default();
+    let after = if before.is_empty() {
+        String::new()
+    } else {
+        after
+    };
     Ok(JobDraft {
         kind,
         content: draft.content,
         flagged: draft.flags.iter().map(|f| f.text.clone()).collect(),
+        before,
+        after,
     })
 }
 
