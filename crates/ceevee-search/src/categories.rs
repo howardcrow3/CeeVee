@@ -24,6 +24,11 @@ pub struct Criteria {
     pub remote_ok: bool,
     /// Words or phrases that rule a posting out ("intern", "clearance").
     pub avoid: Vec<String>,
+    /// Lowest yearly pay that is acceptable, in dollars. 0 means no floor. A posting whose pay is
+    /// listed and tops out below it is ruled out; one that lists no pay is not.
+    pub min_pay: u32,
+    /// Rules out postings that do not say "remote" in the title or place.
+    pub remote_only: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -237,6 +242,35 @@ pub async fn matches(db: &Db, min_score: f64) -> Result<Vec<(i64, i64)>> {
         .collect())
 }
 
+/// For every scored posting, the state and one-sentence reason from the job type it fits best.
+pub async fn explanations(db: &Db) -> Result<std::collections::HashMap<i64, (String, String)>> {
+    let rows = sqlx::query(
+        "SELECT posting_id, score, score_reasons FROM posting_category \
+         ORDER BY posting_id, score DESC, category_id",
+    )
+    .fetch_all(db.pool())
+    .await
+    .map_err(db_err)?;
+    let mut out = std::collections::HashMap::new();
+    for r in rows {
+        let id: i64 = r.get("posting_id");
+        if out.contains_key(&id) {
+            continue;
+        }
+        let value: f64 = r.get("score");
+        let reasons: Vec<String> =
+            serde_json::from_str(&r.get::<String, _>("score_reasons")).unwrap_or_default();
+        out.insert(
+            id,
+            (
+                crate::fit::Fit::from_score(value).as_str().to_string(),
+                crate::fit::explain(value, &reasons),
+            ),
+        );
+    }
+    Ok(out)
+}
+
 /// Score a posting against every active category, store the rows in `posting_category`, and set
 /// the posting's own score to the best one. Returns each category's score.
 pub async fn score_posting(db: &Db, posting_id: i64) -> Result<Vec<(i64, Score)>> {
@@ -244,12 +278,23 @@ pub async fn score_posting(db: &Db, posting_id: i64) -> Result<Vec<(i64, Score)>
     let mut out = Vec::new();
     let mut best: Option<f64> = None;
     for c in list(db).await?.into_iter().filter(|c| c.active) {
-        let s = score(
+        let s = match crate::fit::dealbreaker(
             &c.criteria,
             &p.title,
             p.location.as_deref(),
-            p.body.as_deref(),
-        );
+            p.pay.as_deref(),
+        ) {
+            Some(why) => Score {
+                value: 10.0,
+                reasons: vec![why],
+            },
+            None => score(
+                &c.criteria,
+                &p.title,
+                p.location.as_deref(),
+                p.body.as_deref(),
+            ),
+        };
         sqlx::query(
             "INSERT INTO posting_category (posting_id, category_id, score, score_reasons, scored_with) \
              VALUES (?, ?, ?, ?, 'rules@1') \

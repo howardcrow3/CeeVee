@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byMatch, draftLabel, draftNote, knownText, matchText, placeText, statusWord } from './jobs';
+import { byMatch, draftLabel, draftNote, fitWord, knownText, matchText, placeText, statusWord } from './jobs';
 
 describe('jobs helpers', () => {
   it('words the status', () => {
@@ -129,5 +129,14 @@ describe('by job type', () => {
   it('shows everything for all job types', () => {
     expect(jobsOfType(matches, null)).toBeNull();
     expect(filterJobs(jobs, { state: 'all', text: '', only: null })).toHaveLength(2);
+  });
+});
+
+describe('fitWord', () => {
+  it('names the three states', () => {
+    expect(fitWord('strong')).toBe('Strong');
+    expect(fitWord('possible')).toBe('Possible');
+    expect(fitWord('skip')).toBe('Skip');
+    expect(fitWord('')).toBe('Not scored');
   });
 });

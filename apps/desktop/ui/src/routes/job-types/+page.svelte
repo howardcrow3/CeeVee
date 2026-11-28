@@ -15,6 +15,8 @@
   let locations = $state('');
   let avoid = $state('');
   let remote_ok = $state(true);
+  let min_pay = $state('');
+  let remote_only = $state(false);
 
   async function load() {
     try {
@@ -31,19 +33,21 @@
 
   async function add() {
     error = '';
-    const r = await commands.createCategory(newCategory({ name, titles, keywords, locations, avoid, remote_ok }));
+    const r = await commands.createCategory(newCategory({ name, titles, keywords, locations, avoid, remote_ok, min_pay, remote_only }));
     if (r.status !== 'ok') {
       error = r.error;
       return;
     }
     name = titles = keywords = locations = avoid = '';
     remote_ok = true;
+    min_pay = '';
+    remote_only = false;
     creating = false;
     await load();
   }
 
   let editing = $state<number | null>(null);
-  let form = $state(formFrom({ id: 0, name: '', titles: [], keywords: [], locations: [], remote_ok: true, avoid: [], active: true }));
+  let form = $state(formFrom({ id: 0, name: '', titles: [], keywords: [], locations: [], remote_ok: true, avoid: [], min_pay: 0, remote_only: false, active: true }));
   let removing = $state<number | null>(null);
 
   function startEdit(c: CategoryLine) {
@@ -82,7 +86,7 @@
   <span class="label">Job types</span>
   <button onclick={() => (creating = !creating)}>{creating ? 'Cancel' : 'New job type'}</button>
 </header>
-<p class="note lede">Each job type is a saved search. CeeVee scores new postings from 0 to 100 against its titles, words and places. Separate several entries with commas.</p>
+<p class="note lede">Each job type is a saved search. CeeVee sorts new postings into Strong, Possible and Skip against its titles, words and places, and says why. Only remote jobs and lowest pay are hard rules: a job that breaks one is always Skip. Separate several entries with commas.</p>
 
 {#if creating}
   <section class="form">
@@ -92,6 +96,8 @@
     <label>Places<input bind:value={locations} /></label>
     <label>Words to avoid<input bind:value={avoid} /></label>
     <div class="line"><Toggle bind:checked={remote_ok} label="Remote jobs are fine" /><span>Remote jobs are fine</span></div>
+    <div class="line"><Toggle bind:checked={remote_only} label="Only remote jobs" /><span>Only remote jobs</span></div>
+    <label>Lowest yearly pay<input placeholder="For example 120k" bind:value={min_pay} /></label>
     <div class="row"><button onclick={add} disabled={name.trim() === ''}>Create</button></div>
   </section>
 {/if}
@@ -113,6 +119,8 @@
             <label>Places<input bind:value={form.locations} /></label>
             <label>Words to avoid<input bind:value={form.avoid} /></label>
             <div class="line"><Toggle bind:checked={form.remote_ok} label="Remote jobs are fine" /><span>Remote jobs are fine</span></div>
+            <div class="line"><Toggle bind:checked={form.remote_only} label="Only remote jobs" /><span>Only remote jobs</span></div>
+            <label>Lowest yearly pay<input placeholder="For example 120k" bind:value={form.min_pay} /></label>
             <div class="row">
               <button onclick={() => save(c)} disabled={form.name.trim() === ''}>Save</button>
               <button class="ghost" onclick={() => (editing = null)}>Cancel</button>

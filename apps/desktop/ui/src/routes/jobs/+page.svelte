@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import { commands, type CategoryLine, type JobDraft, type JobLine, type JobTypeMatch } from '$lib/bindings';
-  import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, matchText, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
+  import { byMatch, filterJobs, jobsOfType, draftLabel, draftNote, fitWord, placeText, prepareSummary, selectedText, statusWord, stepId, toggleAllIds, toggleId } from '$lib/jobs';
   import { searchSummary } from '$lib/boards';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import { jobFocus } from '$lib/chat';
@@ -191,7 +191,7 @@
     <div class="plate">
       <table>
         <thead>
-          <tr><th class="pick"><input type="checkbox" aria-label="Select all shown" checked={allPicked} onchange={() => (picked = toggleAllIds(picked, shown.map((j) => j.id)))} /></th><th>Role</th><th>Company</th><th>Place</th><th>Status</th><th class="n">Match</th></tr>
+          <tr><th class="pick"><input type="checkbox" aria-label="Select all shown" checked={allPicked} onchange={() => (picked = toggleAllIds(picked, shown.map((j) => j.id)))} /></th><th>Role</th><th>Company</th><th>Place</th><th>Status</th><th>Fit</th></tr>
         </thead>
         <tbody>
           {#each shown as j (j.id)}
@@ -201,7 +201,7 @@
               <td class="t">{j.company ?? 'Company not listed'}</td>
               <td class="t">{placeText(j)}</td>
               <td><span class="dot" class:on={j.state === 'saved'}></span>{statusWord(j.state)}</td>
-              <td class="n">{matchText(j.score)}</td>
+              <td title={j.why}>{fitWord(j.fit)}</td>
             </tr>
           {:else}
             <tr><td colspan="6" class="none">No jobs match this filter.</td></tr>
@@ -216,7 +216,8 @@
           <button class="ghost" aria-label="Close detail" onclick={() => (openId = null)}>Close</button>
         </div>
         <div class="note">{open.company ?? 'Company not listed'} · {placeText(open)}</div>
-        <div class="note"><span class="dot" class:on={open.state === 'saved'}></span>{statusWord(open.state)} · Match {matchText(open.score)}</div>
+        <div class="note"><span class="dot" class:on={open.state === 'saved'}></span>{statusWord(open.state)} · {fitWord(open.fit)}</div>
+        {#if open.why}<div class="note">{open.why}</div>{/if}
         <IntroPanel job={open.id} />
         <div class="acts">
           <button class="ghost" onclick={() => openPosting(open.url)}>Open posting</button>
@@ -255,7 +256,6 @@
   .pick { width: 28px; padding-right: 0; }
   .bulk { display: flex; align-items: center; gap: 8px; padding: 4px 12px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--selected); }
   b { color: var(--ink); font-weight: 500; }
-  .n { font-variant-numeric: tabular-nums; text-align: right; }
   .detail { border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); padding: 12px; display: flex; flex-direction: column; gap: 8px; }
   .dhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
   .acts { display: flex; flex-direction: column; gap: 6px; align-items: stretch; margin-top: 4px; }

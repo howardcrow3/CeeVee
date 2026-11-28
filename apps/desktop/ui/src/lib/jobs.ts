@@ -10,6 +10,11 @@ export function matchText(score: number | null | undefined): string {
   return score == null ? 'Not scored' : `${Math.max(0, Math.min(100, Math.round(score)))}%`;
 }
 
+/** The word for how well a job fits: Strong, Possible or Skip. */
+export function fitWord(fit: string): string {
+  return fit === 'strong' ? 'Strong' : fit === 'possible' ? 'Possible' : fit === 'skip' ? 'Skip' : 'Not scored';
+}
+
 /** Best matches first; jobs with the same match keep their order (newest first). */
 export function byMatch<T extends { score?: number | null }>(jobs: T[]): T[] {
   return jobs
