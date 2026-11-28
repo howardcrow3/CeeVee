@@ -10,6 +10,7 @@
   let waiting = $state<ProposalLine[]>([]);
   let apps = $state<ApplicationLine[]>([]);
   let error = $state('');
+  // eslint-disable-next-line no-undef
   let importFiles = $state<FileList | null>(null);
   let importResult = $state('');
   let importing = $state(false);
