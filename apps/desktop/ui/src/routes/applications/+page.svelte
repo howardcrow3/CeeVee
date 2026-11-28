@@ -2,7 +2,7 @@
   import { resolve } from '$app/paths';
   import { onMount } from 'svelte';
   import { commands, type ApplicationLine, type ProposalLine } from '$lib/bindings';
-  import { applicationName, boardColumns, dropStatus, groupByStatus, statuses } from '$lib/applications';
+  import { applicationName, boardColumns, dropStatus, groupByStatus, importedText, statuses } from '$lib/applications';
   import { actionWords } from '$lib/approvals';
   import ChatLayout from '$lib/components/ChatLayout.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
@@ -10,6 +10,27 @@
   let waiting = $state<ProposalLine[]>([]);
   let apps = $state<ApplicationLine[]>([]);
   let error = $state('');
+  let importFiles = $state<FileList | null>(null);
+  let importResult = $state('');
+  let importing = $state(false);
+
+  async function importList() {
+    const file = importFiles?.[0];
+    if (!file) return;
+    importing = true;
+    importResult = '';
+    error = '';
+    try {
+      const r = await commands.importApplications(await file.text());
+      if (r.status === 'ok') importResult = importedText(r.data);
+      else error = r.error;
+      await load();
+    } catch (e) {
+      error = `Could not read the file: ${String(e)}`;
+    } finally {
+      importing = false;
+    }
+  }
 
   async function load() {
     try {
@@ -93,10 +114,15 @@
       <button class:on={view === 'board'} aria-pressed={view === 'board'} onclick={() => (view = 'board')}>Board</button>
       <button class:on={view === 'table'} aria-pressed={view === 'table'} onclick={() => (view = 'table')}>Table</button>
     </div>
+    <label class="button ghost" class:disabled={importing}>
+      Import list
+      <input type="file" accept=".csv,text/csv" bind:files={importFiles} onchange={importList} disabled={importing} hidden />
+    </label>
     <button onclick={() => (adding = !adding)}>{adding ? 'Cancel' : 'Add application'}</button>
   </div>
 </header>
 {#if error}<p role="alert">{error}</p>{/if}
+{#if importResult}<p role="status">{importResult}</p>{/if}
 {#if adding}
   <form class="add" onsubmit={(e) => { e.preventDefault(); add(); }}>
     <label>Company <input bind:value={company} required /></label>
@@ -179,6 +205,8 @@
 <style>
   .head { display: flex; align-items: center; justify-content: space-between; }
   .tools { display: flex; gap: 8px; align-items: center; }
+  .button { display: inline-block; }
+  .disabled { opacity: 0.5; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
   .seg button { height: 26px; padding: 0 10px; border: 0; border-radius: 0; background: transparent; color: var(--body); font-size: 12.5px; }
   .seg button.on { background: var(--selected); color: var(--ink); }

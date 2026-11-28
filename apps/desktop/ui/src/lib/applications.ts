@@ -52,3 +52,11 @@ export function dropStatus(columnKey: string, current: string): string | null {
   if (!(openStages as readonly string[]).includes(columnKey)) return null;
   return columnKey === current ? null : columnKey;
 }
+
+/** What to tell the person after importing a list of applications. */
+export function importedText(r: { added: number; existing: number; skipped: number }): string {
+  const parts = [`Added ${r.added} ${r.added === 1 ? 'application' : 'applications'}`];
+  if (r.existing > 0) parts.push(`${r.existing} already tracked`);
+  if (r.skipped > 0) parts.push(`${r.skipped} skipped for a missing company or job title`);
+  return parts.join(', ') + '.';
+}

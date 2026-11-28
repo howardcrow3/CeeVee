@@ -1125,6 +1125,37 @@ pub async fn add_application(
     Ok(())
 }
 
+/// What an application import did.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct ApplicationsImport {
+    pub added: u32,
+    /// Already tracked, so left alone.
+    pub existing: u32,
+    /// Rows with no company or no job title.
+    pub skipped: u32,
+}
+
+/// Bring in a list of applications from a CSV: Simplify's tracker export, a spreadsheet or any
+/// job tracker. Nothing already tracked is changed.
+#[tauri::command]
+#[specta::specta]
+pub async fn import_applications(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    text: String,
+) -> Result<ApplicationsImport, String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let rows = ceevee_search::tracker_import::parse_csv(&text).map_err(|e| e.to_string())?;
+    let s = ceevee_search::tracker_import::import(&db, &rows, &ceevee_search::sources::now_iso())
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(ApplicationsImport {
+        added: s.added as u32,
+        existing: s.existing as u32,
+        skipped: s.skipped as u32,
+    })
+}
+
 /// Move an application to a new status, for example after you submit it.
 #[tauri::command]
 #[specta::specta]

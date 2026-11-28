@@ -140,6 +140,11 @@ export const commands = {
 	listApplications: () => typedError<ApplicationLine_Serialize[], string>(__TAURI_INVOKE("list_applications")),
 	/**  Add an application by hand: a job you applied to outside CeeVee. */
 	addApplication: (company: string, title: string, status: string) => typedError<null, string>(__TAURI_INVOKE("add_application", { company, title, status })),
+	/**
+	 *  Bring in a list of applications from a CSV: Simplify's tracker export, a spreadsheet or any
+	 *  job tracker. Nothing already tracked is changed.
+	 */
+	importApplications: (text: string) => typedError<ApplicationsImport, string>(__TAURI_INVOKE("import_applications", { text })),
 	/**  Move an application to a new status, for example after you submit it. */
 	setApplicationStatus: (id: number, status: string) => typedError<null, string>(__TAURI_INVOKE("set_application_status", { id, status })),
 	/**  How many proposals are waiting for you to approve. */
@@ -266,6 +271,15 @@ export type ApplicationLine_Serialize = {
 	url: string | null,
 	status: string,
 	applied_at: string | null,
+};
+
+/**  What an application import did. */
+export type ApplicationsImport = {
+	added: number,
+	/**  Already tracked, so left alone. */
+	existing: number,
+	/**  Rows with no company or no job title. */
+	skipped: number,
 };
 
 export type BoardLine = {
