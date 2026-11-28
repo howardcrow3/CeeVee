@@ -122,7 +122,10 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::finish_meeting,
             commands::cancel_meeting,
             commands::meeting_prep,
-            commands::meeting_calendar_file
+            commands::meeting_calendar_file,
+            commands::intro_paths,
+            commands::intro_draft,
+            commands::record_intro_ask
         ])
         .typ::<ceevee_core::Event>()
 }

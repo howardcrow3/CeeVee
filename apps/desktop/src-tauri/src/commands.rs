@@ -1400,3 +1400,101 @@ pub async fn meeting_calendar_file(
         .await
         .map_err(|e| e.to_string())
 }
+
+/// Someone who could introduce you at a job's company.
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct IntroLine {
+    pub id: u32,
+    pub name: String,
+    pub title: String,
+    /// `close`, `warm` or `weak`.
+    pub tier: String,
+    /// True when they used to work there rather than working there now.
+    pub former: bool,
+    /// `asked`, `replied`, `referred`, or empty when you have not asked yet.
+    pub asked: String,
+}
+
+async fn company_of_job(db: &ceevee_db::Db, job: u32) -> Result<(i64, String, String), String> {
+    let p = ceevee_search::postings::get(db, i64::from(job))
+        .await
+        .map_err(|e| e.to_string())?;
+    let Some(company_id) = p.company_id else {
+        return Err("This job does not list a company.".to_string());
+    };
+    let name: String = ceevee_search::companies::get(db, company_id)
+        .await
+        .map(|c| c.name)
+        .map_err(|e| e.to_string())?;
+    Ok((company_id, name, p.title))
+}
+
+/// The people you know who could help with a job's company, best first.
+#[tauri::command]
+#[specta::specta]
+pub async fn intro_paths(
+    db: tauri::State<'_, ceevee_db::Db>,
+    job: u32,
+) -> Result<Vec<IntroLine>, String> {
+    let Ok((company_id, _, _)) = company_of_job(&db, job).await else {
+        return Ok(Vec::new());
+    };
+    let rows = ceevee_network::intros::paths(&db, company_id)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(rows
+        .into_iter()
+        .map(|p| IntroLine {
+            id: p.contact_id as u32,
+            name: p.name,
+            title: p.title.unwrap_or_default(),
+            tier: p.tier.as_str().to_string(),
+            former: p.link == ceevee_network::intros::Link::Worked,
+            asked: p.asked.unwrap_or_default(),
+        })
+        .collect())
+}
+
+/// A short message to start from when asking `person` about a job's company. `ask` is
+/// `referral` or `chat`. Nothing is sent.
+#[tauri::command]
+#[specta::specta]
+pub async fn intro_draft(
+    db: tauri::State<'_, ceevee_db::Db>,
+    job: u32,
+    person: u32,
+    ask: String,
+) -> Result<String, String> {
+    let (_, company, title) = company_of_job(&db, job).await?;
+    let ask = if ask == "chat" {
+        ceevee_network::intros::Ask::Chat
+    } else {
+        ceevee_network::intros::Ask::Referral
+    };
+    let title = if ask == ceevee_network::intros::Ask::Referral {
+        title
+    } else {
+        String::new()
+    };
+    ceevee_network::intros::draft(&db, i64::from(person), &company, &title, ask, &now_iso())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// Record that you sent someone a message about a job's company.
+#[tauri::command]
+#[specta::specta]
+pub async fn record_intro_ask(
+    lic: tauri::State<'_, std::sync::Arc<crate::license_cmd::Service>>,
+    db: tauri::State<'_, ceevee_db::Db>,
+    job: u32,
+    person: u32,
+    message: String,
+) -> Result<(), String> {
+    crate::license_cmd::require_write(&lic).await?;
+    let (company_id, _, _) = company_of_job(&db, job).await?;
+    ceevee_network::intros::record_ask(&db, i64::from(person), company_id, &message, &now_iso())
+        .await
+        .map(|_| ())
+        .map_err(|e| e.to_string())
+}

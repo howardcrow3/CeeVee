@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Jobs: "Find an introduction" lists the people you know at a job's company (including people who used to work there), writes a short message to start from, and remembers who you asked.
 - A Downloads button at the top right shows a count while something is downloading. It opens a panel with filter, Ongoing and Completed, and progress, size, speed, time left, pause and cancel for each. The local AI download uses it, and failed downloads can be retried.
 - The account button is now always at the bottom left of the window, however small. Opening it shows the license status (the trial countdown moved here from the top of the page), every settings section, feedback and the theme.
 
