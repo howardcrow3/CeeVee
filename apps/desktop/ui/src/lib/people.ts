@@ -45,3 +45,21 @@ export function whenText(iso: string): string {
   if (Number.isNaN(d.getTime())) return iso;
   return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
+
+/** "2 of 3 this week", or a nudge when the goal is met. */
+export function goalText(done: number, goal: number): string {
+  if (done >= goal) return `Goal met: ${done} ${done === 1 ? 'person' : 'people'} this week.`;
+  return `${done} of ${goal} this week`;
+}
+
+/** The introduction results in one line, or empty when nothing was asked. */
+export function funnelText(asked: number, replied: number, referred: number): string {
+  if (asked === 0) return '';
+  return `Last 30 days: asked ${asked}, ${replied} answered, ${referred} referred.`;
+}
+
+/** "Moved from Acme to Globex as Engineer", whichever parts are known. */
+export function moveText(from: string, to: string, title: string): string {
+  const where = to ? ` to ${to}${title ? ` as ${title}` : ''}` : '';
+  return `Moved${from ? ` from ${from}` : ''}${where}`;
+}

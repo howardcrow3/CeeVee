@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { commands, type DueLine, type PersonLine } from '$lib/bindings';
   import { importSummary, silenceText, tiers, workLine } from '$lib/people';
+  import ProgressPanel from '$lib/components/ProgressPanel.svelte';
   import MeetingsPanel from '$lib/components/MeetingsPanel.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
 
@@ -121,6 +122,8 @@
     {#if due.length > 5}<p class="muted">And {due.length - 5} more.</p>{/if}
   </section>
 {/if}
+
+<ProgressPanel refresh={due.length} />
 
 <MeetingsPanel {people} />
 
