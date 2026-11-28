@@ -111,3 +111,33 @@ fn iso_dates() {
     assert_eq!(iso_from_secs(1_784_000_000), "2026-07-14T03:33:20Z");
     assert_eq!(iso_from_secs(951_782_400), "2000-02-29T00:00:00Z");
 }
+
+async fn serve_once(body: Vec<u8>) -> String {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/feed", listener.local_addr().unwrap());
+    tokio::spawn(async move {
+        let (mut s, _) = listener.accept().await.unwrap();
+        let mut buf = [0u8; 1024];
+        let _ = s.read(&mut buf).await;
+        let head = format!(
+            "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+            body.len()
+        );
+        let _ = s.write_all(head.as_bytes()).await;
+        let _ = s.write_all(&body).await;
+    });
+    url
+}
+
+#[tokio::test]
+async fn a_feed_within_the_limit_is_read_and_one_over_it_is_refused() {
+    let url = serve_once(b"{\"jobs\":[]}".to_vec()).await;
+    let res = reqwest::get(&url).await.unwrap();
+    assert_eq!(read_capped(res, 1024).await.unwrap(), "{\"jobs\":[]}");
+
+    let url = serve_once(vec![b'x'; 2048]).await;
+    let res = reqwest::get(&url).await.unwrap();
+    let err = read_capped(res, 1024).await.unwrap_err();
+    assert!(err.contains("too large"), "{err}");
+}

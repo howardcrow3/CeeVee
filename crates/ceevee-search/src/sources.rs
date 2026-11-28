@@ -137,6 +137,27 @@ pub trait Fetcher: Send + Sync {
     fn get(&self, url: String) -> FetchFuture;
 }
 
+/// The most a job feed may send. Real feeds are well under this; a runaway one is cut off.
+const MAX_BODY: usize = 20 * 1024 * 1024;
+
+/// The response text, failing instead of buffering more than `max` bytes.
+async fn read_capped(
+    mut res: reqwest::Response,
+    max: usize,
+) -> std::result::Result<String, String> {
+    if res.content_length().is_some_and(|n| n > max as u64) {
+        return Err("the answer is too large".into());
+    }
+    let mut body: Vec<u8> = Vec::new();
+    while let Some(chunk) = res.chunk().await.map_err(|e| e.to_string())? {
+        if body.len() + chunk.len() > max {
+            return Err("the answer is too large".into());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(String::from_utf8_lossy(&body).into_owned())
+}
+
 /// Fetches over HTTPS with a short timeout.
 pub struct HttpFetcher {
     client: reqwest::Client,
@@ -165,7 +186,7 @@ impl Fetcher for HttpFetcher {
             if !res.status().is_success() {
                 return Err(Error::Other(format!("{url} answered {}", res.status())));
             }
-            res.text()
+            read_capped(res, MAX_BODY)
                 .await
                 .map_err(|e| Error::Other(format!("reading {url}: {e}")))
         })
