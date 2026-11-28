@@ -368,6 +368,19 @@ pub async fn add_manual(
     status: Status,
     now: &str,
 ) -> Result<Application> {
+    add_manual_with(db, company, title, status, now, None, None).await
+}
+
+/// [`add_manual`] with the posting's real address and place when they are known.
+pub async fn add_manual_with(
+    db: &Db,
+    company: &str,
+    title: &str,
+    status: Status,
+    now: &str,
+    url: Option<&str>,
+    location: Option<&str>,
+) -> Result<Application> {
     let (company, title) = (company.trim(), title.trim());
     if company.is_empty() || title.is_empty() {
         return Err(Error::Invalid(
@@ -376,10 +389,16 @@ pub async fn add_manual(
     }
     let posting = crate::postings::NewPosting {
         source: "manual".into(),
-        url: format!("manual:{now}:{company}:{title}"),
+        url: match url.map(str::trim).filter(|u| !u.is_empty()) {
+            Some(u) => u.to_string(),
+            None => format!("manual:{now}:{company}:{title}"),
+        },
         company: company.into(),
         title: title.into(),
-        location: None,
+        location: location
+            .map(str::trim)
+            .filter(|l| !l.is_empty())
+            .map(str::to_string),
         level: None,
         pay: None,
         body: None,

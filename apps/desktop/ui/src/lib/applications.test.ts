@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applicationName, boardColumns, groupByStatus, statusLabel } from './applications';
+import { applicationName, boardColumns, groupByStatus, importedText, statusLabel } from './applications';
 
 const a = (id: number, status: string, company: string | null = 'Acme') => ({
   id,
@@ -56,4 +56,11 @@ describe('dropStatus', () => {
   it('moves a card to the column it lands on', () => expect(dropStatus('interview', 'sent')).toBe('interview'));
   it('ignores a drop on its own column', () => expect(dropStatus('sent', 'sent')).toBeNull());
   it('does not drop on Closed, where the reason matters', () => expect(dropStatus('closed', 'sent')).toBeNull());
+});
+
+describe('importedText', () => {
+  it('says what an import did', () => {
+    expect(importedText({ added: 1, existing: 0, skipped: 0 })).toBe('Added 1 application.');
+    expect(importedText({ added: 12, existing: 3, skipped: 2 })).toBe('Added 12 applications, 3 already tracked, 2 skipped for a missing company or job title.');
+  });
 });

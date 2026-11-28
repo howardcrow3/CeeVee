@@ -98,6 +98,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::prepare_application,
             commands::list_applications,
             commands::add_application,
+            commands::import_applications,
             commands::set_application_status,
             commands::pending_approval_count,
             mail_cmd::imap_preset,
