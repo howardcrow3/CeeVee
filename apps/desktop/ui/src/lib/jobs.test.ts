@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { byMatch, draftLabel, draftNote, fitWord, knownText, matchText, placeText, statusWord } from './jobs';
+import { byMatch, draftLabel, draftNote, fitWord, gapGroups, knownText, matchText, placeText, statusWord } from './jobs';
 
 describe('jobs helpers', () => {
   it('words the status', () => {
@@ -138,5 +138,16 @@ describe('fitWord', () => {
     expect(fitWord('possible')).toBe('Possible');
     expect(fitWord('skip')).toBe('Skip');
     expect(fitWord('')).toBe('Not scored');
+  });
+});
+
+describe('gapGroups', () => {
+  it('splits the resume check by what the person can do', () => {
+    const g = gapGroups([
+      { term: 'sql', status: 'profile' },
+      { term: 'kubernetes', status: 'missing' },
+      { term: 'python', status: 'shown' }
+    ]);
+    expect(g).toEqual({ add: ['sql'], ask: ['kubernetes'], covered: ['python'] });
   });
 });

@@ -130,6 +130,8 @@ export const commands = {
 	 *  you call `save_job_draft`.
 	 */
 	draftForJob: (id: number, kind: string, instructions: string) => typedError<JobDraft, string>(__TAURI_INVOKE("draft_for_job", { id, kind, instructions })),
+	/**  Which skills a posting asks for, and whether the resume that would be sent already shows each. */
+	resumeGap: (id: number) => typedError<ResumeGap, string>(__TAURI_INVOKE("resume_gap", { id })),
 	/**  Save a draft you reviewed as a new document. Returns the document id. */
 	saveJobDraft: (id: number, kind: string, content: string) => typedError<number, string>(__TAURI_INVOKE("save_job_draft", { id, kind, content })),
 	/**  Open a posting in your browser and fill in its application form. You review and submit. */
@@ -449,6 +451,13 @@ export type FoundJob_Serialize = {
 	summary: string | null,
 };
 
+/**  One skill or tool a posting asks for. */
+export type GapTerm = {
+	term: string,
+	/**  `shown` (on the resume), `profile` (in your profile, not on the resume) or `missing`. */
+	status: string,
+};
+
 /**  Server settings CeeVee knows for an address, so the form can fill them in. */
 export type ImapPreset = {
 	host: string,
@@ -758,6 +767,13 @@ export type ReplyResult = {
 	document_id: number,
 	/**  Names, numbers or acronyms in the draft that the profile, posting and email do not contain. */
 	unverified: string[],
+};
+
+/**  What the resume check found for one job. */
+export type ResumeGap = {
+	/**  The resume that was checked; empty when there is none yet. */
+	resume: string,
+	terms: GapTerm[],
 };
 
 export type SearchResult = {

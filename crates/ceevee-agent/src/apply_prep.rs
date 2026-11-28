@@ -95,6 +95,30 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
     })
 }
 
+/// The resume that would be attached for this posting, as its title and content: the one saved
+/// for the posting's application, else the newest tailored resume, else the newest base resume.
+pub async fn resume_for(db: &Db, posting_id: i64) -> Result<Option<(String, String)>> {
+    let application =
+        ceevee_search::tracking::list(db, &ceevee_search::tracking::Filter::default())
+            .await?
+            .into_iter()
+            .find(|a| a.posting_id == Some(posting_id))
+            .map(|a| a.id);
+    let mut candidates = Vec::new();
+    if let Some(app) = application {
+        candidates.push((DocKind::TailoredResume, Some(app)));
+    }
+    candidates.push((DocKind::TailoredResume, None));
+    candidates.push((DocKind::BaseResume, None));
+    for (kind, app) in candidates {
+        if let Some(doc) = store::list(db, Some(kind), app).await?.into_iter().next() {
+            let cur = store::current(db, doc.id).await?;
+            return Ok(Some((doc.title, cur.content)));
+        }
+    }
+    Ok(None)
+}
+
 /// The answers the person's profile gives: name, contact details, links and the answers they
 /// saved on purpose for sensitive questions.
 async fn answers_from_profile(db: &Db) -> Result<Answers> {
