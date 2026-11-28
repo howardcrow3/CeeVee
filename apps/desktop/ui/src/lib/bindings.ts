@@ -28,7 +28,7 @@ export const commands = {
 	 *  fixed addresses can be opened.
 	 */
 	openInfoPage: (which: string) => typedError<null, string>(__TAURI_INVOKE("open_info_page", { which })),
-	/**  True when this build can send feedback (it carries a feedback key). */
+	/**  True when this build can send feedback (always: requests are signed per install). */
 	feedbackAvailable: () => __TAURI_INVOKE<boolean>("feedback_available"),
 	sendFeedback: (input: FeedbackInput_Deserialize) => typedError<null, string>(__TAURI_INVOKE("send_feedback", { input })),
 	/**
