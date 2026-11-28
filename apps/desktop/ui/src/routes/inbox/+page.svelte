@@ -17,8 +17,7 @@
     foundTitle,
     labelWord,
     syncSummary,
-    type InboxFilter
-  } from '$lib/inbox';
+    type InboxFilter, needsSignIn } from '$lib/inbox';
 
   let lines = $state<InboxLine[]>([]);
   let found = $state<FoundJob[]>([]);
@@ -34,6 +33,7 @@
   let error = $state('');
 
   const shown = $derived(filterInbox(lines, filter));
+  const signInNeeded = $derived(needsSignIn(error));
 
   async function load() {
     try {
@@ -154,7 +154,13 @@
 </script>
 
 <span class="label">Inbox</span>
-{#if error}<p role="alert">{error}</p>{/if}
+{#if signInNeeded}
+  <section class="signin" aria-label="Sign in again">
+    <p><b>CeeVee needs you to sign in again to check your mail.</b> Your saved sign-in has expired or was removed.</p>
+    <GoogleSignIn onchange={() => { error = ''; load().then(check); }} />
+    <p class="note">Using another kind of account? <button class="link" onclick={() => openSettings('accounts')}>Reconnect it in Settings</button>.</p>
+  </section>
+{:else if error}<p role="alert">{error}</p>{/if}
 {#if message}<p role="status">{message}</p>{/if}
 
 {#if loaded && accounts === 0}
@@ -196,7 +202,7 @@
       <button class="ghost" aria-pressed={filter === 'reply'} onclick={() => (filter = 'reply')}>Needs a reply</button>
       <button class="ghost" aria-pressed={filter === 'unread'} onclick={() => (filter = 'unread')}>Unread</button>
     </div>
-    <button class="ghost" onclick={check} disabled={busy}>{busy ? 'Checking' : 'Check mail now'}</button>
+    {#if !signInNeeded}<button class="ghost" onclick={check} disabled={busy}>{busy ? 'Checking' : 'Check mail now'}</button>{/if}
   </div>
   {#if lines.length === 0}
     <EmptyState title="No employer replies yet">
@@ -261,6 +267,8 @@
 {/if}
 
 <style>
+  .signin { display: flex; flex-direction: column; gap: 8px; border: 1px solid var(--line); border-radius: var(--r-md); background: var(--surface); padding: 12px 16px; margin-bottom: 12px; }
+  .signin p { margin: 0; }
   .found { border: 1px solid var(--line); background: var(--surface); padding: 24px; margin-bottom: 24px; display: flex; flex-direction: column; gap: 16px; }
   .found h2 { margin: 0; }
   .found ul { list-style: none; padding: 0; margin: 0; }

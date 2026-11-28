@@ -84,3 +84,8 @@ export function foundTitle(j: { company: string; title: string }): string {
   const noRole = j.title === '' || j.title.startsWith('Role not stated');
   return noRole ? j.company : `${j.title} at ${j.company}`;
 }
+
+/** True when a mail check failed because the saved sign-in is missing, expired or refused. */
+export function needsSignIn(error: string): boolean {
+  return /connect (google|the account) again|missing from the keychain|refused the sign-in|invalid_grant|token (has been )?(expired|revoked)|not signed in/i.test(error);
+}
