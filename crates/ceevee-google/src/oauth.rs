@@ -18,6 +18,9 @@ const REVOKE_URL: &str = "https://oauth2.googleapis.com/revoke";
 /// How long to wait for the person to finish signing in (they can also cancel).
 pub const SIGN_IN_WAIT: std::time::Duration = std::time::Duration::from_secs(300);
 
+/// How long one connection to the sign-in port may stay silent.
+const READ_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
+
 fn err(e: impl std::fmt::Display) -> Error {
     Error::Other(format!("Google sign-in: {e}"))
 }
@@ -347,7 +350,11 @@ async fn wait_for_code(
     loop {
         let (mut sock, _) = listener.accept().await.map_err(err)?;
         let mut buf = vec![0u8; 8192];
-        let n = sock.read(&mut buf).await.map_err(err)?;
+        // A connection that says nothing must not block the real redirect behind it.
+        let n = match tokio::time::timeout(READ_WAIT, sock.read(&mut buf)).await {
+            Ok(Ok(n)) => n,
+            _ => continue,
+        };
         let head = String::from_utf8_lossy(&buf[..n]).into_owned();
         let target = head.split_whitespace().nth(1).unwrap_or("");
         let query = target.split_once('?').map_or("", |(_, q)| q);
