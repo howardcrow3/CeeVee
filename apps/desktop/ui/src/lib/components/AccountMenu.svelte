@@ -2,13 +2,25 @@
   import { openSettings } from '$lib/settings-ui.svelte';
   import { onMount } from 'svelte';
   import { applyTheme, loadTheme, saveTheme, type ThemeChoice } from '$lib/theme';
+  import { settingsTabs } from '$lib/settings';
+  import { menuLicense, pillText } from '$lib/license';
+  import { licenseUi, openBuyPage, refreshLicense } from '$lib/license-ui.svelte';
 
   let { canFeedback = false, onfeedback }: { canFeedback?: boolean; onfeedback?: () => void } = $props();
   let open = $state(false);
   let theme = $state<ThemeChoice>('system');
   let root: HTMLDivElement | undefined = $state();
 
+  let pill = $derived(pillText(licenseUi.view));
+  let lic = $derived(menuLicense(licenseUi.view));
+
+  function toggle() {
+    open = !open;
+    if (open) void refreshLicense();
+  }
+
   onMount(() => {
+    void refreshLicense();
     theme = loadTheme();
     applyTheme(theme, document.documentElement);
   });
@@ -36,8 +48,19 @@
 <div class="account" bind:this={root}>
   {#if open}
     <div class="menu" role="menu" aria-label="Account">
-      <button role="menuitem" onclick={() => { open = false; openSettings(); }}>Settings</button>
+      {#if lic}
+        <div class="lic {lic.tone}" role="group" aria-label="License">
+          <span class="lt">{lic.title}</span>
+          <span class="ld">{lic.detail}</span>
+          {#if lic.buy}<button class="buy" onclick={() => { open = false; void openBuyPage(); }}>Buy CeeVee</button>{/if}
+        </div>
+      {/if}
+      <div class="grp">Settings</div>
+      {#each settingsTabs as t (t.id)}
+        <button role="menuitem" onclick={() => { open = false; openSettings(t.id); }}>{t.label}</button>
+      {/each}
       {#if canFeedback}
+        <div class="sep"></div>
         <button role="menuitem" onclick={() => { open = false; onfeedback?.(); }}>Send feedback</button>
       {/if}
       <div class="sep"></div>
@@ -51,24 +74,39 @@
       </div>
     </div>
   {/if}
-  <button class="trigger" aria-haspopup="menu" aria-expanded={open} onclick={() => (open = !open)}>
+  <button class="trigger" aria-haspopup="menu" aria-expanded={open} onclick={toggle}>
     <span class="avatar" aria-hidden="true">C</span>
-    <span class="who">Account</span>
+    <span class="who">
+      <span class="n">Account</span>
+      {#if pill}<span class="s {pill.tone}">{pill.text}</span>{/if}
+    </span>
   </button>
 </div>
 
 <style>
-  .account { position: relative; margin-top: auto; }
-  .trigger { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 6px; border: 0; background: transparent;
+  .account { position: relative; }
+  .trigger { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 38px; padding: 4px 6px; border: 0; background: transparent;
     color: var(--ink); font-size: 13px; font-weight: 500; border-radius: var(--r-sm); text-align: left; }
   .trigger:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
   .avatar { width: 22px; height: 22px; border-radius: var(--r-pill); background: var(--accent); color: var(--on-accent);
     display: grid; place-items: center; font-size: 11px; font-weight: 600; }
-  .menu { position: absolute; bottom: 40px; left: 0; width: 220px; background: var(--surface); border: 1px solid var(--line);
+  .who { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+  .n { font-size: 13px; font-weight: 500; }
+  .s { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .s.soon { color: var(--ink); font-weight: 500; }
+  .s.ended { color: var(--danger); font-weight: 500; }
+  .menu { position: absolute; bottom: calc(100% + 6px); left: 0; right: 0; min-width: 220px; max-height: calc(100vh - 80px); overflow-y: auto; background: var(--surface); border: 1px solid var(--line);
     border-radius: var(--r-md); box-shadow: var(--shadow-pop); padding: 4px; display: flex; flex-direction: column; gap: 1px; z-index: 20; }
   .menu > button { display: block; height: 28px; line-height: 28px; padding: 0 8px; border: 0; background: transparent;
     color: var(--body); text-decoration: none; font-size: 13px; text-align: left; border-radius: var(--r-sm); }
   .menu > button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+  .lic { margin: 2px 0 4px; padding: 8px 10px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: var(--r-sm); display: flex; flex-direction: column; gap: 6px; }
+  .lic.ended { border-color: var(--danger); background: transparent; }
+  .lt { font-size: 12px; font-weight: 600; color: var(--ink); }
+  .lic.ended .lt { color: var(--danger); }
+  .ld { font-size: 11.5px; color: var(--body); }
+  .grp { font-size: 11px; color: var(--muted); font-weight: 500; padding: 6px 8px 2px; }
+  .buy { border: 0; border-radius: var(--r-sm); font-size: 12px; padding: 0 8px; height: 26px; line-height: 26px; text-align: center; background: var(--ink); color: var(--on-ink); font-weight: 500; }
   .sep { height: 1px; background: var(--line); margin: 4px 0; }
   .row { display: flex; align-items: center; justify-content: space-between; padding: 2px 4px 2px 8px; }
   .lbl { font-size: 12px; color: var(--muted); }
