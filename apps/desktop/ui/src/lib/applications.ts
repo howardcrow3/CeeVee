@@ -60,3 +60,15 @@ export function importedText(r: { added: number; existing: number; skipped: numb
   if (r.skipped > 0) parts.push(`${r.skipped} skipped for a missing company or job title`);
   return parts.join(', ') + '.';
 }
+
+/** "Interview Thu 3 Dec, 17:00" from the invitation's `YYYY-MM-DDTHH:MM`, or nothing when none is known. */
+export function interviewText(at: string): string {
+  const m = at.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+  if (!m) return '';
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12) return '';
+  const dow = days[new Date(Date.UTC(y, mo - 1, d)).getUTCDay()];
+  return `Interview ${dow} ${d} ${months[mo - 1]}, ${m[4]}:${m[5]}`;
+}

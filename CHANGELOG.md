@@ -4,6 +4,7 @@ User-facing notes, one section per release. The release workflow copies the sect
 
 ## Unreleased
 
+- Interview invitations in your email now show on the application card with the time, and an Add to calendar button gives you a calendar file with a reminder an hour before and a short list of what to prepare.
 - Switching from another tracker is one step: on Applications, press Import list and pick a CSV from Simplify, a spreadsheet or any job tracker. CeeVee finds the Company, Job Title, Status and link columns by name, understands plain status words like "Interviewing" or "Not selected", and never changes or doubles up what is already tracked.
 - Tailored resumes open in a one-screen review: what changed from your base resume is highlighted, anything the fact check could not find in your profile or the posting is marked amber, and Accept all saves it. You can still edit the text first.
 - Resume check: on a job, see which skills and tools the posting asks for and whether the resume that would be sent already shows them. Skills only in your profile are offered first, and skills you do not have are shown as questions, never added for you.

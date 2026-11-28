@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applicationName, boardColumns, groupByStatus, importedText, statusLabel } from './applications';
+import { applicationName, boardColumns, groupByStatus, importedText, interviewText, statusLabel } from './applications';
 
 const a = (id: number, status: string, company: string | null = 'Acme') => ({
   id,
@@ -7,7 +7,8 @@ const a = (id: number, status: string, company: string | null = 'Acme') => ({
   company,
   url: null,
   status,
-  applied_at: null
+  applied_at: null,
+  interview_at: ''
 });
 
 describe('applications', () => {
@@ -62,5 +63,13 @@ describe('importedText', () => {
   it('says what an import did', () => {
     expect(importedText({ added: 1, existing: 0, skipped: 0 })).toBe('Added 1 application.');
     expect(importedText({ added: 12, existing: 3, skipped: 2 })).toBe('Added 12 applications, 3 already tracked, 2 skipped for a missing company or job title.');
+  });
+});
+
+describe('interviewText', () => {
+  it('reads the invitation time in words', () => {
+    expect(interviewText('2026-12-03T17:00')).toBe('Interview Thu 3 Dec, 17:00');
+    expect(interviewText('')).toBe('');
+    expect(interviewText('soon')).toBe('');
   });
 });

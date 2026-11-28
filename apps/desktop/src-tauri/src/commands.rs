@@ -1056,6 +1056,8 @@ pub struct ApplicationLine {
     pub url: Option<String>,
     pub status: String,
     pub applied_at: Option<String>,
+    /// When the interview is, as `YYYY-MM-DDTHH:MM` from the invitation; empty when none is known.
+    pub interview_at: String,
 }
 
 async fn application_line(
@@ -1082,6 +1084,7 @@ async fn application_line(
         url: posting.map(|p| p.url),
         status: a.status.as_str().to_string(),
         applied_at: a.applied_at,
+        interview_at: a.next_interview_at.unwrap_or_default(),
     }
 }
 
@@ -1133,6 +1136,31 @@ pub struct ApplicationsImport {
     pub existing: u32,
     /// Rows with no company or no job title.
     pub skipped: u32,
+}
+
+/// A calendar file (.ics) for an application's interview, with a reminder an hour before.
+#[tauri::command]
+#[specta::specta]
+pub async fn interview_calendar_file(
+    db: tauri::State<'_, ceevee_db::Db>,
+    id: u32,
+) -> Result<String, String> {
+    let app = ceevee_search::tracking::get(&db, i64::from(id))
+        .await
+        .map_err(|e| e.to_string())?;
+    let at = app
+        .next_interview_at
+        .clone()
+        .ok_or("No interview time is known for this application.")?;
+    let line = application_line(&db, app).await;
+    ceevee_search::interview::calendar_file(
+        i64::from(id),
+        &line.title,
+        line.company.as_deref(),
+        &at,
+        line.url.as_deref(),
+    )
+    .ok_or_else(|| "The interview time could not be read.".to_string())
 }
 
 /// Bring in a list of applications from a CSV: Simplify's tracker export, a spreadsheet or any
