@@ -34,26 +34,7 @@ pub struct Inputs {
 /// newest tailored resume, then the newest base resume, are used, and no cover letter is attached.
 pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> Result<Inputs> {
     let posting = postings::get(db, posting_id).await?;
-    let basics = repo::get_basics(db).await?;
-    if basics.full_name.trim().is_empty() {
-        return Err(Error::Invalid(
-            "Add your name to your profile before applying.".into(),
-        ));
-    }
-    let links = repo::get_links(db).await?;
-    let facts: Vec<(String, String)> = repo::list_facts(db)
-        .await?
-        .into_iter()
-        .map(|f| (f.question_key, f.answer))
-        .collect();
-    let mut answers = Answers::from_parts(
-        &basics.full_name,
-        basics.email.as_deref(),
-        basics.phone.as_deref(),
-        basics.location.as_deref(),
-        &links,
-        &facts,
-    );
+    let mut answers = answers_from_profile(db).await?;
 
     let application =
         ceevee_search::tracking::list(db, &ceevee_search::tracking::Filter::default())
@@ -112,6 +93,50 @@ pub async fn gather(db: &Db, posting_id: i64, pdf_dir: &Path, paper: Paper) -> R
         resume_version_id,
         cover_letter_version_id,
     })
+}
+
+/// The answers the person's profile gives: name, contact details, links and the answers they
+/// saved on purpose for sensitive questions.
+async fn answers_from_profile(db: &Db) -> Result<Answers> {
+    let basics = repo::get_basics(db).await?;
+    if basics.full_name.trim().is_empty() {
+        return Err(Error::Invalid(
+            "Add your name to your profile before applying.".into(),
+        ));
+    }
+    let links = repo::get_links(db).await?;
+    let facts: Vec<(String, String)> = repo::list_facts(db)
+        .await?
+        .into_iter()
+        .map(|f| (f.question_key, f.answer))
+        .collect();
+    Ok(Answers::from_parts(
+        &basics.full_name,
+        basics.email.as_deref(),
+        basics.phone.as_deref(),
+        basics.location.as_deref(),
+        &links,
+        &facts,
+    ))
+}
+
+/// Answers for a page that is not one of the saved jobs, such as one the person found in their
+/// own browser: the profile and the newest base resume as a PDF in `pdf_dir`.
+pub async fn gather_general(db: &Db, pdf_dir: &Path, paper: Paper) -> Result<Answers> {
+    let mut answers = answers_from_profile(db).await?;
+    if let Some(doc) = store::list(db, Some(DocKind::BaseResume), None)
+        .await?
+        .into_iter()
+        .next()
+    {
+        let cur = store::current(db, doc.id).await?;
+        let bytes = pdf_for(doc.kind, &cur.content, paper)?;
+        std::fs::create_dir_all(pdf_dir)?;
+        let path = pdf_dir.join(format!("{}.pdf", file_stem(&doc.title)));
+        std::fs::write(&path, bytes)?;
+        answers.resume_pdf = Some(path.display().to_string());
+    }
+    Ok(answers)
 }
 
 #[cfg(test)]

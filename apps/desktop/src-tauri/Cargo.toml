@@ -26,6 +26,7 @@ ceevee-google = { path = "../../../crates/ceevee-google" }
 ceevee-ai.workspace = true
 ceevee-profile.workspace = true
 ceevee-apply = { path = "../../../crates/ceevee-apply", features = ["chrome"] }
+ceevee-bridge = { path = "../../../crates/ceevee-bridge" }
 ceevee-license = { path = "../../../crates/ceevee-license" }
 ceevee-analytics = { path = "../../../crates/ceevee-analytics" }
 chrono.workspace = true

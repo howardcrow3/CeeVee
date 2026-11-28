@@ -3,6 +3,7 @@ export const settingsTabs = [
   { id: 'general', label: 'General' },
   { id: 'search', label: 'Job search' },
   { id: 'accounts', label: 'Accounts' },
+  { id: 'browser', label: 'Browser' },
   { id: 'privacy', label: 'Privacy and about' }
 ] as const;
 
